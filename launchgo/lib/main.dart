@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:launchgo/screens/login_screen.dart';
-import 'package:launchgo/screens/main_screen.dart';
+import 'package:launchgo/router/app_router.dart';
+import 'package:launchgo/services/auth_service.dart';
+import 'package:provider/provider.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => AuthService()..initialize(),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -11,17 +17,15 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    final authService = Provider.of<AuthService>(context);
+    
+    return MaterialApp.router(
       title: 'LaunchGo',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
-      home: const LoginScreen(),
-      routes: {
-        '/login': (context) => const LoginScreen(),
-        '/main': (context) => const MainScreen(),
-      },
+      routerConfig: AppRouter.router(authService),
     );
   }
 }

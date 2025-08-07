@@ -37,6 +37,12 @@ dependencies:
 
   ## 3rd Party Login
   google_sign_in: ^7.1.1
+  
+  ## Navigation
+  go_router: ^14.0.0
+  
+  ## State Management
+  provider: ^6.1.0
 
 dev_dependencies:
   flutter_test:
