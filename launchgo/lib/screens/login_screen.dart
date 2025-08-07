@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -38,7 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _isInitialized = true;
       });
     } catch (error) {
-      print('Google Sign-In initialization error: $error');
+      debugPrint('Google Sign-In initialization error: $error');
       setState(() {
         _isInitialized = true;
       });
@@ -59,6 +60,9 @@ class _LoginScreenState extends State<LoginScreen> {
             content: Text('Welcome, ${user.displayName ?? user.email}!'),
             backgroundColor: Colors.green,
           ),
+        );
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const MainScreen()),
         );
       }
     });
@@ -118,7 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       await GoogleSignIn.instance.disconnect();
     } catch (error) {
-      print('Sign out error: $error');
+      debugPrint('Sign out error: $error');
     }
   }
 

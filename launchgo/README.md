@@ -1,16 +1,91 @@
-# launchgo
+# LaunchGo Flutter Project
 
-A new Flutter project.
+## Project Overview
+This is a Flutter application for LaunchGo.
 
-## Getting Started
+## Development Setup
 
-This project is a starting point for a Flutter application.
+### Prerequisites
+- Flutter SDK
+- Dart SDK
+- iOS development: Xcode and CocoaPods
+- Android development: Android Studio
 
-A few resources to get you started if this is your first Flutter project:
+### Getting Started
+```bash
+# Get dependencies
+flutter pub get
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+# iOS specific
+cd ios && pod install && cd ..
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+# Run the app
+flutter run
+```
+
+## Common Commands
+
+### Development
+```bash
+# Run the app
+flutter run
+
+# Run on specific device
+flutter run -d <device_id>
+
+# List available devices
+flutter devices
+```
+
+### Testing
+```bash
+# Run all tests
+flutter test
+
+# Run tests with coverage
+flutter test --coverage
+```
+
+### Build
+```bash
+# Build for iOS
+flutter build ios
+
+# Build for Android
+flutter build apk
+flutter build appbundle
+```
+
+### Code Quality
+```bash
+# Analyze code
+flutter analyze
+
+# Format code
+dart format .
+```
+
+### Dependencies
+```bash
+# Get packages
+flutter pub get
+
+# Upgrade packages
+flutter pub upgrade
+
+# Update dependencies
+flutter pub outdated
+```
+
+## Project Structure
+- `lib/` - Main application code
+- `test/` - Unit and widget tests
+- `ios/` - iOS specific code and configuration
+- `android/` - Android specific code and configuration
+- `assets/` - Images, fonts, and other assets
+- `pubspec.yaml` - Project configuration and dependencies
+
+## Important Notes
+- Always run `flutter pub get` after modifying pubspec.yaml
+- For iOS, run `cd ios && pod install` after adding new dependencies
+- Check `flutter doctor` if you encounter build issues
