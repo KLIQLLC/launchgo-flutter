@@ -4,6 +4,7 @@ import 'package:launchgo/screens/dashboard_screen.dart';
 import 'package:launchgo/screens/login_screen.dart';
 import 'package:launchgo/screens/messages_screen.dart';
 import 'package:launchgo/screens/schedule_screen.dart';
+import 'package:launchgo/screens/settings_screen.dart';
 import 'package:launchgo/screens/study_guide_screen.dart';
 import 'package:launchgo/services/auth_service.dart';
 
@@ -35,6 +36,11 @@ class AppRouter {
           path: '/login',
           name: 'login',
           builder: (context, state) => const LoginScreen(),
+        ),
+        GoRoute(
+          path: '/settings',
+          name: 'settings',
+          builder: (context, state) => const SettingsScreen(),
         ),
         ShellRoute(
           navigatorKey: _shellNavigatorKey,
