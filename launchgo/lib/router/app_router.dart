@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:launchgo/screens/dashboard_screen.dart';
+import 'package:launchgo/screens/courses_screen.dart';
+import 'package:launchgo/screens/documents_screen.dart';
 import 'package:launchgo/screens/login_screen.dart';
-import 'package:launchgo/screens/messages_screen.dart';
+import 'package:launchgo/screens/recaps_screen.dart';
 import 'package:launchgo/screens/schedule_screen.dart';
 import 'package:launchgo/screens/settings_screen.dart';
-import 'package:launchgo/screens/study_guide_screen.dart';
 import 'package:launchgo/services/auth_service.dart';
 
 class AppRouter {
@@ -26,7 +26,7 @@ class AppRouter {
         }
 
         if (isAuthenticated && isLoginRoute) {
-          return '/dashboard';
+          return '/schedule';
         }
 
         return null;
@@ -48,13 +48,6 @@ class AppRouter {
               ScaffoldWithBottomNavBar(child: child),
           routes: [
             GoRoute(
-              path: '/dashboard',
-              name: 'dashboard',
-              pageBuilder: (context, state) => const NoTransitionPage(
-                child: DashboardScreen(),
-              ),
-            ),
-            GoRoute(
               path: '/schedule',
               name: 'schedule',
               pageBuilder: (context, state) => const NoTransitionPage(
@@ -62,17 +55,24 @@ class AppRouter {
               ),
             ),
             GoRoute(
-              path: '/study-guide',
-              name: 'study-guide',
+              path: '/courses',
+              name: 'courses',
               pageBuilder: (context, state) => const NoTransitionPage(
-                child: StudyGuideScreen(),
+                child: CoursesScreen(),
               ),
             ),
             GoRoute(
-              path: '/messages',
-              name: 'messages',
+              path: '/documents',
+              name: 'documents',
               pageBuilder: (context, state) => const NoTransitionPage(
-                child: MessagesScreen(),
+                child: DocumentsScreen(),
+              ),
+            ),
+            GoRoute(
+              path: '/recaps',
+              name: 'recaps',
+              pageBuilder: (context, state) => const NoTransitionPage(
+                child: RecapsScreen(),
               ),
             ),
           ],
@@ -102,20 +102,20 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
         unselectedItemColor: Colors.grey,
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard),
-            label: 'Dashboard',
-          ),
-          BottomNavigationBarItem(
             icon: Icon(Icons.calendar_month),
             label: 'Schedule',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.menu_book),
-            label: 'Study Guide',
+            icon: Icon(Icons.school),
+            label: 'Courses',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.message),
-            label: 'Messages',
+            icon: Icon(Icons.folder),
+            label: 'Documents',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.summarize),
+            label: 'Recaps',
           ),
         ],
       ),
@@ -125,13 +125,13 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
   static int _calculateSelectedIndex(BuildContext context) {
     final String location = GoRouterState.of(context).matchedLocation;
     switch (location) {
-      case '/dashboard':
-        return 0;
       case '/schedule':
+        return 0;
+      case '/courses':
         return 1;
-      case '/study-guide':
+      case '/documents':
         return 2;
-      case '/messages':
+      case '/recaps':
         return 3;
       default:
         return 0;
@@ -141,16 +141,16 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
   void _onItemTapped(int index, BuildContext context) {
     switch (index) {
       case 0:
-        context.go('/dashboard');
-        break;
-      case 1:
         context.go('/schedule');
         break;
+      case 1:
+        context.go('/courses');
+        break;
       case 2:
-        context.go('/study-guide');
+        context.go('/documents');
         break;
       case 3:
-        context.go('/messages');
+        context.go('/recaps');
         break;
     }
   }

@@ -34,7 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
             backgroundColor: Colors.green,
           ),
         );
-        context.go('/dashboard');
+        context.go('/schedule');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
