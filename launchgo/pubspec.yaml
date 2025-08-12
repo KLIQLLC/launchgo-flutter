@@ -43,6 +43,9 @@ dependencies:
   
   ## State Management
   provider: ^6.1.0
+  
+  ## HTTP Client
+  http: ^1.2.0
 
 dev_dependencies:
   flutter_test:

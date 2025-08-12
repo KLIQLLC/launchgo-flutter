@@ -14,16 +14,6 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleSignIn() async {
     final authService = context.read<AuthService>();
     
-    if (!authService.isInitialized) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Google Sign-In is not initialized yet'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
     final success = await authService.signIn();
     
     if (mounted) {
@@ -93,7 +83,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         width: double.infinity,
                         height: 54,
                         child: ElevatedButton(
-                          onPressed: (!authService.isInitialized || authService.isSigningIn) ? null : _handleSignIn,
+                          onPressed: authService.isSigningIn ? null : _handleSignIn,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.white,
                             foregroundColor: Colors.black87,
@@ -127,9 +117,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                       },
                                     ),
                                     const SizedBox(width: 12),
-                                    Text(
-                                      authService.isInitialized ? 'Sign in with Google' : 'Initializing...',
-                                      style: const TextStyle(fontSize: 16),
+                                    const Text(
+                                      'Sign in with Google',
+                                      style: TextStyle(fontSize: 16),
                                     ),
                                   ],
                                 ),
