@@ -32,6 +32,7 @@ flutter run
 
 # Run on specific device
 flutter run -d <device_id>
+flutter run --release -d 00008120-001A75002628C01E
 
 # List available devices
 flutter devices

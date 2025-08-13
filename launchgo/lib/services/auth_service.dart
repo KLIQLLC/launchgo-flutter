@@ -4,8 +4,6 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthService extends ChangeNotifier {
   GoogleSignInAccount? _currentUser;
-  String? _idToken;
-  String? _serverAuthCode;
   String? _sessionToken; // Backend session token
   bool _isInitialized = false;
   bool _isSigningIn = false;
@@ -13,8 +11,6 @@ class AuthService extends ChangeNotifier {
   Completer<void>? _signInCompleter;
 
   GoogleSignInAccount? get currentUser => _currentUser;
-  String? get idToken => _idToken;
-  String? get serverAuthCode => _serverAuthCode;
   String? get sessionToken => _sessionToken;
   bool get isInitialized => _isInitialized;
   bool get isSigningIn => _isSigningIn;
@@ -46,9 +42,9 @@ class AuthService extends ChangeNotifier {
       // Listen for authentication events
       signIn.authenticationEvents.listen(_handleAuthenticationEvent);
       
-      // Don't attempt automatic sign-in on app launch to prevent Safari redirects
-      // Users should explicitly tap the sign-in button
-      // await signIn.attemptLightweightAuthentication();
+      // Attempt silent sign-in (won't show any UI)
+      // This only works if user previously signed in and hasn't revoked access
+      await _attemptSilentSignIn();
       
       _isInitialized = true;
       notifyListeners();
@@ -56,6 +52,33 @@ class AuthService extends ChangeNotifier {
       debugPrint('Google Sign-In initialization error: $error');
       _isInitialized = true;
       notifyListeners();
+    }
+  }
+  
+  Future<void> _attemptSilentSignIn() async {
+    try {
+      debugPrint('Attempting silent sign-in...');
+      
+      // This tries to sign in without showing any UI
+      // Only works if user has previously authorized the app
+      await GoogleSignIn.instance.attemptLightweightAuthentication();
+      
+      // If successful, _handleAuthenticationEvent will be called
+      // and _currentUser will be set
+      if (_currentUser != null) {
+        debugPrint('Silent sign-in successful: ${_currentUser!.email}');
+        
+        // For silent sign-in, we DON'T request serverAuthCode
+        // because that would show a prompt. The backend should:
+        // 1. Use stored refresh token from previous serverAuthCode exchange
+        // 2. Or work with ID tokens only for returning users
+      } else {
+        debugPrint('Silent sign-in failed - user needs to sign in manually');
+      }
+    } catch (error) {
+      debugPrint('Silent sign-in error: $error');
+      // Silent sign-in failure is expected for new users
+      // Don't throw error, just continue without signed-in user
     }
   }
 
@@ -75,9 +98,6 @@ class AuthService extends ChangeNotifier {
       // Complete sign in if we're waiting for it
       _signInCompleter?.complete();
       _signInCompleter = null;
-    } else {
-      _idToken = null;
-      _serverAuthCode = null;
     }
     
     notifyListeners();
@@ -101,11 +121,11 @@ class AuthService extends ChangeNotifier {
         );
         
         if (serverAuth != null && serverAuth.serverAuthCode != null) {
-          _serverAuthCode = serverAuth.serverAuthCode;
-          debugPrint('Server Auth Code received: $_serverAuthCode');
+          final serverAuthCode = serverAuth.serverAuthCode!;
+          debugPrint('Server Auth Code received: $serverAuthCode');
           
           // Send to backend immediately as it's only valid once
-          await _sendServerAuthCodeToBackend(_serverAuthCode!);
+          await _sendServerAuthCodeToBackend(serverAuthCode);
           _serverAuthCodeSent = true; // Mark as sent
         } else {
           debugPrint('No server authorization returned from authorizeServer');
@@ -151,11 +171,14 @@ class AuthService extends ChangeNotifier {
         if (_currentUser != null) {
           debugPrint('Sign in successful for: ${_currentUser!.email}');
           
+          // TODO: Uncomment when backend integration is ready
           // After successful sign-in, check if we need serverAuthCode
-          // Only request it if we haven't sent it to backend yet
-          if (!_serverAuthCodeSent) {
-            await requestServerAuthorization();
-          }
+          // Only request it for first-time users or when backend needs it
+          // if (!_serverAuthCodeSent && shouldRequestServerAuth()) {
+          //   // Show a dialog explaining why we need additional permission
+          //   // Then request server authorization
+          //   await requestServerAuthorization();
+          // }
           
           return true;
         } else {
@@ -177,6 +200,19 @@ class AuthService extends ChangeNotifier {
       notifyListeners();
     }
   }
+  
+  // TODO: Uncomment and use when backend integration is ready
+  // Determine if we should request server authorization
+  // bool shouldRequestServerAuth() {
+  //   // You can customize this logic based on your needs:
+  //   // - Check if user is new (first sign-in)
+  //   // - Check if backend has valid refresh token
+  //   // - Check if user wants to use Google Calendar features
+  //   
+  //   // For now, only request for first-time setup
+  //   // The backend should store refresh tokens and reuse them
+  //   return !_serverAuthCodeSent && _sessionToken == null;
+  // }
   
   // Separate method to request server authorization
   // This will show another prompt but only when explicitly needed
@@ -206,11 +242,8 @@ class AuthService extends ChangeNotifier {
       // Use disconnect() only when you want to completely revoke authorization
       await GoogleSignIn.instance.signOut();
       _currentUser = null;
-      _idToken = null;
-      _serverAuthCode = null;
       _sessionToken = null; // Clear session token
       // Don't reset _serverAuthCodeSent on regular sign out
-      // Only reset it on disconnect when user wants to re-authorize
       notifyListeners();
     } catch (error) {
       debugPrint('Sign out error: $error');
@@ -222,8 +255,6 @@ class AuthService extends ChangeNotifier {
       // This completely revokes the app's authorization
       await GoogleSignIn.instance.disconnect();
       _currentUser = null;
-      _idToken = null;
-      _serverAuthCode = null;
       _sessionToken = null; // Clear session token
       _serverAuthCodeSent = false; // Reset on disconnect for fresh authorization
       notifyListeners();
