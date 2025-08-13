@@ -6,13 +6,16 @@ class AuthService extends ChangeNotifier {
   GoogleSignInAccount? _currentUser;
   String? _idToken;
   String? _serverAuthCode;
+  String? _sessionToken; // Backend session token
   bool _isInitialized = false;
   bool _isSigningIn = false;
+  bool _serverAuthCodeSent = false; // Track if we've sent the code to backend
   Completer<void>? _signInCompleter;
 
   GoogleSignInAccount? get currentUser => _currentUser;
   String? get idToken => _idToken;
   String? get serverAuthCode => _serverAuthCode;
+  String? get sessionToken => _sessionToken;
   bool get isInitialized => _isInitialized;
   bool get isSigningIn => _isSigningIn;
   bool get isAuthenticated => _currentUser != null;
@@ -21,6 +24,7 @@ class AuthService extends ChangeNotifier {
     'email',
     'profile',
     'openid',
+    'https://www.googleapis.com/auth/calendar',
   ];
   
   // Web Client ID from Google Cloud Console
@@ -42,8 +46,9 @@ class AuthService extends ChangeNotifier {
       // Listen for authentication events
       signIn.authenticationEvents.listen(_handleAuthenticationEvent);
       
-      // Try to sign in silently
-      await signIn.attemptLightweightAuthentication();
+      // Don't attempt automatic sign-in on app launch to prevent Safari redirects
+      // Users should explicitly tap the sign-in button
+      // await signIn.attemptLightweightAuthentication();
       
       _isInitialized = true;
       notifyListeners();
@@ -63,11 +68,6 @@ class AuthService extends ChangeNotifier {
     _currentUser = user;
     
     if (user != null) {
-      // Try to get serverAuthCode if available
-      // Note: In v7.1.1, serverAuthCode might not be directly accessible
-      // You may need to handle this differently or upgrade the package
-      await _retrieveTokens();
-      
       // Log user info for debugging
       debugPrint('User signed in: ${user.email}');
       debugPrint('User ID: ${user.id}');
@@ -83,27 +83,47 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
   }
   
-  Future<void> _retrieveTokens() async {
+  Future<void> _getServerAuthCode(GoogleSignInAccount user) async {
     try {
-      final GoogleSignInAuthentication auth = await _currentUser!.authentication;
-      _idToken = auth.idToken;
+      // Skip if we've already sent the serverAuthCode to backend
+      if (_serverAuthCodeSent) {
+        debugPrint('Server auth code already sent to backend, skipping');
+        return;
+      }
       
-      debugPrint('ID Token retrieved: ${_idToken != null}');
-      
-      // For backend authentication, you can use the ID token
-      // The backend can verify this token with Google's public keys
-      if (_idToken != null) {
-        // Send ID token to backend for verification
-        await _sendIdTokenToBackend(_idToken!);
+      // Check if authorizationClient is available
+      if (user.authorizationClient != null) {
+        // Use authorizationClient to get serverAuthCode
+         // Authorization with scopes - this shows the Google login form
+        final GoogleSignInServerAuthorization? serverAuth = 
+            await user.authorizationClient!.authorizeServer(
+          _scopes, // Pass the scopes as required parameter
+        );
+        
+        if (serverAuth != null && serverAuth.serverAuthCode != null) {
+          _serverAuthCode = serverAuth.serverAuthCode;
+          debugPrint('Server Auth Code received: $_serverAuthCode');
+          
+          // Send to backend immediately as it's only valid once
+          await _sendServerAuthCodeToBackend(_serverAuthCode!);
+          _serverAuthCodeSent = true; // Mark as sent
+        } else {
+          debugPrint('No server authorization returned from authorizeServer');
+        }
+      } else {
+        debugPrint('Authorization client not available for this user');
       }
     } catch (error) {
-      debugPrint('Error retrieving tokens: $error');
-      _idToken = null;
+      debugPrint('Error getting server auth code: $error');
     }
   }
 
   Future<bool> signIn() async {
-    if (!_isInitialized || _isSigningIn) return false;
+    // Guard against multiple sign-in attempts and redundant sign-ins
+    if (!_isInitialized || _isSigningIn || _currentUser != null) {
+      debugPrint('Sign in blocked: initialized=$_isInitialized, signingIn=$_isSigningIn, currentUser=${_currentUser != null}');
+      return _currentUser != null;
+    }
 
     _isSigningIn = true;
     notifyListeners();
@@ -113,7 +133,7 @@ class AuthService extends ChangeNotifier {
         // Create a completer to wait for the authentication event
         _signInCompleter = Completer<void>();
         
-        // Authenticate with scopes
+        // Authenticate with scopes - this shows the Google login form
         await GoogleSignIn.instance.authenticate(
           scopeHint: _scopes,
         );
@@ -130,6 +150,13 @@ class AuthService extends ChangeNotifier {
         // Check if authentication was successful
         if (_currentUser != null) {
           debugPrint('Sign in successful for: ${_currentUser!.email}');
+          
+          // After successful sign-in, check if we need serverAuthCode
+          // Only request it if we haven't sent it to backend yet
+          if (!_serverAuthCodeSent) {
+            await requestServerAuthorization();
+          }
+          
           return true;
         } else {
           debugPrint('Sign in completed but no user available');
@@ -150,67 +177,98 @@ class AuthService extends ChangeNotifier {
       notifyListeners();
     }
   }
+  
+  // Separate method to request server authorization
+  // This will show another prompt but only when explicitly needed
+  Future<bool> requestServerAuthorization() async {
+    if (_currentUser == null) {
+      debugPrint('No user signed in, cannot request server authorization');
+      return false;
+    }
+    
+    if (_serverAuthCodeSent) {
+      debugPrint('Server auth code already sent, skipping');
+      return true;
+    }
+    
+    try {
+      await _getServerAuthCode(_currentUser!);
+      return _serverAuthCodeSent;
+    } catch (e) {
+      debugPrint('Failed to get server authorization: $e');
+      return false;
+    }
+  }
 
   Future<void> signOut() async {
     try {
-      await GoogleSignIn.instance.disconnect();
+      // Use signOut() to maintain app authorization (prevents re-authorization prompts)
+      // Use disconnect() only when you want to completely revoke authorization
+      await GoogleSignIn.instance.signOut();
       _currentUser = null;
       _idToken = null;
       _serverAuthCode = null;
+      _sessionToken = null; // Clear session token
+      // Don't reset _serverAuthCodeSent on regular sign out
+      // Only reset it on disconnect when user wants to re-authorize
       notifyListeners();
     } catch (error) {
       debugPrint('Sign out error: $error');
     }
   }
   
-  Future<String?> getValidIdToken() async {
-    if (_currentUser == null) return null;
-    
+  Future<void> disconnect() async {
     try {
-      final GoogleSignInAuthentication auth = await _currentUser!.authentication;
-      _idToken = auth.idToken;
-      return _idToken;
+      // This completely revokes the app's authorization
+      await GoogleSignIn.instance.disconnect();
+      _currentUser = null;
+      _idToken = null;
+      _serverAuthCode = null;
+      _sessionToken = null; // Clear session token
+      _serverAuthCodeSent = false; // Reset on disconnect for fresh authorization
+      notifyListeners();
     } catch (error) {
-      debugPrint('Error getting valid token: $error');
-      return null;
+      debugPrint('Disconnect error: $error');
     }
   }
   
-  Future<void> _sendIdTokenToBackend(String idToken) async {
-    // TODO: Implement this method to send ID token to your backend
+  Future<void> _sendServerAuthCodeToBackend(String serverAuthCode) async {
+    // TODO: Implement this method to send serverAuthCode to your backend
+    // IMPORTANT: This code can only be used ONCE to exchange for tokens
+    
     // The backend should:
-    // 1. Verify the ID token with Google's public keys
-    // 2. Extract user information from the token
-    // 3. Create or update user session
-    // 4. Return session token to the app
+    // 1. Exchange serverAuthCode for refresh + access tokens using Google OAuth2 API
+    // 2. Store the refresh token securely (encrypted in database)
+    // 3. Use refresh token to get new access tokens when needed
+    // 4. Return a session token to the app
     
     // Example:
     // try {
     //   final response = await http.post(
-    //     Uri.parse('https://your-backend.com/auth/google/verify'),
+    //     Uri.parse('https://your-backend.com/auth/google/exchange'),
     //     headers: {'Content-Type': 'application/json'},
-    //     body: json.encode({'idToken': idToken}),
+    //     body: json.encode({
+    //       'serverAuthCode': serverAuthCode,
+    //       'platform': Platform.isIOS ? 'ios' : 'android',
+    //     }),
     //   );
     //   
     //   if (response.statusCode == 200) {
     //     final data = json.decode(response.body);
-    //     // Store session token, user info, etc.
-    //     debugPrint('Authentication successful');
+    //     // Store session token for API authentication
+    //     _sessionToken = data['sessionToken'];
+    //     notifyListeners();
+    //     debugPrint('Server auth code exchanged successfully');
+    //   } else {
+    //     throw Exception('Failed to exchange auth code: ${response.statusCode}');
     //   }
     // } catch (e) {
-    //   debugPrint('Failed to authenticate with backend: $e');
+    //   debugPrint('Failed to send server auth code: $e');
+    //   _serverAuthCodeSent = false; // Reset on failure to allow retry
+    //   rethrow;
     // }
     
-    debugPrint('TODO: Send ID token to backend for verification');
-  }
-  
-  Future<void> _sendServerAuthCodeToBackend(String serverAuthCode) async {
-    // NOTE: serverAuthCode might not be available in v7.1.1
-    // If you need serverAuthCode functionality, consider:
-    // 1. Upgrading to a newer version of google_sign_in
-    // 2. Using Firebase Auth which handles this automatically
-    // 3. Using the ID token for backend authentication instead
-    
-    debugPrint('Server auth code functionality not available in v7.1.1');
+    debugPrint('TODO: Send serverAuthCode to backend for exchange');
+    debugPrint('Note: This code can only be used ONCE. Backend must exchange it immediately.');
   }
 }

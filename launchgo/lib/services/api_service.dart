@@ -13,11 +13,12 @@ class ApiService {
   }) : _authService = authService;
 
   Future<Map<String, String>> _getHeaders() async {
-    final idToken = await _authService.getValidIdToken();
+    // The backend manages its own sessions after exchanging serverAuthCode
+    final sessionToken = _authService.sessionToken;
     
     return {
       'Content-Type': 'application/json',
-      if (idToken != null) 'Authorization': 'Bearer $idToken',
+      if (sessionToken != null) 'Authorization': 'Bearer $sessionToken',
     };
   }
 
@@ -57,23 +58,6 @@ class ApiService {
     } catch (e) {
       debugPrint('API POST error: $e');
       rethrow;
-    }
-  }
-
-  // Example: Verify token with your backend
-  Future<bool> verifyToken() async {
-    try {
-      final idToken = await _authService.getValidIdToken();
-      if (idToken == null) return false;
-
-      final response = await post('/auth/verify', {
-        'idToken': idToken,
-      });
-
-      return response['verified'] == true;
-    } catch (e) {
-      debugPrint('Token verification failed: $e');
-      return false;
     }
   }
 
