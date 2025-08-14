@@ -25,7 +25,7 @@ class AuthService extends ChangeNotifier {
   
   // Web Client ID from Google Cloud Console
   // This enables serverAuthCode for backend authentication
-  static const String _serverClientId = '1068871581972-77k12p5vsv02qf93a23b2bl7eolnlo23.apps.googleusercontent.com';
+  static const String _serverClientId = '481027521494-t3b8vqe1o9nfrejek745uji6q1ed6dgi.apps.googleusercontent.com';
 
   Future<void> initialize() async {
     if (_isInitialized) return;
@@ -174,11 +174,11 @@ class AuthService extends ChangeNotifier {
           // TODO: Uncomment when backend integration is ready
           // After successful sign-in, check if we need serverAuthCode
           // Only request it for first-time users or when backend needs it
-          // if (!_serverAuthCodeSent && shouldRequestServerAuth()) {
-          //   // Show a dialog explaining why we need additional permission
-          //   // Then request server authorization
-          //   await requestServerAuthorization();
-          // }
+          if (shouldRequestServerAuth()) {
+            // Show a dialog explaining why we need additional permission
+            // Then request server authorization
+            await requestServerAuthorization();
+          }
           
           return true;
         } else {
@@ -203,16 +203,17 @@ class AuthService extends ChangeNotifier {
   
   // TODO: Uncomment and use when backend integration is ready
   // Determine if we should request server authorization
-  // bool shouldRequestServerAuth() {
-  //   // You can customize this logic based on your needs:
-  //   // - Check if user is new (first sign-in)
-  //   // - Check if backend has valid refresh token
-  //   // - Check if user wants to use Google Calendar features
-  //   
-  //   // For now, only request for first-time setup
-  //   // The backend should store refresh tokens and reuse them
-  //   return !_serverAuthCodeSent && _sessionToken == null;
-  // }
+  bool shouldRequestServerAuth() {
+    // You can customize this logic based on your needs:
+    // - Check if user is new (first sign-in)
+    // - Check if backend has valid refresh token
+    // - Check if user wants to use Google Calendar features
+    
+    // For now, only request for first-time setup
+    // The backend should store refresh tokens and reuse them
+    // return !_serverAuthCodeSent && _sessionToken == null;
+    return !_serverAuthCodeSent;
+  }
   
   // Separate method to request server authorization
   // This will show another prompt but only when explicitly needed

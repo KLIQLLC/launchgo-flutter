@@ -51,6 +51,19 @@ This guide explains how to properly configure Google Sign-In to get `serverAuthC
 static const String _serverClientId = '123456789-abc.apps.googleusercontent.com'; // Your Web Client ID
 ```
 
+### 2.1 Update Info.plist
+
+In your new GoogleService-Info.plist, you’ll see something like:
+
+<key>CLIENT_ID</key>
+<string>1234567890-abcxyz.apps.googleusercontent.com</string>
+<key>REVERSED_CLIENT_ID</key>
+<string>com.googleusercontent.apps.1234567890-abcxyz</string>
+
+
+CLIENT_ID → Goes into GIDClientID in Info.plist.
+REVERSED_CLIENT_ID → Goes into CFBundleURLTypes in Info.plist.
+
 ### 3. Backend Implementation
 
 Your backend needs to exchange the serverAuthCode for tokens:
