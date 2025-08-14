@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:launchgo/features/documents/presentation/pages/documents_page.dart';
 import 'package:launchgo/screens/courses_screen.dart';
-import 'package:launchgo/screens/documents_screen.dart';
 import 'package:launchgo/screens/login_screen.dart';
 import 'package:launchgo/screens/recaps_screen.dart';
 import 'package:launchgo/screens/schedule_screen.dart';
@@ -65,7 +65,7 @@ class AppRouter {
               path: '/documents',
               name: 'documents',
               pageBuilder: (context, state) => const NoTransitionPage(
-                child: DocumentsScreen(),
+                child: DocumentsPage(),
               ),
             ),
             GoRoute(
@@ -98,8 +98,13 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
         type: BottomNavigationBarType.fixed,
         currentIndex: _calculateSelectedIndex(context),
         onTap: (index) => _onItemTapped(index, context),
-        selectedItemColor: Theme.of(context).primaryColor,
-        unselectedItemColor: Colors.grey,
+        backgroundColor: const Color(0xFF1A1F2B),
+        selectedItemColor: const Color(0xFF7B8CDE),
+        unselectedItemColor: Colors.white.withOpacity(0.5),
+        showSelectedLabels: true,
+        showUnselectedLabels: true,
+        selectedFontSize: 12,
+        unselectedFontSize: 12,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.calendar_month),
