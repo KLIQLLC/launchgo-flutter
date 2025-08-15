@@ -2,9 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:dio/dio.dart';
+import 'package:jwt_decoder/jwt_decoder.dart';
 import '../api/api_service.dart';
 import '../api/dio_client.dart';
 import '../api/models/auth_request.dart';
+import 'secure_storage_service.dart';
 
 class AuthService extends ChangeNotifier {
   GoogleSignInAccount? _currentUser;
@@ -44,6 +46,19 @@ class AuthService extends ChangeNotifier {
     // Initialize API client
     final dio = DioClient.createDio();
     _apiService = ApiService(dio);
+    
+    // Load stored access token
+    _accessToken = await SecureStorageService.getAccessToken();
+    if (_accessToken != null) {
+      debugPrint('Loaded access token from secure storage');
+      // Optionally verify token is still valid
+      final isExpired = await SecureStorageService.isTokenExpired();
+      if (isExpired) {
+        debugPrint('Stored token is expired, clearing...');
+        _accessToken = null;
+        await SecureStorageService.clearAllAuthData();
+      }
+    }
     
     try {
       final GoogleSignIn signIn = GoogleSignIn.instance;
@@ -260,6 +275,10 @@ class AuthService extends ChangeNotifier {
       await GoogleSignIn.instance.signOut();
       _currentUser = null;
       _accessToken = null; // Clear access token
+      
+      // Clear token from secure storage
+      await SecureStorageService.clearAllAuthData();
+      
       // Don't reset _serverAuthCodeSent on regular sign out
       notifyListeners();
     } catch (error) {
@@ -274,6 +293,10 @@ class AuthService extends ChangeNotifier {
       _currentUser = null;
       _accessToken = null; // Clear access token
       _serverAuthCodeSent = false; // Reset on disconnect for fresh authorization
+      
+      // Clear token from secure storage
+      await SecureStorageService.clearAllAuthData();
+      
       notifyListeners();
     } catch (error) {
       debugPrint('Disconnect error: $error');
@@ -297,6 +320,30 @@ class AuthService extends ChangeNotifier {
         _accessToken = response.data!.accessToken;
         debugPrint('Server auth code exchanged successfully');
         debugPrint('Access token received (length: ${_accessToken!.length})');
+        
+        // Save token to secure storage
+        await SecureStorageService.saveAccessToken(_accessToken!);
+        
+        // Decode JWT to get expiry time
+        try {
+          final decodedToken = JwtDecoder.decode(_accessToken!);
+          debugPrint('Decoded JWT: email=${decodedToken['email']}, role=${decodedToken['role']}');
+          
+          // Get expiry from token (exp claim is in seconds since epoch)
+          if (decodedToken.containsKey('exp')) {
+            final expiryTimestamp = decodedToken['exp'] as int;
+            final expiry = DateTime.fromMillisecondsSinceEpoch(expiryTimestamp * 1000);
+            await SecureStorageService.saveTokenExpiry(expiry);
+            debugPrint('Token expires at: $expiry');
+          }
+        } catch (e) {
+          debugPrint('Error decoding JWT: $e');
+          // Fallback to 30 days expiry if decoding fails
+          final expiry = DateTime.now().add(const Duration(days: 30));
+          await SecureStorageService.saveTokenExpiry(expiry);
+        }
+        
+        debugPrint('Access token saved to secure storage');
         
         // Notify listeners about the authentication state change
         notifyListeners();
