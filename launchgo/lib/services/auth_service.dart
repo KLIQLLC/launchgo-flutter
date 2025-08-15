@@ -1,20 +1,31 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:dio/dio.dart';
+import '../api/api_service.dart';
+import '../api/dio_client.dart';
+import '../api/models/auth_request.dart';
 
 class AuthService extends ChangeNotifier {
   GoogleSignInAccount? _currentUser;
-  String? _sessionToken; // Backend session token
+  String? _accessToken; // JWT access token from backend
   bool _isInitialized = false;
   bool _isSigningIn = false;
   bool _serverAuthCodeSent = false; // Track if we've sent the code to backend
   Completer<void>? _signInCompleter;
+  
+  // API client
+  late final ApiService _apiService;
 
   GoogleSignInAccount? get currentUser => _currentUser;
-  String? get sessionToken => _sessionToken;
+  String? get accessToken => _accessToken;
   bool get isInitialized => _isInitialized;
   bool get isSigningIn => _isSigningIn;
+  // Check if user is authenticated
+  // For now, we allow navigation with just Google sign-in
+  // The accessToken will be obtained asynchronously after sign-in
   bool get isAuthenticated => _currentUser != null;
+  bool get hasAccessToken => _accessToken != null;
 
   static const List<String> _scopes = [
     'email',
@@ -29,6 +40,10 @@ class AuthService extends ChangeNotifier {
 
   Future<void> initialize() async {
     if (_isInitialized) return;
+    
+    // Initialize API client
+    final dio = DioClient.createDio();
+    _apiService = ApiService(dio);
     
     try {
       final GoogleSignIn signIn = GoogleSignIn.instance;
@@ -112,16 +127,17 @@ class AuthService extends ChangeNotifier {
       }
       
       // Check if authorizationClient is available
-      if (user.authorizationClient != null) {
+      final authClient = user.authorizationClient;
+      if (authClient != null) {
         // Use authorizationClient to get serverAuthCode
          // Authorization with scopes - this shows the Google login form
         final GoogleSignInServerAuthorization? serverAuth = 
-            await user.authorizationClient!.authorizeServer(
+            await authClient.authorizeServer(
           _scopes, // Pass the scopes as required parameter
         );
         
-        if (serverAuth != null && serverAuth.serverAuthCode != null) {
-          final serverAuthCode = serverAuth.serverAuthCode!;
+        if (serverAuth != null) {
+          final serverAuthCode = serverAuth.serverAuthCode;
           debugPrint('Server Auth Code received: $serverAuthCode');
           
           // Send to backend immediately as it's only valid once
@@ -211,7 +227,7 @@ class AuthService extends ChangeNotifier {
     
     // For now, only request for first-time setup
     // The backend should store refresh tokens and reuse them
-    // return !_serverAuthCodeSent && _sessionToken == null;
+    // return !_serverAuthCodeSent && _accessToken == null;
     return !_serverAuthCodeSent;
   }
   
@@ -243,7 +259,7 @@ class AuthService extends ChangeNotifier {
       // Use disconnect() only when you want to completely revoke authorization
       await GoogleSignIn.instance.signOut();
       _currentUser = null;
-      _sessionToken = null; // Clear session token
+      _accessToken = null; // Clear access token
       // Don't reset _serverAuthCodeSent on regular sign out
       notifyListeners();
     } catch (error) {
@@ -256,7 +272,7 @@ class AuthService extends ChangeNotifier {
       // This completely revokes the app's authorization
       await GoogleSignIn.instance.disconnect();
       _currentUser = null;
-      _sessionToken = null; // Clear session token
+      _accessToken = null; // Clear access token
       _serverAuthCodeSent = false; // Reset on disconnect for fresh authorization
       notifyListeners();
     } catch (error) {
@@ -265,42 +281,40 @@ class AuthService extends ChangeNotifier {
   }
   
   Future<void> _sendServerAuthCodeToBackend(String serverAuthCode) async {
-    // TODO: Implement this method to send serverAuthCode to your backend
     // IMPORTANT: This code can only be used ONCE to exchange for tokens
     
-    // The backend should:
-    // 1. Exchange serverAuthCode for refresh + access tokens using Google OAuth2 API
-    // 2. Store the refresh token securely (encrypted in database)
-    // 3. Use refresh token to get new access tokens when needed
-    // 4. Return a session token to the app
-    
-    // Example:
-    // try {
-    //   final response = await http.post(
-    //     Uri.parse('https://your-backend.com/auth/google/exchange'),
-    //     headers: {'Content-Type': 'application/json'},
-    //     body: json.encode({
-    //       'serverAuthCode': serverAuthCode,
-    //       'platform': Platform.isIOS ? 'ios' : 'android',
-    //     }),
-    //   );
-    //   
-    //   if (response.statusCode == 200) {
-    //     final data = json.decode(response.body);
-    //     // Store session token for API authentication
-    //     _sessionToken = data['sessionToken'];
-    //     notifyListeners();
-    //     debugPrint('Server auth code exchanged successfully');
-    //   } else {
-    //     throw Exception('Failed to exchange auth code: ${response.statusCode}');
-    //   }
-    // } catch (e) {
-    //   debugPrint('Failed to send server auth code: $e');
-    //   _serverAuthCodeSent = false; // Reset on failure to allow retry
-    //   rethrow;
-    // }
-    
-    debugPrint('TODO: Send serverAuthCode to backend for exchange');
-    debugPrint('Note: This code can only be used ONCE. Backend must exchange it immediately.');
+    try {
+      debugPrint('Sending serverAuthCode to backend...');
+      
+      // Create request object
+      final request = GoogleAuthRequest(code: serverAuthCode);
+      
+      // Call API using Retrofit
+      final response = await _apiService.authenticateWithGoogle(request);
+      
+      // Extract the access token from the response
+      if (response.data != null) {
+        _accessToken = response.data!.accessToken;
+        debugPrint('Server auth code exchanged successfully');
+        debugPrint('Access token received (length: ${_accessToken!.length})');
+        
+        // Notify listeners about the authentication state change
+        notifyListeners();
+      } else {
+        throw Exception('Invalid response format: missing accessToken');
+      }
+    } on DioException catch (e) {
+      debugPrint('Failed to send server auth code (DioException): ${e.message}');
+      if (e.response != null) {
+        debugPrint('Status code: ${e.response!.statusCode}');
+        debugPrint('Response data: ${e.response!.data}');
+      }
+      _serverAuthCodeSent = false; // Reset on failure to allow retry
+      rethrow;
+    } catch (e) {
+      debugPrint('Failed to send server auth code: $e');
+      _serverAuthCodeSent = false; // Reset on failure to allow retry
+      rethrow;
+    }
   }
 }
