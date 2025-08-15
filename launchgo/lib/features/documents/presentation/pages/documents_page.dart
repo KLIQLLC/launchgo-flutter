@@ -51,117 +51,29 @@ class _DocumentsViewState extends State<DocumentsView> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F1318),
+      appBar: AppBar(
+        title: const Text(
+          'Documents & Study Guides',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: const Color(0xFF0F1318),
+        elevation: 0,
+        centerTitle: true,
+      ),
       body: SafeArea(
-        child: Column(
-          children: [
-            // User Profile Section
-            Container(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    user?.displayName ?? 'Alex Johnson',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Year: Sophomore • GPA: 2.4',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.7),
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      TextButton(
-                        onPressed: () {
-                          // TODO: Implement edit profile
-                        },
-                        child: const Text(
-                          'Edit',
-                          style: TextStyle(color: Color(0xFF7B8CDE)),
-                        ),
-                      ),
-                      const Spacer(),
-                      OutlinedButton.icon(
-                        onPressed: () {
-                          // TODO: Implement change semester
-                        },
-                        icon: const Icon(
-                          Icons.expand_more,
-                          color: Colors.white,
-                          size: 18,
-                        ),
-                        label: const Text(
-                          'Change',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(
-                            color: Color(0xFF2A303E),
-                            width: 1,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const Divider(color: Color(0xFF2A303E), height: 1),
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              const Divider(color: Color(0xFF2A303E), height: 1),
             // Documents Section
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.description_outlined,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Documents &\nStudy Guides',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          height: 1.2,
-                        ),
-                      ),
-                      const Spacer(),
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          // TODO: Implement new document
-                        },
-                        icon: const Icon(Icons.add, size: 20),
-                        label: const Text('New Document'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
                   // Search Bar
                   TextField(
                     controller: _searchController,
@@ -218,7 +130,7 @@ class _DocumentsViewState extends State<DocumentsView> {
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
-                          vertical: 8,
+                          vertical: 4,
                         ),
                         decoration: BoxDecoration(
                           color: const Color(0xFF1A1F2B),
@@ -236,6 +148,7 @@ class _DocumentsViewState extends State<DocumentsView> {
                             
                             return DropdownButton<DocumentSortOption>(
                               value: sortOption,
+                              isDense: true,
                               onChanged: (option) {
                                 if (option != null) {
                                   context
@@ -282,8 +195,7 @@ class _DocumentsViewState extends State<DocumentsView> {
               ),
             ),
             // Documents List
-            Expanded(
-              child: BlocBuilder<DocumentsBloc, DocumentsState>(
+            BlocBuilder<DocumentsBloc, DocumentsState>(
                 builder: (context, state) {
                   if (state is DocumentsLoading) {
                     return const Center(
@@ -315,14 +227,15 @@ class _DocumentsViewState extends State<DocumentsView> {
                       );
                     }
                     
-                    return ListView.builder(
+                    return Padding(
                       padding: const EdgeInsets.only(bottom: 16),
-                      itemCount: state.filteredDocuments.length,
-                      itemBuilder: (context, index) {
-                        return DocumentCard(
-                          document: state.filteredDocuments[index],
-                        );
-                      },
+                      child: Column(
+                        children: state.filteredDocuments.map((document) {
+                          return DocumentCard(
+                            document: document,
+                          );
+                        }).toList(),
+                      ),
                     );
                   } else if (state is DocumentsError) {
                     return Center(
@@ -362,9 +275,18 @@ class _DocumentsViewState extends State<DocumentsView> {
                   return const SizedBox();
                 },
               ),
-            ),
-          ],
+              const SizedBox(height: 80), // Space for FAB
+            ],
+          ),
         ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          // TODO: Implement new document
+        },
+        backgroundColor: Colors.white,
+        icon: const Icon(Icons.add),
+        label: const Text('New Document'),
       ),
     );
   }
