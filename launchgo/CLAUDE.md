@@ -123,10 +123,42 @@ flutter pub outdated
 - Nested navigation using ShellRoute for persistent bottom navigation
 - URL-based routing for deep linking support on iOS and Android
 
-### State Management
-- **Provider** for dependency injection and state management
+### State Management & Dependency Injection
+- **Provider** for reactive state management and UI updates
+- **GetIt** (optional) for service locator pattern and dependency injection
 - AuthService as a ChangeNotifier for reactive authentication state
 - Centralized authentication logic separated from UI
+
+#### DI Options:
+1. **Current: Provider Only** (`main.dart`)
+   - Simple, Flutter-native solution
+   - Good for small to medium apps
+   - Services registered in main.dart
+   
+2. **Available: GetIt + Provider Hybrid** (`main_with_getit.dart`)
+   - GetIt for service location and non-UI dependencies
+   - Provider for reactive UI state
+   - Better testability and modularity
+   - See `lib/core/di/service_locator.dart` for service registration
+   - To use: rename `main_with_getit.dart` to `main.dart`
+   
+#### Using GetIt in the app:
+```dart
+// Get service instance anywhere
+final authService = getIt<AuthService>();
+final apiService = getIt<ApiService>();
+
+// In widgets (if not using Provider)
+import 'package:launchgo/core/di/service_locator.dart';
+
+class MyWidget extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final authService = getIt<AuthService>();
+    // Use authService...
+  }
+}
+```
 
 ### Authentication & Security
 - **Google Sign-In** for user authentication

@@ -13,12 +13,12 @@ class ApiService {
   }) : _authService = authService;
 
   Future<Map<String, String>> _getHeaders() async {
-    // The backend manages its own sessions after exchanging serverAuthCode
-    final sessionToken = _authService.sessionToken;
+    // The backend manages its own accessToken after exchanging serverAuthCode
+    final accessToken = _authService.accessToken;
     
     return {
       'Content-Type': 'application/json',
-      if (sessionToken != null) 'Authorization': 'Bearer $sessionToken',
+      if (accessToken != null) 'Authorization': 'Bearer $accessToken',
     };
   }
 

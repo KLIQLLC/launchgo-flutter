@@ -1,12 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:launchgo/core/di/service_locator.dart';
 import 'package:launchgo/router/app_router.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:provider/provider.dart';
 
-void main() {
+/// Alternative main file using GetIt for dependency injection
+/// This demonstrates how to use GetIt alongside Provider for a hybrid approach
+/// 
+/// To use this instead of the default main.dart:
+/// 1. Rename this file to main.dart
+/// 2. Rename the current main.dart to main_provider_only.dart
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize GetIt service locator
+  await setupServiceLocator();
+  
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => AuthService()..initialize(),
+    // We still use Provider for UI state management
+    // but services are now managed by GetIt
+    ChangeNotifierProvider.value(
+      value: getIt<AuthService>(),
       child: const MyApp(),
     ),
   );
@@ -25,7 +39,8 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    final authService = context.read<AuthService>();
+    // Get AuthService from GetIt instead of Provider
+    final authService = getIt<AuthService>();
     _appRouter = AppRouter(authService);
   }
 
@@ -41,4 +56,3 @@ class _MyAppState extends State<MyApp> {
     );
   }
 }
-

@@ -13,11 +13,10 @@ class AuthService extends ChangeNotifier {
   String? _accessToken; // JWT access token from backend
   bool _isInitialized = false;
   bool _isSigningIn = false;
-  bool _serverAuthCodeSent = false; // Track if we've sent the code to backend
   Completer<void>? _signInCompleter;
   
-  // API client
-  late final ApiService _apiService;
+  // API client - can be injected or created internally
+  ApiService? _apiService;
 
   GoogleSignInAccount? get currentUser => _currentUser;
   String? get accessToken => _accessToken;
@@ -28,6 +27,11 @@ class AuthService extends ChangeNotifier {
   // The accessToken will be obtained asynchronously after sign-in
   bool get isAuthenticated => _currentUser != null;
   bool get hasAccessToken => _accessToken != null;
+  
+  // Setter for dependency injection
+  void setApiService(ApiService apiService) {
+    _apiService = apiService;
+  }
 
   static const List<String> _scopes = [
     'email',
@@ -43,9 +47,11 @@ class AuthService extends ChangeNotifier {
   Future<void> initialize() async {
     if (_isInitialized) return;
     
-    // Initialize API client
-    final dio = DioClient.createDio();
-    _apiService = ApiService(dio);
+    // Initialize API client if not injected
+    if (_apiService == null) {
+      final dio = DioClient.createDio();
+      _apiService = ApiService(dio);
+    }
     
     // Load stored access token
     _accessToken = await SecureStorageService.getAccessToken();
@@ -135,10 +141,13 @@ class AuthService extends ChangeNotifier {
   
   Future<void> _getServerAuthCode(GoogleSignInAccount user) async {
     try {
-      // Skip if we've already sent the serverAuthCode to backend
-      if (_serverAuthCodeSent) {
-        debugPrint('Server auth code already sent to backend, skipping');
-        return;
+      // Skip if we already have a valid access token
+      if (_accessToken != null) {
+        final isExpired = await SecureStorageService.isTokenExpired();
+        if (!isExpired) {
+          debugPrint('Valid access token already exists, skipping server auth code request');
+          return;
+        }
       }
       
       // Check if authorizationClient is available
@@ -157,7 +166,6 @@ class AuthService extends ChangeNotifier {
           
           // Send to backend immediately as it's only valid once
           await _sendServerAuthCodeToBackend(serverAuthCode);
-          _serverAuthCodeSent = true; // Mark as sent
         } else {
           debugPrint('No server authorization returned from authorizeServer');
         }
@@ -240,10 +248,8 @@ class AuthService extends ChangeNotifier {
     // - Check if backend has valid refresh token
     // - Check if user wants to use Google Calendar features
     
-    // For now, only request for first-time setup
-    // The backend should store refresh tokens and reuse them
-    // return !_serverAuthCodeSent && _accessToken == null;
-    return !_serverAuthCodeSent;
+    // Request server auth if we don't have a valid access token
+    return _accessToken == null;
   }
   
   // Separate method to request server authorization
@@ -254,14 +260,17 @@ class AuthService extends ChangeNotifier {
       return false;
     }
     
-    if (_serverAuthCodeSent) {
-      debugPrint('Server auth code already sent, skipping');
-      return true;
+    if (_accessToken != null) {
+      final isExpired = await SecureStorageService.isTokenExpired();
+      if (!isExpired) {
+        debugPrint('Valid access token already exists, skipping');
+        return true;
+      }
     }
     
     try {
       await _getServerAuthCode(_currentUser!);
-      return _serverAuthCodeSent;
+      return _accessToken != null;
     } catch (e) {
       debugPrint('Failed to get server authorization: $e');
       return false;
@@ -279,7 +288,6 @@ class AuthService extends ChangeNotifier {
       // Clear token from secure storage
       await SecureStorageService.clearAllAuthData();
       
-      // Don't reset _serverAuthCodeSent on regular sign out
       notifyListeners();
     } catch (error) {
       debugPrint('Sign out error: $error');
@@ -292,7 +300,6 @@ class AuthService extends ChangeNotifier {
       await GoogleSignIn.instance.disconnect();
       _currentUser = null;
       _accessToken = null; // Clear access token
-      _serverAuthCodeSent = false; // Reset on disconnect for fresh authorization
       
       // Clear token from secure storage
       await SecureStorageService.clearAllAuthData();
@@ -313,7 +320,7 @@ class AuthService extends ChangeNotifier {
       final request = GoogleAuthRequest(code: serverAuthCode);
       
       // Call API using Retrofit
-      final response = await _apiService.authenticateWithGoogle(request);
+      final response = await _apiService!.authenticateWithGoogle(request);
       
       // Extract the access token from the response
       if (response.data != null) {
@@ -356,11 +363,9 @@ class AuthService extends ChangeNotifier {
         debugPrint('Status code: ${e.response!.statusCode}');
         debugPrint('Response data: ${e.response!.data}');
       }
-      _serverAuthCodeSent = false; // Reset on failure to allow retry
       rethrow;
     } catch (e) {
       debugPrint('Failed to send server auth code: $e');
-      _serverAuthCodeSent = false; // Reset on failure to allow retry
       rethrow;
     }
   }

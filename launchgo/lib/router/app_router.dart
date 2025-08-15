@@ -9,11 +9,12 @@ import 'package:launchgo/screens/settings_screen.dart';
 import 'package:launchgo/services/auth_service.dart';
 
 class AppRouter {
-  static final _rootNavigatorKey = GlobalKey<NavigatorState>();
-  static final _shellNavigatorKey = GlobalKey<NavigatorState>();
-
-  static GoRouter router(AuthService authService) {
-    return GoRouter(
+  final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
+  final GlobalKey<NavigatorState> _shellNavigatorKey = GlobalKey<NavigatorState>();
+  late final GoRouter router;
+  
+  AppRouter(AuthService authService) {
+    router = GoRouter(
       navigatorKey: _rootNavigatorKey,
       initialLocation: '/login',
       refreshListenable: authService,
