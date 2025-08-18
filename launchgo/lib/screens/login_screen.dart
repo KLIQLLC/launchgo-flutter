@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:provider/provider.dart';
@@ -46,26 +47,35 @@ class _LoginScreenState extends State<LoginScreen> {
     return Consumer<AuthService>(
       builder: (context, authService, child) {
         return Scaffold(
-          body: SafeArea(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.rocket_launch,
-                      size: 100,
-                      color: Colors.blue,
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'LaunchGo',
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
+          body: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [
+                  Color(0xFFFE3732), // Red color from your gradient
+                  Color(0xFFFF894B), // Orange color from your gradient
+                ],
+              ),
+            ),
+            child: SafeArea(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                    SvgPicture.asset(
+                      'assets/images/launchgo_logo.svg',
+                      height: 80,
+                      width: 240,
+                      fit: BoxFit.contain,
+                      colorFilter: const ColorFilter.mode(
+                        Colors.white,
+                        BlendMode.srcIn,
                       ),
                     ),
+                    const SizedBox(height: 24),
                     const SizedBox(height: 8),
                     Text(
                       authService.currentUser != null 
@@ -73,7 +83,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         : 'Sign in to continue',
                       style: const TextStyle(
                         fontSize: 16,
-                        color: Colors.grey,
+                        color: Colors.white70,
                       ),
                     ),
                     const SizedBox(height: 48),
@@ -150,8 +160,9 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
-        );
-      },
-    );
+        ),
+      );
+    },
+  );
   }
 }
