@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
 import '../../../../services/auth_service.dart';
+import '../../../../services/api_service.dart';
 import '../../data/repositories/documents_repository_impl.dart';
 import '../../domain/usecases/get_documents.dart';
 import '../../domain/usecases/search_documents.dart';
@@ -17,7 +18,9 @@ class DocumentsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (context) {
-        final repository = DocumentsRepositoryImpl();
+        final authService = Provider.of<AuthService>(context, listen: false);
+        final apiService = ApiService(authService: authService);
+        final repository = DocumentsRepositoryImpl(apiService: apiService);
         return DocumentsBloc(
           getDocuments: GetDocuments(repository),
           searchDocuments: SearchDocuments(repository),
@@ -44,10 +47,18 @@ class _DocumentsViewState extends State<DocumentsView> {
     super.dispose();
   }
 
+  Future<void> _onRefresh() async {
+    final bloc = context.read<DocumentsBloc>();
+    _searchController.clear();
+    
+    bloc.add(const LoadDocuments());
+    
+    // Wait for the loading to complete by listening to state changes
+    await bloc.stream.firstWhere((state) => state is! DocumentsLoading);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final authService = Provider.of<AuthService>(context);
-    final user = authService.currentUser;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F1318),
@@ -65,17 +76,27 @@ class _DocumentsViewState extends State<DocumentsView> {
         centerTitle: true,
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              const Divider(color: Color(0xFF2A303E), height: 1),
-            // Documents Section
-            Padding(
+        child: Column(
+          children: [
+            const Divider(color: Color(0xFF2A303E), height: 1),
+            Expanded(
+              child: RefreshIndicator(
+                backgroundColor: const Color(0xFF1A1F2B),
+                color: const Color(0xFF7B8CDE),
+                onRefresh: _onRefresh,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Column(
+                  children: [
+                    // Documents Section
+                    Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
                   // Search Bar
-                  TextField(
+                  SizedBox(
+                    height: 40,
+                    child: TextField(
                     controller: _searchController,
                     onChanged: (value) {
                       context
@@ -89,9 +110,12 @@ class _DocumentsViewState extends State<DocumentsView> {
                       prefixIcon: Icon(
                         Icons.search,
                         color: Colors.white.withOpacity(0.5),
+                        size: 20,
                       ),
                       filled: true,
                       fillColor: const Color(0xFF1A1F2B),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(
@@ -113,6 +137,7 @@ class _DocumentsViewState extends State<DocumentsView> {
                           width: 1,
                         ),
                       ),
+                    ),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -276,8 +301,12 @@ class _DocumentsViewState extends State<DocumentsView> {
                 },
               ),
               const SizedBox(height: 80), // Space for FAB
-            ],
-          ),
+                  ],
+                ),
+              ),
+                ),
+            ),
+          ],
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(

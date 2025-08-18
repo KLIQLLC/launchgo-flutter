@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:dio/dio.dart';
@@ -27,6 +28,20 @@ class AuthService extends ChangeNotifier {
   // The accessToken will be obtained asynchronously after sign-in
   bool get isAuthenticated => _currentUser != null;
   bool get hasAccessToken => _accessToken != null;
+  
+  // Force re-authentication to get backend token
+  Future<bool> forceReAuthentication() async {
+    debugPrint('=== forceReAuthentication called ===');
+    
+    // Sign out completely first
+    await signOut();
+    
+    // Wait a moment for sign out to complete
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    // Sign in again (this will trigger the automatic backend token request)
+    return await signIn();
+  }
   
   // Setter for dependency injection
   void setApiService(ApiService apiService) {
@@ -64,6 +79,8 @@ class AuthService extends ChangeNotifier {
         _accessToken = null;
         await SecureStorageService.clearAllAuthData();
       }
+    } else {
+      debugPrint('No access token found in secure storage');
     }
     
     try {
@@ -81,6 +98,19 @@ class AuthService extends ChangeNotifier {
       // Attempt silent sign-in (won't show any UI)
       // This only works if user previously signed in and hasn't revoked access
       await _attemptSilentSignIn();
+      
+      // If user is signed in but doesn't have backend token, request it
+      debugPrint('After silent sign-in: currentUser=${_currentUser?.email}, accessToken=$_accessToken');
+      if (_currentUser != null && _accessToken == null) {
+        debugPrint('User signed in but no backend token. Requesting server authorization...');
+        try {
+          await requestServerAuthorization();
+        } catch (e) {
+          debugPrint('Failed to get backend token during initialization: $e');
+        }
+      } else {
+        debugPrint('Skipping backend token request: currentUser=${_currentUser != null}, accessToken=${_accessToken != null}');
+      }
       
       _isInitialized = true;
       notifyListeners();
@@ -104,10 +134,13 @@ class AuthService extends ChangeNotifier {
       if (_currentUser != null) {
         debugPrint('Silent sign-in successful: ${_currentUser!.email}');
         
-        // For silent sign-in, we DON'T request serverAuthCode
-        // because that would show a prompt. The backend should:
-        // 1. Use stored refresh token from previous serverAuthCode exchange
-        // 2. Or work with ID tokens only for returning users
+        // Check if we need to get backend token for silent sign-in users
+        if (shouldRequestServerAuth()) {
+          debugPrint('Backend token missing for returning user, will request on next explicit sign-in');
+          // For silent sign-in, we don't automatically request serverAuthCode
+          // because that would show a prompt to the user
+          // The user will need to explicitly sign in again to get the backend token
+        }
       } else {
         debugPrint('Silent sign-in failed - user needs to sign in manually');
       }
@@ -131,6 +164,16 @@ class AuthService extends ChangeNotifier {
       debugPrint('User signed in: ${user.email}');
       debugPrint('User ID: ${user.id}');
       
+      // Check if we need backend token for this sign-in
+      if (_accessToken == null) {
+        debugPrint('User signed in but no backend token. Requesting server authorization...');
+        try {
+          await requestServerAuthorization();
+        } catch (e) {
+          debugPrint('Failed to get backend token after sign-in: $e');
+        }
+      }
+      
       // Complete sign in if we're waiting for it
       _signInCompleter?.complete();
       _signInCompleter = null;
@@ -141,6 +184,9 @@ class AuthService extends ChangeNotifier {
   
   Future<void> _getServerAuthCode(GoogleSignInAccount user) async {
     try {
+      debugPrint('=== _getServerAuthCode called ===');
+      debugPrint('User: ${user.email}');
+      
       // Skip if we already have a valid access token
       if (_accessToken != null) {
         final isExpired = await SecureStorageService.isTokenExpired();
@@ -152,6 +198,7 @@ class AuthService extends ChangeNotifier {
       
       // Check if authorizationClient is available
       final authClient = user.authorizationClient;
+      debugPrint('Authorization client available: ${authClient != null}');
       if (authClient != null) {
         // Use authorizationClient to get serverAuthCode
          // Authorization with scopes - this shows the Google login form
@@ -210,13 +257,15 @@ class AuthService extends ChangeNotifier {
         if (_currentUser != null) {
           debugPrint('Sign in successful for: ${_currentUser!.email}');
           
-          // TODO: Uncomment when backend integration is ready
-          // After successful sign-in, check if we need serverAuthCode
-          // Only request it for first-time users or when backend needs it
+          // Automatically request server authorization to get backend token
           if (shouldRequestServerAuth()) {
-            // Show a dialog explaining why we need additional permission
-            // Then request server authorization
-            await requestServerAuthorization();
+            debugPrint('Requesting server authorization for backend token...');
+            final success = await requestServerAuthorization();
+            if (success) {
+              debugPrint('Backend token obtained successfully');
+            } else {
+              debugPrint('Failed to obtain backend token, but continuing with Google sign-in');
+            }
           }
           
           return true;
@@ -255,6 +304,10 @@ class AuthService extends ChangeNotifier {
   // Separate method to request server authorization
   // This will show another prompt but only when explicitly needed
   Future<bool> requestServerAuthorization() async {
+    debugPrint('=== requestServerAuthorization called ===');
+    debugPrint('Current user: $_currentUser');
+    debugPrint('Current access token: $_accessToken');
+    
     if (_currentUser == null) {
       debugPrint('No user signed in, cannot request server authorization');
       return false;
@@ -269,7 +322,9 @@ class AuthService extends ChangeNotifier {
     }
     
     try {
+      debugPrint('Attempting to get server auth code...');
       await _getServerAuthCode(_currentUser!);
+      debugPrint('Server auth code process completed. Access token: $_accessToken');
       return _accessToken != null;
     } catch (e) {
       debugPrint('Failed to get server authorization: $e');
@@ -315,57 +370,82 @@ class AuthService extends ChangeNotifier {
     
     try {
       debugPrint('Sending serverAuthCode to backend...');
+      debugPrint('Using API service: $_apiService');
+      debugPrint('Server auth code: $serverAuthCode');
       
       // Create request object
       final request = GoogleAuthRequest(code: serverAuthCode);
+      debugPrint('Request created: ${request.toJson()}');
       
-      // Call API using Retrofit
-      final response = await _apiService!.authenticateWithGoogle(request);
-      
-      // Extract the access token from the response
-      if (response.data != null) {
-        _accessToken = response.data!.accessToken;
-        debugPrint('Server auth code exchanged successfully');
-        debugPrint('Access token received (length: ${_accessToken!.length})');
+      // Fallback: manually parse the response since backend returns text/plain
+      try {
+        final dio = DioClient.createDio();
+        dio.options.baseUrl = 'https://paqlhj8bef.execute-api.us-west-1.amazonaws.com/api';
+        final rawResponse = await dio.post(
+          '/users/auth/google/mobile',
+          data: request.toJson(),
+        );
         
-        // Save token to secure storage
-        await SecureStorageService.saveAccessToken(_accessToken!);
+        debugPrint('Raw response data: ${rawResponse.data}');
+        debugPrint('Raw response type: ${rawResponse.data.runtimeType}');
         
-        // Decode JWT to get expiry time
-        try {
-          final decodedToken = JwtDecoder.decode(_accessToken!);
-          debugPrint('Decoded JWT: email=${decodedToken['email']}, role=${decodedToken['role']}');
-          
-          // Get expiry from token (exp claim is in seconds since epoch)
-          if (decodedToken.containsKey('exp')) {
-            final expiryTimestamp = decodedToken['exp'] as int;
-            final expiry = DateTime.fromMillisecondsSinceEpoch(expiryTimestamp * 1000);
-            await SecureStorageService.saveTokenExpiry(expiry);
-            debugPrint('Token expires at: $expiry');
-          }
-        } catch (e) {
-          debugPrint('Error decoding JWT: $e');
-          // Fallback to 30 days expiry if decoding fails
-          final expiry = DateTime.now().add(const Duration(days: 30));
-          await SecureStorageService.saveTokenExpiry(expiry);
+        // Parse the response manually
+        Map<String, dynamic> responseData;
+        if (rawResponse.data is String) {
+          responseData = json.decode(rawResponse.data);
+        } else {
+          responseData = rawResponse.data as Map<String, dynamic>;
         }
         
-        debugPrint('Access token saved to secure storage');
+        debugPrint('Parsed response: $responseData');
         
-        // Notify listeners about the authentication state change
-        notifyListeners();
-      } else {
-        throw Exception('Invalid response format: missing accessToken');
+        if (responseData['data'] != null && responseData['data']['accessToken'] != null) {
+          _accessToken = responseData['data']['accessToken'] as String;
+          debugPrint('Server auth code exchanged successfully');
+          debugPrint('Access token received (length: ${_accessToken!.length})');
+          
+          // Save token to secure storage
+          await SecureStorageService.saveAccessToken(_accessToken!);
+          
+          // Decode JWT to get expiry time
+          try {
+            final decodedToken = JwtDecoder.decode(_accessToken!);
+            debugPrint('Decoded JWT: email=${decodedToken['email']}, role=${decodedToken['role']}');
+            
+            // Get expiry from token (exp claim is in seconds since epoch)
+            if (decodedToken.containsKey('exp')) {
+              final expiryTimestamp = decodedToken['exp'] as int;
+              final expiry = DateTime.fromMillisecondsSinceEpoch(expiryTimestamp * 1000);
+              await SecureStorageService.saveTokenExpiry(expiry);
+              debugPrint('Token expires at: $expiry');
+            }
+          } catch (e) {
+            debugPrint('Error decoding JWT: $e');
+            // Fallback to 30 days expiry if decoding fails
+            final expiry = DateTime.now().add(const Duration(days: 30));
+            await SecureStorageService.saveTokenExpiry(expiry);
+          }
+          
+          debugPrint('Access token saved to secure storage');
+          
+          // Notify listeners about the authentication state change
+          notifyListeners();
+        } else {
+          throw Exception('Invalid response format: missing accessToken');
+        }
+      } on DioException catch (e) {
+        debugPrint('Failed to send server auth code (DioException): ${e.message}');
+        if (e.response != null) {
+          debugPrint('Status code: ${e.response!.statusCode}');
+          debugPrint('Response data: ${e.response!.data}');
+        }
+        rethrow;
+      } catch (e) {
+        debugPrint('Failed to send server auth code: $e');
+        rethrow;
       }
-    } on DioException catch (e) {
-      debugPrint('Failed to send server auth code (DioException): ${e.message}');
-      if (e.response != null) {
-        debugPrint('Status code: ${e.response!.statusCode}');
-        debugPrint('Response data: ${e.response!.data}');
-      }
-      rethrow;
     } catch (e) {
-      debugPrint('Failed to send server auth code: $e');
+      debugPrint('Error getting server auth code: $e');
       rethrow;
     }
   }

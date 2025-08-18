@@ -114,8 +114,8 @@ class DocumentsBloc extends Bloc<DocumentsEvent, DocumentsState> {
         break;
       case DocumentSortOption.course:
         sortedList.sort((a, b) {
-          final courseA = a.courseName ?? '';
-          final courseB = b.courseName ?? '';
+          final courseA = a.courseId ?? '';
+          final courseB = b.courseId ?? '';
           return courseA.compareTo(courseB);
         });
         break;

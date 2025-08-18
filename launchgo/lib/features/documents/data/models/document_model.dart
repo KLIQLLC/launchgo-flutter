@@ -3,60 +3,55 @@ import '../../domain/entities/document_entity.dart';
 class DocumentModel extends DocumentEntity {
   const DocumentModel({
     required super.id,
-    required super.title,
-    required super.type,
-    required super.lastOpened,
-    super.googleDocsUrl,
+    required super.name,
+    required super.category,
+    required super.ownerId,
+    required super.fileId,
     super.courseId,
-    super.courseName,
+    required super.link,
+    required super.createdAt,
+    required super.updatedAt,
   });
 
   factory DocumentModel.fromJson(Map<String, dynamic> json) {
     return DocumentModel(
       id: json['id'] as String,
-      title: json['title'] as String,
-      type: _parseDocumentType(json['type'] as String),
-      lastOpened: DateTime.parse(json['lastOpened'] as String),
-      googleDocsUrl: json['googleDocsUrl'] as String?,
+      name: json['name'] as String,
+      category: json['category'] as String,
+      ownerId: json['ownerId'] as String,
+      fileId: json['fileId'] as String,
       courseId: json['courseId'] as String?,
-      courseName: json['courseName'] as String?,
+      link: json['link'] as String,
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      updatedAt: DateTime.parse(json['updatedAt'] as String),
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'title': title,
-      'type': type.toString().split('.').last,
-      'lastOpened': lastOpened.toIso8601String(),
-      'googleDocsUrl': googleDocsUrl,
+      'name': name,
+      'category': category,
+      'ownerId': ownerId,
+      'fileId': fileId,
       'courseId': courseId,
-      'courseName': courseName,
+      'link': link,
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
     };
-  }
-
-  static DocumentType _parseDocumentType(String type) {
-    switch (type) {
-      case 'studyGuide':
-        return DocumentType.studyGuide;
-      case 'assignment':
-        return DocumentType.assignment;
-      case 'notes':
-        return DocumentType.notes;
-      default:
-        return DocumentType.other;
-    }
   }
 
   factory DocumentModel.fromEntity(DocumentEntity entity) {
     return DocumentModel(
       id: entity.id,
-      title: entity.title,
-      type: entity.type,
-      lastOpened: entity.lastOpened,
-      googleDocsUrl: entity.googleDocsUrl,
+      name: entity.name,
+      category: entity.category,
+      ownerId: entity.ownerId,
+      fileId: entity.fileId,
       courseId: entity.courseId,
-      courseName: entity.courseName,
+      link: entity.link,
+      createdAt: entity.createdAt,
+      updatedAt: entity.updatedAt,
     );
   }
 }

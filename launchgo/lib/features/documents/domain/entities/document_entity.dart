@@ -9,22 +9,39 @@ enum DocumentType {
 
 class DocumentEntity extends Equatable {
   final String id;
-  final String title;
-  final DocumentType type;
-  final DateTime lastOpened;
-  final String? googleDocsUrl;
+  final String name;
+  final String category;
+  final String ownerId;
+  final String fileId;
   final String? courseId;
-  final String? courseName;
+  final String link;
+  final DateTime createdAt;
+  final DateTime updatedAt;
 
   const DocumentEntity({
     required this.id,
-    required this.title,
-    required this.type,
-    required this.lastOpened,
-    this.googleDocsUrl,
+    required this.name,
+    required this.category,
+    required this.ownerId,
+    required this.fileId,
     this.courseId,
-    this.courseName,
+    required this.link,
+    required this.createdAt,
+    required this.updatedAt,
   });
+
+  DocumentType get type {
+    switch (category) {
+      case 'study-guide':
+        return DocumentType.studyGuide;
+      case 'assignment':
+        return DocumentType.assignment;
+      case 'notes':
+        return DocumentType.notes;
+      default:
+        return DocumentType.other;
+    }
+  }
 
   String get typeLabel {
     switch (type) {
@@ -39,14 +56,20 @@ class DocumentEntity extends Equatable {
     }
   }
 
+  String get title => name;
+  DateTime get lastOpened => updatedAt;
+  String get googleDocsUrl => link;
+
   @override
   List<Object?> get props => [
         id,
-        title,
-        type,
-        lastOpened,
-        googleDocsUrl,
+        name,
+        category,
+        ownerId,
+        fileId,
         courseId,
-        courseName,
+        link,
+        createdAt,
+        updatedAt,
       ];
 }

@@ -47,11 +47,10 @@ class DocumentCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            if (document.googleDocsUrl != null)
-              SizedBox(
+            SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: () => _openInGoogleDocs(document.googleDocsUrl!),
+                  onPressed: () => _openInGoogleDocs(document.link),
                   icon: const Icon(
                     Icons.open_in_new,
                     size: 18,
