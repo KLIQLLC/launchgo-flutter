@@ -80,12 +80,41 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  
+  ## App Icon Generator
+  flutter_launcher_icons: ^0.13.1
   retrofit_generator: ^8.0.6
   build_runner: ^2.4.7
   json_serializable: ^6.7.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
+
+# Flutter Launcher Icons configuration
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/app_icon/app_icon_1024.png"
+  min_sdk_android: 21 # android min sdk min:16, default 21
+  
+  # Optional: Remove alpha channel for iOS (recommended)
+  remove_alpha_ios: true
+  
+  # Optional: Adaptive icon configuration for Android
+  adaptive_icon_background: "#FF5757"
+  adaptive_icon_foreground: "assets/app_icon/app_icon_1024.png"
+  
+  # Web is not supported in this project
+  web:
+    generate: false
+  
+  # Windows is not supported in this project
+  windows:
+    generate: false
+  
+  # macOS is not supported in this project
+  macos:
+    generate: false
 
 # The following section is specific to Flutter packages.
 flutter:
