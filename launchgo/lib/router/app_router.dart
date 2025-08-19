@@ -9,6 +9,7 @@ import 'package:launchgo/screens/settings_screen.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/widgets/app_drawer.dart';
+import 'package:launchgo/widgets/custom_icon.dart';
 import 'package:provider/provider.dart';
 
 class AppRouter {
@@ -152,21 +153,57 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
         showUnselectedLabels: true,
         selectedFontSize: 12,
         unselectedFontSize: 12,
-        items: const [
+        items: [
           BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_month),
+            icon: CustomIcon(
+              icon: CustomIconPath.schedule,
+              size: const Size(24, 24),
+              color: Colors.white.withValues(alpha: 0.5), // Unselected color
+            ),
+            activeIcon: CustomIcon(
+              icon: CustomIconPath.schedule,
+              size: const Size(24, 24),
+              color: const Color(0xFF7B8CDE), // Selected color
+            ),
             label: 'Schedule',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.school),
+            icon: CustomIcon(
+              icon: CustomIconPath.course,
+              size: const Size(24, 24),
+              color: Colors.white.withValues(alpha: 0.5), // Unselected color
+            ),
+            activeIcon: CustomIcon(
+              icon: CustomIconPath.course,
+              size: const Size(24, 24),
+              color: const Color(0xFF7B8CDE), // Selected color
+            ),
             label: 'Courses',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.folder),
+            icon: CustomIcon(
+              icon: CustomIconPath.document,
+              size: const Size(24, 24),
+              color: Colors.white.withValues(alpha: 0.5), // Unselected color
+            ),
+            activeIcon: CustomIcon(
+              icon: CustomIconPath.document,
+              size: const Size(24, 24),
+              color: const Color(0xFF7B8CDE), // Selected color
+            ),
             label: 'Documents',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.summarize),
+            icon: CustomIcon(
+              icon: CustomIconPath.recap,
+              size: const Size(24, 24),
+              color: Colors.white.withValues(alpha: 0.5), // Unselected color
+            ),
+            activeIcon: CustomIcon(
+              icon: CustomIconPath.recap,
+              size: const Size(24, 24),
+              color: const Color(0xFF7B8CDE), // Selected color
+            ),
             label: 'Recaps',
           ),
         ],
