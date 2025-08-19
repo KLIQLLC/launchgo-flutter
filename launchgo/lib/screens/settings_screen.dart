@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:launchgo/services/auth_service.dart';
+import 'package:launchgo/services/theme_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 
@@ -32,22 +33,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final authService = context.read<AuthService>();
+    final themeService = context.watch<ThemeService>();
     
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: themeService.backgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: themeService.backgroundColor,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'Settings',
           style: TextStyle(
-            color: Colors.black87,
+            color: themeService.textColor,
             fontSize: 24,
             fontWeight: FontWeight.w600,
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          icon: Icon(Icons.arrow_back, color: themeService.textColor),
           onPressed: () => context.pop(),
         ),
       ),
@@ -60,11 +62,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 CircleAvatar(
                   radius: 40,
-                  backgroundColor: Colors.grey[300],
+                  backgroundColor: themeService.borderColor,
                   child: Icon(
                     Icons.person,
                     size: 40,
-                    color: Colors.grey[600],
+                    color: themeService.iconColor,
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -74,9 +76,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     children: [
                       Text(
                         authService.currentUser?.displayName ?? 'Student',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w600,
+                          color: themeService.textColor,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -84,7 +87,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         authService.currentUser?.email ?? '',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.grey[600],
+                          color: themeService.textSecondaryColor,
                         ),
                       ),
                     ],
@@ -94,25 +97,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           
-          const Divider(),
+          Divider(color: themeService.borderColor),
           
           ListTile(
-            leading: const Icon(Icons.notifications_outlined),
-            title: const Text('Notifications'),
-            trailing: const Icon(Icons.chevron_right),
+            leading: Icon(Icons.notifications_outlined, color: themeService.iconColor),
+            title: Text('Notifications', style: TextStyle(color: themeService.textColor)),
+            trailing: Icon(Icons.chevron_right, color: themeService.textTertiaryColor),
             onTap: () {},
           ),
           
-          const Divider(),
+          Divider(color: themeService.borderColor),
+          
+          // Theme Toggle
+          ListTile(
+            leading: Icon(
+              themeService.isDarkMode ? Icons.dark_mode : Icons.light_mode,
+              color: themeService.iconColor,
+            ),
+            title: Text(
+              'Dark Theme',
+              style: TextStyle(color: themeService.textColor),
+            ),
+            trailing: Switch(
+              value: themeService.isDarkMode,
+              onChanged: (value) => themeService.setDarkMode(value),
+              activeColor: ThemeService.accent,
+            ),
+          ),
+          
+          Divider(color: themeService.borderColor),
           
           // App Version
           ListTile(
-            leading: const Icon(Icons.info_outline),
-            title: const Text('Version'),
-            subtitle: Text('$_version ($_buildNumber)'),
+            leading: Icon(Icons.info_outline, color: themeService.iconColor),
+            title: Text('Version', style: TextStyle(color: themeService.textColor)),
+            subtitle: Text(
+              '$_version ($_buildNumber)',
+              style: TextStyle(color: themeService.textSecondaryColor),
+            ),
           ),
           
-          const Divider(),
+          Divider(color: themeService.borderColor),
           
           // Logout Button
           Padding(

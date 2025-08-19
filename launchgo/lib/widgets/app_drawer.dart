@@ -13,6 +13,7 @@ class AppDrawer extends StatelessWidget {
     final currentRoute = GoRouterState.of(context).matchedLocation;
 
     return Drawer(
+      backgroundColor: const Color(0xFF0F1318),
       child: Column(
         children: [
           // Drawer Header with gradient
@@ -191,17 +192,17 @@ class AppDrawer extends StatelessWidget {
     return ListTile(
       leading: Icon(
         icon,
-        color: isSelected ? const Color(0xFFFF5757) : Colors.grey[700],
+        color: isSelected ? const Color(0xFF7B8CDE) : Colors.white.withValues(alpha: 0.7),
       ),
       title: Text(
         title,
         style: TextStyle(
-          color: isSelected ? const Color(0xFFFF5757) : Colors.grey[700],
+          color: isSelected ? const Color(0xFF7B8CDE) : Colors.white.withValues(alpha: 0.7),
           fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
         ),
       ),
       selected: isSelected,
-      selectedTileColor: const Color(0xFFFF5757).withValues(alpha: 0.1),
+      selectedTileColor: const Color(0xFF7B8CDE).withValues(alpha: 0.1),
       onTap: onTap ?? (route != null ? () {
         Navigator.pop(context); // Close drawer
         context.go(route);

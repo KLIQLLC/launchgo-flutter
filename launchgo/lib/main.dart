@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:launchgo/router/app_router.dart';
 import 'package:launchgo/services/auth_service.dart';
+import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/widgets/splash_screen.dart';
 import 'package:provider/provider.dart';
 
@@ -15,8 +16,11 @@ void main() {
   ]);
   
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => AuthService()..initialize(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthService()..initialize()),
+        ChangeNotifierProvider(create: (_) => ThemeService()),
+      ],
       child: const MyApp(),
     ),
   );
@@ -51,13 +55,12 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
+    final themeService = context.watch<ThemeService>();
+    
     if (_showSplash) {
       return MaterialApp(
         title: 'LaunchGo',
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFFF5757)),
-          useMaterial3: true,
-        ),
+        theme: themeService.themeData,
         home: const SplashScreen(),
         debugShowCheckedModeBanner: false,
       );
@@ -65,10 +68,7 @@ class _MyAppState extends State<MyApp> {
 
     return MaterialApp.router(
       title: 'LaunchGo',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFFF5757)),
-        useMaterial3: true,
-      ),
+      theme: themeService.themeData,
       routerConfig: _appRouter.router,
       debugShowCheckedModeBanner: false,
     );

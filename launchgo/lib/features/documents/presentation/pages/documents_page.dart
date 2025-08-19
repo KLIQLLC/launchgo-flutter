@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
 import '../../../../services/auth_service.dart';
 import '../../../../services/api_service.dart';
+import '../../../../services/theme_service.dart';
 import '../../data/repositories/documents_repository_impl.dart';
 import '../../domain/usecases/get_documents.dart';
 import '../../domain/usecases/search_documents.dart';
@@ -59,14 +60,16 @@ class _DocumentsViewState extends State<DocumentsView> {
 
   @override
   Widget build(BuildContext context) {
+    final themeService = context.watch<ThemeService>();
+    
     return SafeArea(
         child: Column(
           children: [
-            const Divider(color: Color(0xFF2A303E), height: 1),
+            Divider(color: themeService.borderColor, height: 1),
             Expanded(
               child: RefreshIndicator(
-                backgroundColor: const Color(0xFF1A1F2B),
-                color: const Color(0xFF7B8CDE),
+                backgroundColor: themeService.cardColor,
+                color: ThemeService.accent,
                 onRefresh: _onRefresh,
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
@@ -87,37 +90,37 @@ class _DocumentsViewState extends State<DocumentsView> {
                           .read<DocumentsBloc>()
                           .add(SearchDocumentsEvent(value));
                     },
-                    style: const TextStyle(color: Colors.white),
+                    style: TextStyle(color: themeService.textColor),
                     decoration: InputDecoration(
                       hintText: 'Search documents...',
-                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                      hintStyle: TextStyle(color: themeService.textTertiaryColor),
                       prefixIcon: Icon(
                         Icons.search,
-                        color: Colors.white.withOpacity(0.5),
+                        color: themeService.textTertiaryColor,
                         size: 20,
                       ),
                       filled: true,
-                      fillColor: const Color(0xFF1A1F2B),
+                      fillColor: themeService.cardColor,
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                          color: Color(0xFF2A303E),
+                        borderSide: BorderSide(
+                          color: themeService.borderColor,
                           width: 1,
                         ),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                          color: Color(0xFF2A303E),
+                        borderSide: BorderSide(
+                          color: themeService.borderColor,
                           width: 1,
                         ),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(
-                          color: Color(0xFF7B8CDE),
+                          color: ThemeService.accent,
                           width: 1,
                         ),
                       ),
@@ -131,7 +134,7 @@ class _DocumentsViewState extends State<DocumentsView> {
                       Text(
                         'Filter by course:',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.7),
+                          color: themeService.textSecondaryColor,
                           fontSize: 14,
                         ),
                       ),
@@ -142,10 +145,10 @@ class _DocumentsViewState extends State<DocumentsView> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1A1F2B),
+                          color: themeService.cardColor,
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: const Color(0xFF2A303E),
+                            color: themeService.borderColor,
                             width: 1,
                           ),
                         ),
@@ -166,14 +169,14 @@ class _DocumentsViewState extends State<DocumentsView> {
                                 }
                               },
                               underline: const SizedBox(),
-                              dropdownColor: const Color(0xFF1A1F2B),
-                              icon: const Icon(
+                              dropdownColor: themeService.cardColor,
+                              icon: Icon(
                                 Icons.expand_more,
-                                color: Colors.white,
+                                color: themeService.textColor,
                                 size: 18,
                               ),
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: themeService.textColor,
                                 fontSize: 14,
                               ),
                               items: const [
@@ -209,7 +212,7 @@ class _DocumentsViewState extends State<DocumentsView> {
                   if (state is DocumentsLoading) {
                     return const Center(
                       child: CircularProgressIndicator(
-                        color: Color(0xFF7B8CDE),
+                        color: ThemeService.accent,
                       ),
                     );
                   } else if (state is DocumentsLoaded) {
@@ -220,14 +223,14 @@ class _DocumentsViewState extends State<DocumentsView> {
                           children: [
                             Icon(
                               Icons.description_outlined,
-                              color: Colors.white.withOpacity(0.3),
+                              color: themeService.textTertiaryColor,
                               size: 64,
                             ),
                             const SizedBox(height: 16),
                             Text(
                               'No documents found',
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.5),
+                                color: themeService.textSecondaryColor,
                                 fontSize: 16,
                               ),
                             ),
@@ -253,14 +256,14 @@ class _DocumentsViewState extends State<DocumentsView> {
                         children: [
                           Icon(
                             Icons.error_outline,
-                            color: Colors.red.withOpacity(0.7),
+                            color: Colors.red,
                             size: 64,
                           ),
                           const SizedBox(height: 16),
                           Text(
                             'Error: ${state.message}',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.5),
+                              color: themeService.textSecondaryColor,
                               fontSize: 16,
                             ),
                           ),
@@ -272,7 +275,7 @@ class _DocumentsViewState extends State<DocumentsView> {
                                   .add(const LoadDocuments());
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF7B8CDE),
+                              backgroundColor: ThemeService.accent,
                             ),
                             child: const Text('Retry'),
                           ),
