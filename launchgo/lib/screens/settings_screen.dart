@@ -2,33 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/theme_service.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
-
-  @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
-}
-
-class _SettingsScreenState extends State<SettingsScreen> {
-  String _version = '';
-  String _buildNumber = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _loadAppInfo();
-  }
-
-  Future<void> _loadAppInfo() async {
-    final packageInfo = await PackageInfo.fromPlatform();
-    setState(() {
-      _version = packageInfo.version;
-      _buildNumber = packageInfo.buildNumber;
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -122,18 +99,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: themeService.isDarkMode,
               onChanged: (value) => themeService.setDarkMode(value),
               activeColor: ThemeService.accent,
-            ),
-          ),
-          
-          Divider(color: themeService.borderColor),
-          
-          // App Version
-          ListTile(
-            leading: Icon(Icons.info_outline, color: themeService.iconColor),
-            title: Text('Version', style: TextStyle(color: themeService.textColor)),
-            subtitle: Text(
-              '$_version ($_buildNumber)',
-              style: TextStyle(color: themeService.textSecondaryColor),
             ),
           ),
           

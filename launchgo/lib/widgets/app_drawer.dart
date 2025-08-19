@@ -2,10 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:launchgo/services/auth_service.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 
-class AppDrawer extends StatelessWidget {
+class AppDrawer extends StatefulWidget {
   const AppDrawer({super.key});
+
+  @override
+  State<AppDrawer> createState() => _AppDrawerState();
+}
+
+class _AppDrawerState extends State<AppDrawer> {
+  String _version = '';
+  String _buildNumber = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAppInfo();
+  }
+
+  Future<void> _loadAppInfo() async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    setState(() {
+      _version = packageInfo.version;
+      _buildNumber = packageInfo.buildNumber;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +41,7 @@ class AppDrawer extends StatelessWidget {
         children: [
           // Drawer Header with gradient
           Container(
-            height: 200,
+            height: 210,
             width: double.infinity,
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -31,39 +54,44 @@ class AppDrawer extends StatelessWidget {
               ),
             ),
             child: SafeArea(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Logo
-                  SvgPicture.asset(
-                    'assets/images/launchgo_logo.svg',
-                    height: 60,
-                    width: 150,
-                    fit: BoxFit.contain,
-                    colorFilter: const ColorFilter.mode(
-                      Colors.white,
-                      BlendMode.srcIn,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Logo
+                    SvgPicture.asset(
+                      'assets/images/launchgo_logo.svg',
+                      height: 50,
+                      width: 120,
+                      fit: BoxFit.contain,
+                      colorFilter: const ColorFilter.mode(
+                        Colors.white,
+                        BlendMode.srcIn,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  // User info
-                  Text(
-                    authService.currentUser?.displayName ?? 'Student',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
+                    const SizedBox(height: 12),
+                    // User info
+                    Text(
+                      authService.currentUser?.displayName ?? 'Student',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    authService.currentUser?.email ?? '',
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
+                    const SizedBox(height: 2),
+                    Text(
+                      authService.currentUser?.email ?? '',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -125,22 +153,43 @@ class AppDrawer extends StatelessWidget {
                     // TODO: Implement help & support
                   },
                 ),
+                // Version Info (compact)
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 14,
+                        color: Colors.white.withValues(alpha: 0.5),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'v$_version ($_buildNumber)',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.5),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
           
           // Logout Button
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             child: ListTile(
               leading: const Icon(
                 Icons.logout,
-                color: Colors.red,
+                color: Color(0xFFFF6B35), // Warm orange-red
               ),
               title: const Text(
                 'Logout',
                 style: TextStyle(
-                  color: Colors.red,
+                  color: Color(0xFFFF6B35), // Warm orange-red
                   fontWeight: FontWeight.w600,
                 ),
               ),

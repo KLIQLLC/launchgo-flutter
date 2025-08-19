@@ -136,7 +136,7 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        centerTitle: location != '/schedule',
+        centerTitle: true,
         actions: null,
       ),
       body: child,
