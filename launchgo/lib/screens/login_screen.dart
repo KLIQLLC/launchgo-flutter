@@ -75,18 +75,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         BlendMode.srcIn,
                       ),
                     ),
-                    const SizedBox(height: 24),
-                    const SizedBox(height: 8),
-                    Text(
-                      authService.currentUser != null 
-                        ? 'Welcome, ${authService.currentUser!.displayName ?? authService.currentUser!.email}!'
-                        : 'Sign in to continue',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Colors.white70,
-                      ),
-                    ),
-                    const SizedBox(height: 48),
+                    const SizedBox(height: 80),
                     
                     if (authService.currentUser == null) ...[
                       SizedBox(

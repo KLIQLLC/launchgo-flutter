@@ -47,6 +47,9 @@ dependencies:
   ## SVG Support
   flutter_svg: ^2.0.10
   
+  ## App Info
+  package_info_plus: ^8.0.2
+  
   ## State Management
   provider: ^6.1.0
   bloc: ^9.0.0

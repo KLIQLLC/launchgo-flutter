@@ -1,10 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:launchgo/services/auth_service.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  String _version = '';
+  String _buildNumber = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAppInfo();
+  }
+
+  Future<void> _loadAppInfo() async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    setState(() {
+      _version = packageInfo.version;
+      _buildNumber = packageInfo.buildNumber;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,14 +96,6 @@ class SettingsScreen extends StatelessWidget {
           
           const Divider(),
           
-          // Settings Options
-          ListTile(
-            leading: const Icon(Icons.person_outline),
-            title: const Text('Edit Profile'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {},
-          ),
-          
           ListTile(
             leading: const Icon(Icons.notifications_outlined),
             title: const Text('Notifications'),
@@ -102,11 +117,13 @@ class SettingsScreen extends StatelessWidget {
             onTap: () {},
           ),
           
+          const Divider(),
+          
+          // App Version
           ListTile(
             leading: const Icon(Icons.info_outline),
-            title: const Text('About'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {},
+            title: const Text('Version'),
+            subtitle: Text('$_version ($_buildNumber)'),
           ),
           
           const Divider(),
