@@ -142,6 +142,15 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
       ),
       body: child,
       drawer: const AppDrawer(),
+      floatingActionButton: location == '/documents' ? FloatingActionButton.extended(
+        onPressed: () {
+          // TODO: Implement new document functionality
+        },
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF1A1F2B),
+        icon: const Icon(Icons.add),
+        label: const Text('New Document'),
+      ) : null,
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         currentIndex: _calculateSelectedIndex(context),
