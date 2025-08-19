@@ -5,23 +5,7 @@ class CoursesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        title: const Text(
-          'Courses',
-          style: TextStyle(
-            color: Colors.black87,
-            fontSize: 24,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        centerTitle: true,
-      ),
-      body: ListView(
+    return ListView(
         padding: const EdgeInsets.all(20),
         children: [
           _buildCourseCard(
@@ -43,8 +27,7 @@ class CoursesScreen extends StatelessWidget {
             Colors.orange,
           ),
         ],
-      ),
-    );
+      );
   }
 
   Widget _buildCourseCard(String code, String title, String instructor, Color color) {

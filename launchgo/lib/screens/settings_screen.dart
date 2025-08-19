@@ -103,20 +103,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: () {},
           ),
           
-          ListTile(
-            leading: const Icon(Icons.lock_outline),
-            title: const Text('Privacy & Security'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {},
-          ),
-          
-          ListTile(
-            leading: const Icon(Icons.help_outline),
-            title: const Text('Help & Support'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {},
-          ),
-          
           const Divider(),
           
           // App Version

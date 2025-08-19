@@ -7,6 +7,7 @@ import 'package:launchgo/screens/recaps_screen.dart';
 import 'package:launchgo/screens/schedule_screen.dart';
 import 'package:launchgo/screens/settings_screen.dart';
 import 'package:launchgo/services/auth_service.dart';
+import 'package:launchgo/widgets/app_drawer.dart';
 
 class AppRouter {
   final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -93,15 +94,61 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final String location = GoRouterState.of(context).matchedLocation;
+    
+    String getTitle() {
+      switch (location) {
+        case '/schedule':
+          return 'Schedule';
+        case '/courses':
+          return 'Courses';
+        case '/documents':
+          return 'Documents & Study Guides';
+        case '/recaps':
+          return 'Recaps';
+        default:
+          return 'LaunchGo';
+      }
+    }
+    
+    bool isDarkTheme() {
+      return location == '/documents';
+    }
+
     return Scaffold(
+      backgroundColor: isDarkTheme() ? const Color(0xFF0F1318) : Colors.white,
+      appBar: AppBar(
+        backgroundColor: isDarkTheme() ? const Color(0xFF0F1318) : Colors.white,
+        elevation: 0,
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: Icon(
+              Icons.menu, 
+              color: isDarkTheme() ? Colors.white : Colors.black87,
+            ),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
+        title: Text(
+          getTitle(),
+          style: TextStyle(
+            color: isDarkTheme() ? Colors.white : Colors.black87,
+            fontSize: 24,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        centerTitle: location != '/schedule',
+        actions: null,
+      ),
       body: child,
+      drawer: const AppDrawer(),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         currentIndex: _calculateSelectedIndex(context),
         onTap: (index) => _onItemTapped(index, context),
         backgroundColor: const Color(0xFF1A1F2B),
         selectedItemColor: const Color(0xFF7B8CDE),
-        unselectedItemColor: Colors.white.withOpacity(0.5),
+        unselectedItemColor: Colors.white.withValues(alpha: 0.5),
         showSelectedLabels: true,
         showUnselectedLabels: true,
         selectedFontSize: 12,

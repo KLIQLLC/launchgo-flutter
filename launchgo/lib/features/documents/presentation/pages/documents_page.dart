@@ -59,23 +59,7 @@ class _DocumentsViewState extends State<DocumentsView> {
 
   @override
   Widget build(BuildContext context) {
-
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F1318),
-      appBar: AppBar(
-        title: const Text(
-          'Documents & Study Guides',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: const Color(0xFF0F1318),
-        elevation: 0,
-        centerTitle: true,
-      ),
-      body: SafeArea(
+    return SafeArea(
         child: Column(
           children: [
             const Divider(color: Color(0xFF2A303E), height: 1),
@@ -308,15 +292,6 @@ class _DocumentsViewState extends State<DocumentsView> {
             ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          // TODO: Implement new document
-        },
-        backgroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text('New Document'),
-      ),
-    );
+      );
   }
 }

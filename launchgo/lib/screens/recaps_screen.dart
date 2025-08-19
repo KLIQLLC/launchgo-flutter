@@ -5,23 +5,7 @@ class RecapsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        title: const Text(
-          'Recaps',
-          style: TextStyle(
-            color: Colors.black87,
-            fontSize: 24,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        centerTitle: true,
-      ),
-      body: ListView(
+    return ListView(
         padding: const EdgeInsets.all(20),
         children: [
           const Text(
@@ -77,8 +61,7 @@ class RecapsScreen extends StatelessWidget {
             Colors.orange,
           ),
         ],
-      ),
-    );
+      );
   }
 
   Widget _buildMessageCard(String sender, String subject, String preview, String time, bool isMentor) {
