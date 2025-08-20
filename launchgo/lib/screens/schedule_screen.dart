@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:provider/provider.dart';
 
@@ -15,10 +16,14 @@ class ScheduleScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.calendar_month,
-                size: 80,
-                color: ThemeService.accent,
+              SvgPicture.asset(
+                'assets/icons/ic_schedule.svg',
+                width: 80,
+                height: 80,
+                colorFilter: const ColorFilter.mode(
+                  ThemeService.accent,
+                  BlendMode.srcIn,
+                ),
               ),
               const SizedBox(height: 20),
               Text(

@@ -101,16 +101,10 @@ class _LoginScreenState extends State<LoginScreen> {
                               : Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Image.network(
-                                      'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
+                                    SvgPicture.asset(
+                                      'assets/icons/ic_google.svg',
                                       height: 24,
                                       width: 24,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return const Icon(
-                                          Icons.g_mobiledata,
-                                          size: 24,
-                                        );
-                                      },
                                     ),
                                     const SizedBox(width: 12),
                                     const Text(
