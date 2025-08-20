@@ -28,10 +28,7 @@ class SplashScreen extends StatelessWidget {
                 height: 120,
                 width: 300,
                 fit: BoxFit.contain,
-                colorFilter: const ColorFilter.mode(
-                  Colors.white,
-                  BlendMode.srcIn,
-                ),
+                colorFilter: null,
               ),
             ],
           ),

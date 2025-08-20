@@ -65,10 +65,7 @@ class _AppDrawerState extends State<AppDrawer> {
                       height: 50,
                       width: 120,
                       fit: BoxFit.contain,
-                      colorFilter: const ColorFilter.mode(
-                        Colors.white,
-                        BlendMode.srcIn,
-                      ),
+                      colorFilter: null
                     ),
                     const SizedBox(height: 12),
                     // User info
