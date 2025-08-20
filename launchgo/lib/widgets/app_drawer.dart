@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:launchgo/services/auth_service.dart';
+import 'package:launchgo/services/theme_service.dart';
+import 'package:launchgo/widgets/semester_selector.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 
@@ -33,10 +35,11 @@ class _AppDrawerState extends State<AppDrawer> {
   @override
   Widget build(BuildContext context) {
     final authService = context.read<AuthService>();
+    final themeService = context.watch<ThemeService>();
     final currentRoute = GoRouterState.of(context).matchedLocation;
 
     return Drawer(
-      backgroundColor: const Color(0xFF0F1318),
+      backgroundColor: themeService.backgroundColor,
       child: Column(
         children: [
           // Drawer Header with gradient
@@ -47,10 +50,7 @@ class _AppDrawerState extends State<AppDrawer> {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFFFE3732),
-                  Color(0xFFFF894B),
-                ],
+                colors: [Color(0xFFFE3732), Color(0xFFFF894B)],
               ),
             ),
             child: SafeArea(
@@ -73,7 +73,7 @@ class _AppDrawerState extends State<AppDrawer> {
                     const SizedBox(height: 12),
                     // User info
                     Text(
-                      authService.currentUser?.displayName ?? 'Student',
+                      authService.currentUser?.displayName ?? 'Unknown',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,
@@ -95,134 +95,134 @@ class _AppDrawerState extends State<AppDrawer> {
               ),
             ),
           ),
-          
+
           // Navigation Items
           Expanded(
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
-                _buildDrawerItem(
-                  context: context,
-                  icon: Icons.calendar_month,
-                  title: 'Schedule',
-                  route: '/schedule',
-                  isSelected: currentRoute == '/schedule',
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Text(
+                    'Semester',
+                    style: TextStyle(
+                      color: themeService.textTertiaryColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
                 ),
-                _buildDrawerItem(
-                  context: context,
-                  icon: Icons.school,
-                  title: 'Courses',
-                  route: '/courses',
-                  isSelected: currentRoute == '/courses',
+                Padding(
+                  padding: const EdgeInsets.only(left: 32, right: 80),
+                  child: SemesterSelector(
+                    onSemesterChanged: (semester) {
+                      // TODO: Handle semester change
+                      debugPrint('Selected semester: $semester');
+                    },
+                  ),
                 ),
-                _buildDrawerItem(
-                  context: context,
-                  icon: Icons.folder,
-                  title: 'Documents',
-                  route: '/documents',
-                  isSelected: currentRoute == '/documents',
+                const SizedBox(height: 8),
+                // Navigation label
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Text(
+                    'Navigation',
+                    style: TextStyle(
+                      color: themeService.textTertiaryColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
                 ),
-                _buildDrawerItem(
-                  context: context,
-                  icon: Icons.summarize,
-                  title: 'Recaps',
-                  route: '/recaps',
-                  isSelected: currentRoute == '/recaps',
+                // Settings with indent
+                Padding(
+                  padding: const EdgeInsets.only(left: 16),
+                  child: _buildDrawerItem(
+                    context: context,
+                    icon: Icons.settings,
+                    title: 'Settings',
+                    route: null,
+                    isSelected: currentRoute == '/settings',
+                    onTap: () {
+                      Navigator.pop(context); // Close drawer
+                      context.push('/settings');
+                    },
+                  ),
                 ),
-                const Divider(),
-                _buildDrawerItem(
-                  context: context,
-                  icon: Icons.settings,
-                  title: 'Settings',
-                  route: null,
-                  isSelected: currentRoute == '/settings',
-                  onTap: () {
-                    Navigator.pop(context); // Close drawer
-                    context.push('/settings');
-                  },
+                // Logout Button with indent
+                Padding(
+                  padding: const EdgeInsets.only(left: 16),
+                  child: ListTile(
+                    leading: const Icon(
+                      Icons.logout,
+                      color: Color(0xFFFF6B35), // Warm orange-red
+                    ),
+                    title: const Text(
+                      'Logout',
+                      style: TextStyle(
+                        color: Color(0xFFFF6B35), // Warm orange-red
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    onTap: () async {
+                      // Show confirmation dialog
+                      final shouldLogout = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Logout'),
+                          content: const Text(
+                            'Are you sure you want to logout?',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: const Text(
+                                'Logout',
+                                style: TextStyle(color: Colors.red),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (shouldLogout == true && context.mounted) {
+                        await authService.signOut();
+                        if (context.mounted) {
+                          context.go('/login');
+                        }
+                      }
+                    },
+                  ),
                 ),
-                const Divider(),
-                _buildDrawerItem(
-                  context: context,
-                  icon: Icons.help_outline,
-                  title: 'Help & Support',
-                  route: null,
-                  isSelected: false,
-                  onTap: () {
-                    Navigator.pop(context);
-                    // TODO: Implement help & support
-                  },
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Divider(color: themeService.borderColor, height: 1),
                 ),
                 // Version Info (compact)
                 Padding(
                   padding: const EdgeInsets.all(20),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        size: 14,
-                        color: Colors.white.withValues(alpha: 0.5),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'v$_version ($_buildNumber)',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.5),
-                          fontSize: 12,
+                  child: Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Version $_version.$_buildNumber',
+                          style: TextStyle(
+                            color: themeService.textTertiaryColor,
+                            fontSize: 14,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ],
-            ),
-          ),
-          
-          // Logout Button
-          Container(
-            padding: const EdgeInsets.all(20),
-            child: ListTile(
-              leading: const Icon(
-                Icons.logout,
-                color: Color(0xFFFF6B35), // Warm orange-red
-              ),
-              title: const Text(
-                'Logout',
-                style: TextStyle(
-                  color: Color(0xFFFF6B35), // Warm orange-red
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              onTap: () async {
-                // Show confirmation dialog
-                final shouldLogout = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Logout'),
-                    content: const Text('Are you sure you want to logout?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text('Cancel'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        child: const Text(
-                          'Logout',
-                          style: TextStyle(color: Colors.red),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-                
-                if (shouldLogout == true && context.mounted) {
-                  await authService.signOut();
-                  if (context.mounted) {
-                    context.go('/login');
-                  }
-                }
-              },
             ),
           ),
         ],
@@ -238,24 +238,33 @@ class _AppDrawerState extends State<AppDrawer> {
     required bool isSelected,
     VoidCallback? onTap,
   }) {
+    final themeService = context.watch<ThemeService>();
     return ListTile(
       leading: Icon(
         icon,
-        color: isSelected ? const Color(0xFF7B8CDE) : Colors.white.withValues(alpha: 0.7),
+        color: isSelected
+            ? ThemeService.accent
+            : themeService.textSecondaryColor,
       ),
       title: Text(
         title,
         style: TextStyle(
-          color: isSelected ? const Color(0xFF7B8CDE) : Colors.white.withValues(alpha: 0.7),
+          color: isSelected
+              ? ThemeService.accent
+              : themeService.textSecondaryColor,
           fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
         ),
       ),
       selected: isSelected,
-      selectedTileColor: const Color(0xFF7B8CDE).withValues(alpha: 0.1),
-      onTap: onTap ?? (route != null ? () {
-        Navigator.pop(context); // Close drawer
-        context.go(route);
-      } : null),
+      selectedTileColor: ThemeService.accent.withValues(alpha: 0.1),
+      onTap:
+          onTap ??
+          (route != null
+              ? () {
+                  Navigator.pop(context); // Close drawer
+                  context.go(route);
+                }
+              : null),
     );
   }
 }
