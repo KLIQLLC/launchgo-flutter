@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:launchgo/features/documents/presentation/pages/documents_page.dart';
 import 'package:launchgo/screens/courses_screen.dart';
@@ -138,7 +139,54 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
           ),
         ),
         centerTitle: true,
-        actions: null,
+        actions: [
+          IconButton(
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                SvgPicture.asset(
+                  'assets/icons/ic_alert.svg',
+                  width: 20,
+                  height: 20,
+                  colorFilter: ColorFilter.mode(
+                    themeService.textColor,
+                    BlendMode.srcIn,
+                  ),
+                ),
+                // Badge with unread count
+                Positioned(
+                  right: -10,
+                  top: -14,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 14,
+                      minHeight: 14,
+                    ),
+                    child: const Center(
+                      child: Text(
+                        '3',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            onPressed: () {
+              // TODO: Handle alert/notifications action
+            },
+          ),
+        ],
       ),
       body: child,
       drawer: const AppDrawer(),
