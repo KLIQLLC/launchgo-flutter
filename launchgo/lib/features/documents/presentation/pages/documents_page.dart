@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../../services/auth_service.dart';
 import '../../../../services/api_service.dart';
 import '../../../../services/theme_service.dart';
+import '../../../../widgets/course_filter_selector.dart';
 import '../../data/repositories/documents_repository_impl.dart';
 import '../../domain/usecases/get_documents.dart';
 import '../../domain/usecases/search_documents.dart';
@@ -139,67 +140,53 @@ class _DocumentsViewState extends State<DocumentsView> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: themeService.cardColor,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: themeService.borderColor,
-                            width: 1,
-                          ),
-                        ),
-                        child: BlocBuilder<DocumentsBloc, DocumentsState>(
-                          builder: (context, state) {
-                            final sortOption = state is DocumentsLoaded
-                                ? state.sortOption
-                                : DocumentSortOption.course;
-                            
-                            return DropdownButton<DocumentSortOption>(
-                              value: sortOption,
-                              isDense: true,
-                              onChanged: (option) {
-                                if (option != null) {
-                                  context
-                                      .read<DocumentsBloc>()
-                                      .add(SortDocuments(option));
-                                }
-                              },
-                              underline: const SizedBox(),
-                              dropdownColor: themeService.cardColor,
-                              icon: Icon(
-                                Icons.expand_more,
-                                color: themeService.textColor,
-                                size: 18,
-                              ),
-                              style: TextStyle(
-                                color: themeService.textColor,
-                                fontSize: 14,
-                              ),
-                              items: const [
-                                DropdownMenuItem(
-                                  value: DocumentSortOption.course,
-                                  child: Text('All'),
-                                ),
-                                DropdownMenuItem(
-                                  value: DocumentSortOption.lastOpened,
-                                  child: Text('CODE11'),
-                                ),
-                                DropdownMenuItem(
-                                  value: DocumentSortOption.title,
-                                  child: Text('CODE12'),
-                                ),
-                                DropdownMenuItem(
-                                  value: DocumentSortOption.type,
-                                  child: Text('CODE13'),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
+                      BlocBuilder<DocumentsBloc, DocumentsState>(
+                        builder: (context, state) {
+                          // Map sort options to course names for display
+                          String getCurrentCourse() {
+                            if (state is DocumentsLoaded) {
+                              switch (state.sortOption) {
+                                case DocumentSortOption.course:
+                                  return 'All';
+                                case DocumentSortOption.lastOpened:
+                                  return 'CODE11';
+                                case DocumentSortOption.title:
+                                  return 'CODE12';
+                                case DocumentSortOption.type:
+                                  return 'CODE13';
+                                default:
+                                  return 'All';
+                              }
+                            }
+                            return 'All';
+                          }
+                          
+                          return CourseFilterSelector(
+                            initialCourse: getCurrentCourse(),
+                            courses: const ['All', 'CODE11', 'CODE12', 'CODE13'],
+                            onCourseChanged: (course) {
+                              // Map course selection back to sort option
+                              DocumentSortOption option;
+                              switch (course) {
+                                case 'All':
+                                  option = DocumentSortOption.course;
+                                  break;
+                                case 'CODE11':
+                                  option = DocumentSortOption.lastOpened;
+                                  break;
+                                case 'CODE12':
+                                  option = DocumentSortOption.title;
+                                  break;
+                                case 'CODE13':
+                                  option = DocumentSortOption.type;
+                                  break;
+                                default:
+                                  option = DocumentSortOption.course;
+                              }
+                              context.read<DocumentsBloc>().add(SortDocuments(option));
+                            },
+                          );
+                        },
                       ),
                     ],
                   ),
