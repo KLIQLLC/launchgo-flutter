@@ -13,7 +13,6 @@ NC='\033[0m' # No Color
 
 # Increment build number automatically
 echo -e "${YELLOW}🔢 Incrementing build number...${NC}"
-cd ..
 current_version=$(grep "version:" pubspec.yaml | sed 's/version: //' | tr -d ' ')
 version_name=$(echo $current_version | cut -d'+' -f1)
 build_number=$(echo $current_version | cut -d'+' -f2)
@@ -21,7 +20,6 @@ new_build_number=$((build_number + 1))
 new_version="${version_name}+${new_build_number}"
 sed -i '' "s/version: .*/version: ${new_version}/" pubspec.yaml
 echo -e "${GREEN}✅ Updated version to: ${new_version}${NC}"
-cd ios
 
 # Clean and get dependencies
 echo -e "${YELLOW}📦 Cleaning and updating dependencies...${NC}"
