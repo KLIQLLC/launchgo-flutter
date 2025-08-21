@@ -95,21 +95,31 @@ class AuthService extends ChangeNotifier {
       // Listen for authentication events
       signIn.authenticationEvents.listen(_handleAuthenticationEvent);
       
-      // Attempt silent sign-in (won't show any UI)
-      // This only works if user previously signed in and hasn't revoked access
-      await _attemptSilentSignIn();
-      
-      // If user is signed in but doesn't have backend token, request it
-      debugPrint('After silent sign-in: currentUser=${_currentUser?.email}, accessToken=$_accessToken');
-      if (_currentUser != null && _accessToken == null) {
-        debugPrint('User signed in but no backend token. Requesting server authorization...');
-        try {
-          await requestServerAuthorization();
-        } catch (e) {
-          debugPrint('Failed to get backend token during initialization: $e');
+      // Only attempt silent sign-in if we have a valid stored access token
+      // This prevents auto-login for fresh installs while preserving UX for returning users
+      if (_accessToken != null && !JwtDecoder.isExpired(_accessToken!)) {
+        debugPrint('Valid access token found, attempting silent sign-in...');
+        await _attemptSilentSignIn();
+        
+        // If user is signed in but token is missing/invalid, request new one
+        if (_currentUser != null && (_accessToken == null || JwtDecoder.isExpired(_accessToken!))) {
+          debugPrint('User signed in but token invalid. Requesting server authorization...');
+          try {
+            await requestServerAuthorization();
+          } catch (e) {
+            debugPrint('Failed to get backend token during initialization: $e');
+            // Clear invalid auth state
+            await signOut();
+          }
         }
       } else {
-        debugPrint('Skipping backend token request: currentUser=${_currentUser != null}, accessToken=${_accessToken != null}');
+        debugPrint('No valid access token found, skipping silent sign-in. User will see login screen.');
+        // Clear any invalid stored auth data
+        if (_accessToken != null && JwtDecoder.isExpired(_accessToken!)) {
+          debugPrint('Clearing expired access token');
+          await SecureStorageService.clearAllAuthData();
+          _accessToken = null;
+        }
       }
       
       _isInitialized = true;
@@ -199,25 +209,22 @@ class AuthService extends ChangeNotifier {
       // Check if authorizationClient is available
       final authClient = user.authorizationClient;
       debugPrint('Authorization client available: ${authClient != null}');
-      if (authClient != null) {
-        // Use authorizationClient to get serverAuthCode
-         // Authorization with scopes - this shows the Google login form
-        final GoogleSignInServerAuthorization? serverAuth = 
-            await authClient.authorizeServer(
+      
+      // Use authorizationClient to get serverAuthCode
+      // Authorization with scopes - this shows the Google login form
+      final GoogleSignInServerAuthorization? serverAuth = 
+          await authClient.authorizeServer(
           _scopes, // Pass the scopes as required parameter
         );
         
-        if (serverAuth != null) {
-          final serverAuthCode = serverAuth.serverAuthCode;
-          debugPrint('Server Auth Code received: $serverAuthCode');
-          
-          // Send to backend immediately as it's only valid once
-          await _sendServerAuthCodeToBackend(serverAuthCode);
-        } else {
-          debugPrint('No server authorization returned from authorizeServer');
-        }
+      if (serverAuth != null) {
+        final serverAuthCode = serverAuth.serverAuthCode;
+        debugPrint('Server Auth Code received: $serverAuthCode');
+        
+        // Send to backend immediately as it's only valid once
+        await _sendServerAuthCodeToBackend(serverAuthCode);
       } else {
-        debugPrint('Authorization client not available for this user');
+        debugPrint('No server authorization returned from authorizeServer');
       }
     } catch (error) {
       debugPrint('Error getting server auth code: $error');
