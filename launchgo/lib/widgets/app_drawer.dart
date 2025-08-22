@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:launchgo/config/environment.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/widgets/semester_selector.dart';
@@ -209,7 +210,7 @@ class _AppDrawerState extends State<AppDrawer> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'Version $_version.$_buildNumber',
+                          'Version $_version.$_buildNumber-${EnvironmentConfig.isStage ? 'stage' : 'prod'}',
                           style: TextStyle(
                             color: themeService.textTertiaryColor,
                             fontSize: 14,

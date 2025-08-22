@@ -5,7 +5,7 @@ import 'models/auth_response.dart';
 
 part 'api_service.g.dart';
 
-@RestApi(baseUrl: "https://paqlhj8bef.execute-api.us-west-1.amazonaws.com/api")
+@RestApi()
 abstract class ApiService {
   factory ApiService(Dio dio, {String baseUrl}) = _ApiService;
 

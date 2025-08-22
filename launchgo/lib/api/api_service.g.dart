@@ -13,9 +13,7 @@ class _ApiService implements ApiService {
     this._dio, {
     this.baseUrl,
     this.errorLogger,
-  }) {
-    baseUrl ??= 'https://paqlhj8bef.execute-api.us-west-1.amazonaws.com/api';
-  }
+  });
 
   final Dio _dio;
 

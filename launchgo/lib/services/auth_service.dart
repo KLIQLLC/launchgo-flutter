@@ -7,6 +7,7 @@ import 'package:jwt_decoder/jwt_decoder.dart';
 import '../api/api_service.dart';
 import '../api/dio_client.dart';
 import '../api/models/auth_request.dart';
+import '../config/environment.dart';
 import 'secure_storage_service.dart';
 
 class AuthService extends ChangeNotifier {
@@ -65,7 +66,7 @@ class AuthService extends ChangeNotifier {
     // Initialize API client if not injected
     if (_apiService == null) {
       final dio = DioClient.createDio();
-      _apiService = ApiService(dio);
+      _apiService = ApiService(dio, baseUrl: EnvironmentConfig.baseUrl);
     }
     
     // Load stored access token
