@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../../../../services/auth_service.dart';
 import '../../../../services/api_service.dart';
@@ -142,21 +143,11 @@ class _DocumentsViewState extends State<DocumentsView> {
                       const SizedBox(width: 12),
                       BlocBuilder<DocumentsBloc, DocumentsState>(
                         builder: (context, state) {
-                          // Map sort options to course names for display
+                          // Get current selected course
                           String getCurrentCourse() {
                             if (state is DocumentsLoaded) {
-                              switch (state.sortOption) {
-                                case DocumentSortOption.course:
-                                  return 'All';
-                                case DocumentSortOption.lastOpened:
-                                  return 'CODE11';
-                                case DocumentSortOption.title:
-                                  return 'CODE12';
-                                case DocumentSortOption.type:
-                                  return 'CODE13';
-                                default:
-                                  return 'All';
-                              }
+                              // If no course is selected (null), it means "All"
+                              return state.selectedCourseId ?? 'All';
                             }
                             return 'All';
                           }
@@ -165,25 +156,14 @@ class _DocumentsViewState extends State<DocumentsView> {
                             initialCourse: getCurrentCourse(),
                             courses: const ['All', 'CODE11', 'CODE12', 'CODE13'],
                             onCourseChanged: (course) {
-                              // Map course selection back to sort option
-                              DocumentSortOption option;
-                              switch (course) {
-                                case 'All':
-                                  option = DocumentSortOption.course;
-                                  break;
-                                case 'CODE11':
-                                  option = DocumentSortOption.lastOpened;
-                                  break;
-                                case 'CODE12':
-                                  option = DocumentSortOption.title;
-                                  break;
-                                case 'CODE13':
-                                  option = DocumentSortOption.type;
-                                  break;
-                                default:
-                                  option = DocumentSortOption.course;
+                              // Filter by course
+                              if (course == 'All') {
+                                // Show all documents - no filter
+                                context.read<DocumentsBloc>().add(const FilterDocumentsByCourse(null));
+                              } else {
+                                // Filter by specific course
+                                context.read<DocumentsBloc>().add(FilterDocumentsByCourse(course));
                               }
-                              context.read<DocumentsBloc>().add(SortDocuments(option));
                             },
                           );
                         },
@@ -204,24 +184,90 @@ class _DocumentsViewState extends State<DocumentsView> {
                     );
                   } else if (state is DocumentsLoaded) {
                     if (state.filteredDocuments.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.description_outlined,
-                              color: themeService.textTertiaryColor,
-                              size: 64,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No documents found',
-                              style: TextStyle(
-                                color: themeService.textSecondaryColor,
-                                fontSize: 16,
+                      // Check if it's empty due to search or no documents at all
+                      final bool isSearching = _searchController.text.isNotEmpty;
+                      final bool hasNoDocuments = state.documents.isEmpty;
+                      // Check if "All" courses is selected (null selectedCourseId means "All")
+                      final bool isAllCoursesSelected = state.selectedCourseId == null;
+                      
+                      return Container(
+                        padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 32),
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(24),
+                                decoration: BoxDecoration(
+                                  color: themeService.cardColor,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: themeService.borderColor,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: isSearching 
+                                  ? Icon(
+                                      Icons.search_off,
+                                      color: themeService.textTertiaryColor,
+                                      size: 48,
+                                    )
+                                  : SvgPicture.asset(
+                                      'assets/icons/ic_document.svg',
+                                      width: 48,
+                                      height: 48,
+                                      colorFilter: ColorFilter.mode(
+                                        themeService.textTertiaryColor,
+                                        BlendMode.srcIn,
+                                      ),
+                                    ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 24),
+                              Text(
+                                isSearching 
+                                  ? 'No results found'
+                                  : hasNoDocuments
+                                    ? 'No documents yet'
+                                    : isAllCoursesSelected
+                                      ? 'No documents yet'  // This should only show if filtered docs are empty when "All" is selected
+                                      : 'No documents in this course',
+                                style: TextStyle(
+                                  color: themeService.textColor,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                isSearching 
+                                  ? 'Try adjusting your search terms'
+                                  : hasNoDocuments
+                                    ? 'Your documents will appear here\nonce they are uploaded'
+                                    : isAllCoursesSelected
+                                      ? 'Your documents will appear here\nonce they are uploaded'
+                                      : 'Select a different course or\ncheck back later for updates',
+                                style: TextStyle(
+                                  color: themeService.textSecondaryColor,
+                                  fontSize: 14,
+                                  height: 1.5,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              if (isSearching) ...[
+                                const SizedBox(height: 24),
+                                TextButton(
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    context.read<DocumentsBloc>().add(const SearchDocumentsEvent(''));
+                                  },
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: ThemeService.accent,
+                                  ),
+                                  child: const Text('Clear search'),
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
                       );
                     }

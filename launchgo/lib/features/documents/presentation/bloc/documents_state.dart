@@ -29,7 +29,7 @@ class DocumentsLoaded extends DocumentsState {
     required this.filteredDocuments,
     this.searchQuery = '',
     this.selectedCourseId,
-    this.sortOption = DocumentSortOption.lastOpened,
+    this.sortOption = DocumentSortOption.course, // Default to "All"
   });
 
   @override

@@ -26,10 +26,12 @@ class DocumentsBloc extends Bloc<DocumentsEvent, DocumentsState> {
     emit(const DocumentsLoading());
     try {
       final documents = await getDocuments();
-      final sortedDocuments = _sortDocuments(documents, DocumentSortOption.lastOpened);
+      // Start with "All" selected (DocumentSortOption.course)
+      final sortedDocuments = _sortDocuments(documents, DocumentSortOption.course);
       emit(DocumentsLoaded(
         documents: documents,
         filteredDocuments: sortedDocuments,
+        sortOption: DocumentSortOption.course, // Explicitly set to "All"
       ));
     } catch (e) {
       emit(DocumentsError(e.toString()));

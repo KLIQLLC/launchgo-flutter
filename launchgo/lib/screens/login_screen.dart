@@ -18,7 +18,8 @@ class _LoginScreenState extends State<LoginScreen> {
     final success = await authService.signIn();
     
     if (mounted) {
-      if (success) {
+      // Only navigate if both authentication and access token are available
+      if (success && authService.isAuthenticated && authService.hasAccessToken) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Welcome, ${authService.currentUser?.displayName ?? authService.currentUser?.email}!'),
