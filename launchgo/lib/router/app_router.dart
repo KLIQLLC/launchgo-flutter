@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:launchgo/features/documents/presentation/pages/documents_page.dart';
+import 'package:launchgo/screens/chat_screen.dart';
 import 'package:launchgo/screens/courses_screen.dart';
 import 'package:launchgo/screens/login_screen.dart';
 import 'package:launchgo/screens/recaps_screen.dart';
@@ -81,6 +82,13 @@ class AppRouter {
                 child: RecapsScreen(),
               ),
             ),
+            GoRoute(
+              path: '/chat',
+              name: 'chat',
+              pageBuilder: (context, state) => const NoTransitionPage(
+                child: ChatScreen(),
+              ),
+            ),
           ],
         ),
       ],
@@ -111,6 +119,8 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
           return 'Documents & Study Guides';
         case '/recaps':
           return 'Recaps';
+        case '/chat':
+          return 'Chat';
         default:
           return 'LaunchGo';
       }
@@ -263,6 +273,19 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
             ),
             label: 'Recaps',
           ),
+          BottomNavigationBarItem(
+            icon: CustomIcon(
+              icon: CustomIconPath.chat,
+              size: const Size(24, 24),
+              color: Colors.white.withValues(alpha: 0.5), // Unselected color
+            ),
+            activeIcon: CustomIcon(
+              icon: CustomIconPath.chat,
+              size: const Size(24, 24),
+              color: const Color(0xFF7B8CDE), // Selected color
+            ),
+            label: 'Chat',
+          ),
         ],
       ),
     );
@@ -279,6 +302,8 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
         return 2;
       case '/recaps':
         return 3;
+      case '/chat':
+        return 4;
       default:
         return 0;
     }
@@ -297,6 +322,9 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
         break;
       case 3:
         context.go('/recaps');
+        break;
+      case 4:
+        context.go('/chat');
         break;
     }
   }

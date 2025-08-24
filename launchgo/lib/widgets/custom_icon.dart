@@ -7,6 +7,7 @@ enum CustomIconPath {
   schedule('assets/icons/ic_schedule.svg'),
   course('assets/icons/ic_course.svg'),
   recap('assets/icons/ic_recap.svg'),
+  chat('assets/icons/ic_chat.svg'),
   ;
 
   final String path;
