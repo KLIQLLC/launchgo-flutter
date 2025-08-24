@@ -5,6 +5,7 @@ import 'package:launchgo/features/documents/presentation/pages/documents_page.da
 import 'package:launchgo/screens/chat_screen.dart';
 import 'package:launchgo/screens/courses_screen.dart';
 import 'package:launchgo/screens/login_screen.dart';
+import 'package:launchgo/screens/new_document_screen.dart';
 import 'package:launchgo/screens/recaps_screen.dart';
 import 'package:launchgo/screens/schedule_screen.dart';
 import 'package:launchgo/screens/settings_screen.dart';
@@ -48,6 +49,11 @@ class AppRouter {
           path: '/settings',
           name: 'settings',
           builder: (context, state) => const SettingsScreen(),
+        ),
+        GoRoute(
+          path: '/new-document',
+          name: 'newDocument',
+          builder: (context, state) => const NewDocumentScreen(),
         ),
         ShellRoute(
           navigatorKey: _shellNavigatorKey,
@@ -201,8 +207,13 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
       body: child,
       drawer: const AppDrawer(),
       floatingActionButton: location == '/documents' ? FloatingActionButton.extended(
-        onPressed: () {
-          // TODO: Implement new document functionality
+        onPressed: () async {
+          // Navigate to new document screen
+          final result = await context.push('/new-document');
+          if (result == true && context.mounted) {
+            // Refresh documents list if document was created successfully
+            // This will be handled by the documents page's refresh logic
+          }
         },
         backgroundColor: Colors.white,
         foregroundColor: const Color(0xFF1A1F2B),

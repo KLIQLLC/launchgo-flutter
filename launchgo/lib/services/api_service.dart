@@ -206,6 +206,36 @@ class ApiService {
     }
   }
   
+  // Create new document
+  Future<Map<String, dynamic>> createDocument(Map<String, dynamic> documentData) async {
+    try {
+      final accessToken = _authService.accessToken;
+      if (accessToken == null) {
+        throw Exception('No access token available. Please sign in again.');
+      }
+      
+      debugPrint('=== Creating Document ===');
+      debugPrint('Environment: ${EnvironmentConfig.environmentName}');
+      debugPrint('Base URL: $baseUrl');
+      
+      // Use hardcoded userId for now (same as in getDocuments)
+      final userId = "e0a6da47-7328-4f48-bbbb-964e75eb7838";
+      debugPrint('User ID: $userId');
+      
+      final endpoint = '/users/$userId/documents';
+      debugPrint('POST endpoint: $endpoint');
+      debugPrint('Document data: $documentData');
+      
+      final response = await post(endpoint, documentData);
+      
+      debugPrint('Document created successfully: $response');
+      return response;
+    } catch (e) {
+      debugPrint('Failed to create document: $e');
+      rethrow;
+    }
+  }
+  
   // Extract user ID from JWT token
   String? _getUserIdFromToken(String token) {
     try {
