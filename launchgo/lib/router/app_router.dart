@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:launchgo/features/documents/domain/entities/document_entity.dart';
 import 'package:launchgo/features/documents/presentation/pages/documents_page.dart';
 import 'package:launchgo/screens/chat_screen.dart';
 import 'package:launchgo/screens/courses_screen.dart';
 import 'package:launchgo/screens/login_screen.dart';
-import 'package:launchgo/screens/new_document_screen.dart';
+import 'package:launchgo/screens/document_form_screen.dart';
 import 'package:launchgo/screens/recaps_screen.dart';
 import 'package:launchgo/screens/schedule_screen.dart';
 import 'package:launchgo/screens/settings_screen.dart';
@@ -53,7 +54,18 @@ class AppRouter {
         GoRoute(
           path: '/new-document',
           name: 'newDocument',
-          builder: (context, state) => const NewDocumentScreen(),
+          builder: (context, state) => const DocumentFormScreen(),
+        ),
+        GoRoute(
+          path: '/edit-document/:documentId',
+          name: 'editDocument',
+          builder: (context, state) {
+            final document = state.extra as DocumentEntity;
+            return DocumentFormScreen(
+              mode: DocumentScreenMode.edit,
+              document: document,
+            );
+          },
         ),
         ShellRoute(
           navigatorKey: _shellNavigatorKey,

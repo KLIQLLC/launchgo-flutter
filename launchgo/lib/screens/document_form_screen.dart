@@ -1,21 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../features/documents/domain/entities/document_entity.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/theme_service.dart';
+import '../widgets/cupertino_dropdown.dart';
 
-class NewDocumentScreen extends StatefulWidget {
-  const NewDocumentScreen({super.key});
-
-  @override
-  State<NewDocumentScreen> createState() => _NewDocumentScreenState();
+enum DocumentScreenMode {
+  create,
+  edit,
 }
 
-class _NewDocumentScreenState extends State<NewDocumentScreen> {
+class DocumentFormScreen extends StatefulWidget {
+  final DocumentScreenMode mode;
+  final DocumentEntity? document;
+  
+  const DocumentFormScreen({
+    super.key,
+    this.mode = DocumentScreenMode.create,
+    this.document,
+  });
+
+  @override
+  State<DocumentFormScreen> createState() => _DocumentFormScreenState();
+}
+
+class _DocumentFormScreenState extends State<DocumentFormScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _categoryController = TextEditingController(text: 'Notes'); // Preselect Notes
+  late TextEditingController _nameController;
+  late TextEditingController _categoryController;
   String? _selectedCourse;
   bool _isSubmitting = false;
 
@@ -25,6 +39,46 @@ class _NewDocumentScreenState extends State<NewDocumentScreen> {
     'Assignment',
     'Study Guide'
   ];
+  
+  bool get isEditMode => widget.mode == DocumentScreenMode.edit;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    if (isEditMode && widget.document != null) {
+      // Initialize with existing document data
+      _nameController = TextEditingController(text: widget.document!.name);
+      
+      // Map category from API format to display format
+      String initialCategory = 'Notes';
+      switch (widget.document!.category) {
+        case 'notes':
+          initialCategory = 'Notes';
+          break;
+        case 'assignment':
+          initialCategory = 'Assignment';
+          break;
+        case 'study-guide':
+          initialCategory = 'Study Guide';
+          break;
+      }
+      _categoryController = TextEditingController(text: initialCategory);
+      
+      // Map courseId to course name
+      if (widget.document!.courseId != null) {
+        final courseId = widget.document!.courseId!.toUpperCase();
+        if (_courses.contains(courseId)) {
+          _selectedCourse = courseId;
+        }
+      }
+    } else {
+      // Create mode - default values
+      _nameController = TextEditingController();
+      _categoryController = TextEditingController(text: 'Notes');
+      _selectedCourse = null;
+    }
+  }
 
   @override
   void dispose() {
@@ -49,18 +103,24 @@ class _NewDocumentScreenState extends State<NewDocumentScreen> {
       final documentData = {
         'name': _nameController.text.trim(),
         'type': '', // Empty string for type
-        'category': _categoryController.text.trim().toLowerCase(), // Category in lowercase
+        'category': _categoryController.text.trim().toLowerCase().replaceAll(' ', '-'), // Category in lowercase with dashes
         'tag': (_selectedCourse != null && _selectedCourse != 'Select course (optional)') 
             ? _selectedCourse!.toLowerCase() 
             : '', // Course as tag, empty string if not selected
       };
 
-      await apiService.createDocument(documentData);
+      if (isEditMode) {
+        await apiService.updateDocument(widget.document!.id, documentData);
+      } else {
+        await apiService.createDocument(documentData);
+      }
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Document created successfully'),
+          SnackBar(
+            content: Text(isEditMode 
+                ? 'Document updated successfully' 
+                : 'Document created successfully'),
             backgroundColor: Colors.green,
           ),
         );
@@ -70,7 +130,9 @@ class _NewDocumentScreenState extends State<NewDocumentScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to create document: ${e.toString()}'),
+            content: Text(isEditMode 
+                ? 'Failed to update document: ${e.toString()}'
+                : 'Failed to create document: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -98,7 +160,7 @@ class _NewDocumentScreenState extends State<NewDocumentScreen> {
           onPressed: () => context.pop(),
         ),
         title: Text(
-          'Create New Document',
+          isEditMode ? 'Edit Document' : 'Create New Document',
           style: TextStyle(
             color: themeService.textColor,
             fontSize: 20,
@@ -202,41 +264,11 @@ class _NewDocumentScreenState extends State<NewDocumentScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
+                CupertinoDropdown(
                   value: _categoryController.text.isEmpty ? null : _categoryController.text,
-                  style: TextStyle(color: themeService.textColor),
-                  dropdownColor: themeService.cardColor,
-                  decoration: InputDecoration(
-                    hintText: 'Select category',
-                    hintStyle: TextStyle(color: themeService.textTertiaryColor),
-                    filled: true,
-                    fillColor: themeService.cardColor,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: themeService.borderColor,
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: themeService.borderColor,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                        color: ThemeService.accent,
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                  items: _categories.map((category) {
-                    return DropdownMenuItem<String>(
-                      value: category,
-                      child: Text(category),
-                    );
-                  }).toList(),
+                  items: _categories,
+                  hintText: 'Select category',
+                  isRequired: true,
                   onChanged: (value) {
                     setState(() {
                       _categoryController.text = value ?? '';
@@ -261,41 +293,10 @@ class _NewDocumentScreenState extends State<NewDocumentScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
+                CupertinoDropdown(
                   value: _selectedCourse,
-                  style: TextStyle(color: themeService.textColor),
-                  dropdownColor: themeService.cardColor,
-                  decoration: InputDecoration(
-                    hintText: 'Select course (optional)',
-                    hintStyle: TextStyle(color: themeService.textTertiaryColor),
-                    filled: true,
-                    fillColor: themeService.cardColor,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: themeService.borderColor,
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: themeService.borderColor,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                        color: ThemeService.accent,
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                  items: _courses.map((course) {
-                    return DropdownMenuItem<String>(
-                      value: course,
-                      child: Text(course),
-                    );
-                  }).toList(),
+                  items: _courses,
+                  hintText: 'Select course (optional)',
                   onChanged: (value) {
                     setState(() {
                       _selectedCourse = value;
@@ -323,9 +324,9 @@ class _NewDocumentScreenState extends State<NewDocumentScreen> {
                             color: Colors.white,
                             strokeWidth: 2,
                           )
-                        : const Text(
-                            'Create Document',
-                            style: TextStyle(
+                        : Text(
+                            isEditMode ? 'Update Document' : 'Create Document',
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                             ),

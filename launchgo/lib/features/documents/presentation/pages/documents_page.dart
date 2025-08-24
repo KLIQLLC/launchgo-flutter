@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../../services/auth_service.dart';
 import '../../../../services/api_service.dart';
 import '../../../../services/theme_service.dart';
-import '../../../../widgets/course_filter_selector.dart';
+import '../../../../widgets/cupertino_dropdown.dart';
 import '../../data/repositories/documents_repository_impl.dart';
 import '../../domain/usecases/get_documents.dart';
 import '../../domain/usecases/search_documents.dart';
@@ -141,32 +141,38 @@ class _DocumentsViewState extends State<DocumentsView> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      BlocBuilder<DocumentsBloc, DocumentsState>(
-                        builder: (context, state) {
-                          // Get current selected course
-                          String getCurrentCourse() {
-                            if (state is DocumentsLoaded) {
-                              // If no course is selected (null), it means "All"
-                              return state.selectedCourseId ?? 'All';
-                            }
-                            return 'All';
-                          }
-                          
-                          return CourseFilterSelector(
-                            initialCourse: getCurrentCourse(),
-                            courses: const ['All', 'CODE11', 'CODE12', 'CODE13'],
-                            onCourseChanged: (course) {
-                              // Filter by course
-                              if (course == 'All') {
-                                // Show all documents - no filter
-                                context.read<DocumentsBloc>().add(const FilterDocumentsByCourse(null));
-                              } else {
-                                // Filter by specific course
-                                context.read<DocumentsBloc>().add(FilterDocumentsByCourse(course));
+                      SizedBox(
+                        width: 120, // Fixed width for the dropdown
+                        child: BlocBuilder<DocumentsBloc, DocumentsState>(
+                          builder: (context, state) {
+                            // Get current selected course
+                            String getCurrentCourse() {
+                              if (state is DocumentsLoaded) {
+                                // If no course is selected (null), it means "All"
+                                return state.selectedCourseId ?? 'All';
                               }
-                            },
-                          );
-                        },
+                              return 'All';
+                            }
+                            
+                            return CupertinoDropdown(
+                              value: getCurrentCourse(),
+                              items: const ['All', 'CODE11', 'CODE12', 'CODE13'],
+                              hintText: 'Select course',
+                              onChanged: (course) {
+                                  if (course != null) {
+                                    // Filter by course
+                                    if (course == 'All') {
+                                      // Show all documents - no filter
+                                      context.read<DocumentsBloc>().add(const FilterDocumentsByCourse(null));
+                                    } else {
+                                      // Filter by specific course
+                                      context.read<DocumentsBloc>().add(FilterDocumentsByCourse(course));
+                                    }
+                                  }
+                                },
+                            );
+                          },
+                        ),
                       ),
                     ],
                   ),

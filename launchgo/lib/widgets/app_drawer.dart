@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:launchgo/config/environment.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/theme_service.dart';
-import 'package:launchgo/widgets/semester_selector.dart';
+import 'package:launchgo/widgets/cupertino_dropdown.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 
@@ -18,6 +18,7 @@ class AppDrawer extends StatefulWidget {
 class _AppDrawerState extends State<AppDrawer> {
   String _version = '';
   String _buildNumber = '';
+  String _selectedSemester = 'Fall 2024';
 
   @override
   void initState() {
@@ -113,11 +114,19 @@ class _AppDrawerState extends State<AppDrawer> {
                 ),
                 Padding(
                   padding: const EdgeInsets.only(left: 32, right: 80),
-                  child: SemesterSelector(
-                    onSemesterChanged: (semester) {
-                      // TODO: Handle semester change
-                      debugPrint('Selected semester: $semester');
-                    },
+                  child: CupertinoDropdown(
+                    value: _selectedSemester,
+                    items: const ['Fall 2024', 'Spring 2024', 'Summer 2024'],
+                    hintText: 'Select semester',
+                    onChanged: (semester) {
+                        if (semester != null) {
+                          setState(() {
+                            _selectedSemester = semester;
+                          });
+                          // TODO: Handle semester change
+                          debugPrint('Selected semester: $semester');
+                        }
+                      },
                   ),
                 ),
                 const SizedBox(height: 8),

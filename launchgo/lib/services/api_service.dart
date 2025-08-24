@@ -98,6 +98,34 @@ class ApiService {
     }
   }
 
+  Future<dynamic> _put(String endpoint, Map<String, dynamic> body) async {
+    try {
+      final headers = await _getHeaders();
+      final accessToken = _authService.accessToken;
+      
+      if (accessToken == null) {
+        throw Exception('No access token available. Please sign in again.');
+      }
+      
+      final response = await http.put(
+        Uri.parse('$baseUrl$endpoint'),
+        headers: headers,
+        body: json.encode(body),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return json.decode(response.body);
+      } else if (response.statusCode == 401) {
+        throw Exception('Authentication failed. Please sign in again.');
+      } else {
+        throw Exception('Failed to update data: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('API PUT error: $e');
+      rethrow;
+    }
+  }
+
   // Example: Get user profile from your backend
   Future<Map<String, dynamic>?> getUserProfile() async {
     try {
@@ -232,6 +260,37 @@ class ApiService {
       return response;
     } catch (e) {
       debugPrint('Failed to create document: $e');
+      rethrow;
+    }
+  }
+  
+  // Update existing document
+  Future<Map<String, dynamic>> updateDocument(String documentId, Map<String, dynamic> documentData) async {
+    try {
+      final accessToken = _authService.accessToken;
+      if (accessToken == null) {
+        throw Exception('No access token available. Please sign in again.');
+      }
+      
+      debugPrint('=== Updating Document ===');
+      debugPrint('Environment: ${EnvironmentConfig.environmentName}');
+      debugPrint('Base URL: $baseUrl');
+      
+      // Use hardcoded userId for now (same as in getDocuments)
+      final userId = "e0a6da47-7328-4f48-bbbb-964e75eb7838";
+      debugPrint('User ID: $userId');
+      debugPrint('Document ID: $documentId');
+      
+      final endpoint = '/users/$userId/documents/$documentId';
+      debugPrint('PUT endpoint: $endpoint');
+      debugPrint('Document data: $documentData');
+      
+      final response = await _put(endpoint, documentData);
+      
+      debugPrint('Document updated successfully: $response');
+      return response;
+    } catch (e) {
+      debugPrint('Failed to update document: $e');
       rethrow;
     }
   }

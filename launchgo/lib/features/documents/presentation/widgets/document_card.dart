@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -17,22 +18,25 @@ class DocumentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final themeService = context.watch<ThemeService>();
     
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: _buildCardDecoration(themeService),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildTitle(themeService),
-            const SizedBox(height: 12),
-            _buildTypeTag(themeService),
-            const SizedBox(height: 12),
-            _buildLastOpenedText(themeService),
-            const SizedBox(height: 16),
-            _buildOpenButton(themeService),
-          ],
+    return GestureDetector(
+      onTap: () => _navigateToEditDocument(context),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: _buildCardDecoration(themeService),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildTitle(themeService),
+              const SizedBox(height: 12),
+              _buildTypeTag(themeService),
+              const SizedBox(height: 12),
+              _buildLastOpenedText(themeService),
+              const SizedBox(height: 16),
+              _buildOpenButton(themeService),
+            ],
+          ),
         ),
       ),
     );
@@ -191,6 +195,10 @@ class DocumentCard extends StatelessWidget {
   }
 
   // MARK: - Actions
+
+  void _navigateToEditDocument(BuildContext context) {
+    context.push('/edit-document/${document.id}', extra: document);
+  }
 
   Future<void> _openInGoogleDocs(String url) async {
     final uri = Uri.parse(url);
