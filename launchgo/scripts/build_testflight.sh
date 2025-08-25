@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Build script for Stage TestFlight distribution
+# Build script for Production TestFlight distribution
 # Usage: bash scripts/build_stage_testflight.sh
 
-echo "🚀 Building LaunchGo Stage for TestFlight..."
+echo "🚀 Building LaunchGo Production for TestFlight..."
 
 # Colors for output
 RED='\033[0;31m'
@@ -26,13 +26,17 @@ echo -e "${YELLOW}📦 Cleaning and updating dependencies...${NC}"
 flutter clean
 flutter pub get
 
+# Build iOS with Flutter using stage flavor but production environment
+echo -e "${YELLOW}🏗️ Building iOS for TestFlight (stage bundle ID + prod env)...${NC}"
+flutter build ios --flavor stage --dart-define=ENV=prod
+
 # iOS specific setup
 echo -e "${YELLOW}🍎 Setting up iOS dependencies...${NC}"
 cd ios
 pod install
 
 # Build archive with Release-stage configuration
-echo -e "${YELLOW}🏗️ Building iOS archive for Stage...${NC}"
+echo -e "${YELLOW}🏗️ Building iOS archive for TestFlight...${NC}"
 xcodebuild -workspace Runner.xcworkspace \
   -scheme Runner \
   -configuration Release-stage \
@@ -47,18 +51,18 @@ if [ $? -eq 0 ]; then
     echo -e "${YELLOW}📦 Exporting IPA...${NC}"
     xcodebuild -exportArchive \
       -archivePath build/Runner-stage.xcarchive \
-      -exportPath build/stage-ipa \
+      -exportPath build/testflight-ipa \
       -exportOptionsPlist ExportOptions-stage.plist
     
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}✅ IPA exported successfully!${NC}"
-        echo -e "${GREEN}📍 IPA location: ios/build/stage-ipa/${NC}"
-        ls -la build/stage-ipa/*.ipa
+        echo -e "${GREEN}📍 IPA location: ios/build/testflight-ipa/${NC}"
+        ls -la build/testflight-ipa/*.ipa
         
         echo -e "\n${YELLOW}📤 Next steps:${NC}"
         echo "1. Open Transporter app"
         echo "2. Sign in with your Apple ID"
-        echo "3. Drag the IPA file from ios/build/stage-ipa/"
+        echo "3. Drag the IPA file from ios/build/testflight-ipa/"
         echo "4. Click Deliver"
         echo ""
         echo "Or use Xcode Organizer:"
@@ -75,4 +79,4 @@ else
 fi
 
 cd ..
-echo -e "${GREEN}🎉 Stage build complete!${NC}"
+echo -e "${GREEN}🎉 TestFlight build complete!${NC}"
