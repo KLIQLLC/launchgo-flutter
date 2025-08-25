@@ -102,11 +102,10 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
       
       final documentData = {
         'name': _nameController.text.trim(),
-        'type': '', // Empty string for type
         'category': _categoryController.text.trim().toLowerCase().replaceAll(' ', '-'), // Category in lowercase with dashes
-        'tag': (_selectedCourse != null && _selectedCourse != 'Select course (optional)') 
+        'courseId': (_selectedCourse != null && _selectedCourse != 'Select course (optional)') 
             ? _selectedCourse!.toLowerCase() 
-            : '', // Course as tag, empty string if not selected
+            : '', // Course as courseId, empty string if not selected
       };
 
       if (isEditMode) {
