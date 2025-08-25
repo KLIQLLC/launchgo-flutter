@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
-import 'package:launchgo/config/environment.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/widgets/cupertino_dropdown.dart';
-import 'package:package_info_plus/package_info_plus.dart';
+import 'package:launchgo/widgets/version_environment_widget.dart';
 import 'package:provider/provider.dart';
 
 class AppDrawer extends StatefulWidget {
@@ -16,23 +15,7 @@ class AppDrawer extends StatefulWidget {
 }
 
 class _AppDrawerState extends State<AppDrawer> {
-  String _version = '';
-  String _buildNumber = '';
   String _selectedSemester = 'Fall 2024';
-
-  @override
-  void initState() {
-    super.initState();
-    _loadAppInfo();
-  }
-
-  Future<void> _loadAppInfo() async {
-    final packageInfo = await PackageInfo.fromPlatform();
-    setState(() {
-      _version = packageInfo.version;
-      _buildNumber = packageInfo.buildNumber;
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -212,23 +195,7 @@ class _AppDrawerState extends State<AppDrawer> {
                   child: Divider(color: themeService.borderColor, height: 1),
                 ),
                 // Version Info (compact)
-                Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Center(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Version $_version.$_buildNumber-${EnvironmentConfig.isStage ? 'stage' : 'prod'}',
-                          style: TextStyle(
-                            color: themeService.textTertiaryColor,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                const VersionEnvironmentWidget(),
               ],
             ),
           ),
