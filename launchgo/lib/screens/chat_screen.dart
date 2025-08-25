@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../services/theme_service.dart';
 
@@ -15,10 +16,14 @@ class ChatScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.chat_bubble_outline,
-              color: themeService.textTertiaryColor,
-              size: 64,
+            SvgPicture.asset(
+              'assets/icons/ic_chat.svg',
+              width: 64,
+              height: 64,
+              colorFilter: ColorFilter.mode(
+                themeService.textTertiaryColor,
+                BlendMode.srcIn,
+              ),
             ),
             const SizedBox(height: 16),
             Text(

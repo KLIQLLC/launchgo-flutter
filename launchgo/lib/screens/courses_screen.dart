@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:provider/provider.dart';
 
@@ -9,102 +10,52 @@ class CoursesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final themeService = context.watch<ThemeService>();
     
-    return ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          _buildCourseCard(
-            context,
-            'Math 101',
-            'Introduction to Calculus',
-            'Prof. Smith',
-            Colors.blue,
-          ),
-          _buildCourseCard(
-            context,
-            'History 202',
-            'World History',
-            'Dr. Johnson',
-            Colors.green,
-          ),
-          _buildCourseCard(
-            context,
-            'English 303',
-            'Advanced Writing',
-            'Prof. Williams',
-            Colors.orange,
-          ),
-        ],
-      );
-  }
-
-  Widget _buildCourseCard(BuildContext context, String code, String title, String instructor, Color color) {
-    final themeService = context.watch<ThemeService>();
-    
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: themeService.cardColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: themeService.borderColor,
-          width: 1,
-        ),
-        boxShadow: !themeService.isDarkMode ? [
-          BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.1),
-            spreadRadius: 1,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ] : null,
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
-        leading: Container(
-          width: 50,
-          height: 50,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            Icons.book,
-            color: color,
-          ),
-        ),
-        title: Text(
-          code,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-            color: themeService.textColor,
-          ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: themeService.cardColor,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: themeService.borderColor,
+                  width: 1,
+                ),
+              ),
+              child: SvgPicture.asset(
+                'assets/icons/ic_course.svg',
+                width: 48,
+                height: 48,
+                colorFilter: ColorFilter.mode(
+                  themeService.textTertiaryColor,
+                  BlendMode.srcIn,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
             Text(
-              title,
+              'No Courses Yet',
               style: TextStyle(
                 color: themeService.textColor,
-                fontSize: 14,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 8),
             Text(
-              instructor,
+              'Your enrolled courses will appear here\nonce they are available',
               style: TextStyle(
                 color: themeService.textSecondaryColor,
-                fontSize: 12,
+                fontSize: 14,
+                height: 1.5,
               ),
+              textAlign: TextAlign.center,
             ),
           ],
-        ),
-        trailing: Icon(
-          Icons.arrow_forward_ios, 
-          size: 16, 
-          color: themeService.textTertiaryColor,
         ),
       ),
     );
