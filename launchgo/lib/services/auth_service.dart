@@ -24,7 +24,7 @@ class AuthService extends ChangeNotifier {
   String? get accessToken => _accessToken;
   bool get isInitialized => _isInitialized;
   bool get isSigningIn => _isSigningIn;
-  bool get isAuthenticated => _currentUser != null;
+  bool get isAuthenticated => _currentUser != null && _accessToken != null;
   bool get hasAccessToken => _accessToken != null;
 
   // Google Sign-In configuration
@@ -145,10 +145,20 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await GoogleSignIn.instance.authenticate();
-      await _signInCompleter?.future;
+      // If already signed in with Google but no access token, 
+      // just retry backend authentication
+      if (_currentUser != null && _accessToken == null) {
+        // User is already authenticated with Google, just need backend token
+        await _getServerAuthCode(_currentUser!);
+        _signInCompleter?.complete();
+        await _signInCompleter?.future;
+      } else {
+        // Normal sign-in flow
+        await GoogleSignIn.instance.authenticate();
+        await _signInCompleter?.future;
+      }
       
-      final success = _currentUser != null;
+      final success = _currentUser != null && _accessToken != null;
       _isSigningIn = false;
       notifyListeners();
       

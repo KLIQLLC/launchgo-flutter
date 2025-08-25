@@ -75,7 +75,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 80),
                     
-                    if (authService.currentUser == null) ...[
+                    // Show Sign In button if:
+                    // 1. User is not signed in with Google at all, OR
+                    // 2. User is signed in with Google but doesn't have backend access token
+                    if (authService.currentUser == null || !authService.hasAccessToken) ...[
                       SizedBox(
                         width: double.infinity,
                         height: 54,
@@ -108,15 +111,36 @@ class _LoginScreenState extends State<LoginScreen> {
                                       width: 24,
                                     ),
                                     const SizedBox(width: 12),
-                                    const Text(
-                                      'Sign in with Google',
-                                      style: TextStyle(fontSize: 16),
+                                    Text(
+                                      // Show different text based on state
+                                      authService.currentUser != null 
+                                          ? 'Retry Authentication' 
+                                          : 'Sign in with Google',
+                                      style: const TextStyle(fontSize: 16),
                                     ),
                                   ],
                                 ),
                         ),
                       ),
+                      
+                      // Show sign out option if user is signed in with Google
+                      // but backend authentication failed
+                      if (authService.currentUser != null && !authService.hasAccessToken) ...[
+                        const SizedBox(height: 16),
+                        TextButton(
+                          onPressed: _handleSignOut,
+                          child: const Text(
+                            'Sign in with different account',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ],
                     ] else ...[
+                      // This case should not happen anymore since we check hasAccessToken above
+                      // Keeping for safety
                       SizedBox(
                         width: double.infinity,
                         height: 54,
