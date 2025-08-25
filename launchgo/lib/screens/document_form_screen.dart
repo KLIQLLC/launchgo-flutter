@@ -168,30 +168,6 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
           ),
         ),
         centerTitle: true,
-        actions: [
-          TextButton(
-            onPressed: _isSubmitting ? null : _submitDocument,
-            child: _isSubmitting
-                ? SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        ThemeService.accent,
-                      ),
-                    ),
-                  )
-                : Text(
-                    'Save',
-                    style: TextStyle(
-                      color: ThemeService.accent,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-          ),
-        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
