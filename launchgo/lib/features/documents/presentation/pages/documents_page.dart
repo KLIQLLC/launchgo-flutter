@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../../../services/auth_service.dart';
 import '../../../../services/api_service.dart';
@@ -64,7 +65,23 @@ class _DocumentsViewState extends State<DocumentsView> {
   Widget build(BuildContext context) {
     final themeService = context.watch<ThemeService>();
     
-    return SafeArea(
+    return Scaffold(
+      backgroundColor: themeService.backgroundColor,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          // Navigate to new document screen
+          final result = await context.push('/new-document');
+          if (result == true && context.mounted) {
+            // Refresh documents list if document was created successfully
+            _onRefresh();
+          }
+        },
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF1A1F2B),
+        icon: const Icon(Icons.add),
+        label: const Text('New Document'),
+      ),
+      body: SafeArea(
         child: Column(
           children: [
             Divider(color: themeService.borderColor, height: 1),
@@ -284,6 +301,7 @@ class _DocumentsViewState extends State<DocumentsView> {
                         children: state.filteredDocuments.map((document) {
                           return DocumentCard(
                             document: document,
+                            onDeleted: _onRefresh,
                           );
                         }).toList(),
                       ),
@@ -334,6 +352,7 @@ class _DocumentsViewState extends State<DocumentsView> {
             ),
           ],
         ),
-      );
+      ),
+    );
   }
 }

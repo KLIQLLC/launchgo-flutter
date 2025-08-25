@@ -218,20 +218,6 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
       ),
       body: child,
       drawer: const AppDrawer(),
-      floatingActionButton: location == '/documents' ? FloatingActionButton.extended(
-        onPressed: () async {
-          // Navigate to new document screen
-          final result = await context.push('/new-document');
-          if (result == true && context.mounted) {
-            // Refresh documents list if document was created successfully
-            // This will be handled by the documents page's refresh logic
-          }
-        },
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF1A1F2B),
-        icon: const Icon(Icons.add),
-        label: const Text('New Document'),
-      ) : null,
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         currentIndex: _calculateSelectedIndex(context),

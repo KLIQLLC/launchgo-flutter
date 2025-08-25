@@ -3,41 +3,141 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../services/api_service.dart';
+import '../../../../services/auth_service.dart';
 import '../../../../services/theme_service.dart';
 import '../../domain/entities/document_entity.dart';
 
-class DocumentCard extends StatelessWidget {
+class DocumentCard extends StatefulWidget {
   final DocumentEntity document;
+  final VoidCallback? onDeleted;
 
   const DocumentCard({
     super.key,
     required this.document,
+    this.onDeleted,
   });
+
+  @override
+  State<DocumentCard> createState() => _DocumentCardState();
+}
+
+class _DocumentCardState extends State<DocumentCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _slideAnimation;
+  double _maxSlideDistance = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+    _slideAnimation = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOut,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final themeService = context.watch<ThemeService>();
     
-    return GestureDetector(
-      onTap: () => _navigateToEditDocument(context),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: _buildCardDecoration(themeService),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          _maxSlideDistance = constraints.maxWidth * 0.4; // 40% of width
+          
+          return Stack(
             children: [
-              _buildTitle(themeService),
-              const SizedBox(height: 12),
-              _buildTypeTag(themeService),
-              const SizedBox(height: 12),
-              _buildLastOpenedText(themeService),
-              const SizedBox(height: 16),
-              _buildOpenButton(themeService),
+              // Delete background - only visible when sliding
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 20),
+                  child: const Icon(
+                    Icons.delete,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+              ),
+              // Main card that slides
+              AnimatedBuilder(
+                animation: _slideAnimation,
+                builder: (context, child) {
+                  final slideOffset = _slideAnimation.value * _maxSlideDistance;
+                  return Transform.translate(
+                    offset: Offset(-slideOffset, 0),
+                    child: GestureDetector(
+                      onHorizontalDragUpdate: (details) {
+                        if (details.delta.dx < 0) {
+                          // Sliding left
+                          final progress = (_slideAnimation.value * _maxSlideDistance - details.delta.dx) / _maxSlideDistance;
+                          _animationController.value = progress.clamp(0.0, 1.0);
+                        } else if (details.delta.dx > 0) {
+                          // Sliding right
+                          final progress = (_slideAnimation.value * _maxSlideDistance - details.delta.dx) / _maxSlideDistance;
+                          _animationController.value = progress.clamp(0.0, 1.0);
+                        }
+                      },
+                      onHorizontalDragEnd: (details) {
+                        if (_slideAnimation.value > 0.5) {
+                          // If more than 50% swiped, trigger delete
+                          _showDeleteConfirmation(context).then((confirmed) {
+                            if (confirmed == true) {
+                              _deleteDocument(context);
+                            } else {
+                              _animationController.reverse();
+                            }
+                          });
+                        } else {
+                          // Snap back
+                          _animationController.reverse();
+                        }
+                      },
+                      onTap: _slideAnimation.value == 0 ? () => _navigateToEditDocument(context) : null,
+                      child: Container(
+                        decoration: _buildCardDecoration(themeService),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildTitle(themeService),
+                              const SizedBox(height: 12),
+                              _buildTypeTag(themeService),
+                              const SizedBox(height: 12),
+                              _buildLastOpenedText(themeService),
+                              const SizedBox(height: 16),
+                              _buildOpenButton(themeService),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
             ],
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -46,7 +146,7 @@ class DocumentCard extends StatelessWidget {
   
   Widget _buildTitle(ThemeService themeService) {
     return Text(
-      document.title,
+      widget.document.title,
       style: TextStyle(
         color: themeService.textColor,
         fontSize: 16,
@@ -56,7 +156,7 @@ class DocumentCard extends StatelessWidget {
   }
 
   Widget _buildTypeTag(ThemeService themeService) {
-    final tagColors = _getTagColors(themeService, document.type);
+    final tagColors = _getTagColors(themeService, widget.document.type);
     
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -65,7 +165,7 @@ class DocumentCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
-        document.typeLabel,
+        widget.document.typeLabel,
         style: TextStyle(
           color: tagColors.textColor,
           fontSize: 12,
@@ -77,7 +177,7 @@ class DocumentCard extends StatelessWidget {
 
   Widget _buildLastOpenedText(ThemeService themeService) {
     return Text(
-      'Last Opened: ${DateFormat('M/d/yyyy').format(document.lastOpened)}',
+      'Last Opened: ${DateFormat('M/d/yyyy').format(widget.document.lastOpened)}',
       style: TextStyle(
         color: themeService.textSecondaryColor,
         fontSize: 14,
@@ -89,7 +189,7 @@ class DocumentCard extends StatelessWidget {
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
-        onPressed: () => _openInGoogleDocs(document.link),
+        onPressed: () => _openInGoogleDocs(widget.document.link),
         icon: Icon(
           Icons.open_in_new,
           size: 18,
@@ -196,14 +296,71 @@ class DocumentCard extends StatelessWidget {
 
   // MARK: - Actions
 
-  void _navigateToEditDocument(BuildContext context) {
-    context.push('/edit-document/${document.id}', extra: document);
+  void _navigateToEditDocument(BuildContext context) async {
+    final result = await context.push('/edit-document/${widget.document.id}', extra: widget.document);
+    if (result == true && context.mounted) {
+      // Notify parent that document was edited
+      widget.onDeleted?.call();
+    }
   }
 
   Future<void> _openInGoogleDocs(String url) async {
     final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<bool?> _showDeleteConfirmation(BuildContext context) async {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Document'),
+        content: Text('Are you sure you want to delete "${widget.document.title}"? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteDocument(BuildContext context) async {
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final apiService = ApiService(authService: authService);
+      
+      await apiService.deleteDocument(widget.document.id);
+      
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Document deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        
+        // Notify parent that document was deleted
+        widget.onDeleted?.call();
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete document: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 }

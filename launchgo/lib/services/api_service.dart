@@ -126,6 +126,34 @@ class ApiService {
     }
   }
 
+  Future<void> _delete(String endpoint) async {
+    try {
+      final headers = await _getHeaders();
+      final accessToken = _authService.accessToken;
+      
+      if (accessToken == null) {
+        throw Exception('No access token available. Please sign in again.');
+      }
+      
+      final response = await http.delete(
+        Uri.parse('$baseUrl$endpoint'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        // Success - no content to return
+        return;
+      } else if (response.statusCode == 401) {
+        throw Exception('Authentication failed. Please sign in again.');
+      } else {
+        throw Exception('Failed to delete data: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('API DELETE error: $e');
+      rethrow;
+    }
+  }
+
   // Example: Get user profile from your backend
   Future<Map<String, dynamic>?> getUserProfile() async {
     try {
@@ -198,9 +226,9 @@ class ApiService {
       debugPrint('Base URL: $baseUrl');
       
       // Extract user ID from JWT token
-      // final userId = _getUserIdFromToken(accessToken);
+      final userId = _getUserIdFromToken(accessToken);
       //hardcoded userId for testing
-      final userId = "e0a6da47-7328-4f48-bbbb-964e75eb7838";
+      // final userId = "e0a6da47-7328-4f48-bbbb-964e75eb7838";
       debugPrint('User ID from token: $userId');
       
       // Call the documents endpoint
@@ -246,8 +274,9 @@ class ApiService {
       debugPrint('Environment: ${EnvironmentConfig.environmentName}');
       debugPrint('Base URL: $baseUrl');
       
+      final userId = _getUserIdFromToken(accessToken);
       // Use hardcoded userId for now (same as in getDocuments)
-      final userId = "e0a6da47-7328-4f48-bbbb-964e75eb7838";
+      // final userId = "e0a6da47-7328-4f48-bbbb-964e75eb7838";
       debugPrint('User ID: $userId');
       
       final endpoint = '/users/$userId/documents';
@@ -276,8 +305,9 @@ class ApiService {
       debugPrint('Environment: ${EnvironmentConfig.environmentName}');
       debugPrint('Base URL: $baseUrl');
       
+      final userId = _getUserIdFromToken(accessToken);
       // Use hardcoded userId for now (same as in getDocuments)
-      final userId = "e0a6da47-7328-4f48-bbbb-964e75eb7838";
+      // final userId = "e0a6da47-7328-4f48-bbbb-964e75eb7838";
       debugPrint('User ID: $userId');
       debugPrint('Document ID: $documentId');
       
@@ -295,6 +325,37 @@ class ApiService {
     }
   }
   
+  // Delete document
+  Future<void> deleteDocument(String documentId) async {
+    try {
+      final accessToken = _authService.accessToken;
+      if (accessToken == null) {
+        throw Exception('No access token available. Please sign in again.');
+      }
+      
+      final userId = _getUserIdFromToken(accessToken);
+      if (userId == null) {
+        throw Exception('Unable to extract user ID from token.');
+      }
+      
+      debugPrint('=== Deleting Document ===');
+      debugPrint('Environment: ${EnvironmentConfig.environmentName}');
+      debugPrint('Base URL: $baseUrl');
+      debugPrint('User ID: $userId');
+      debugPrint('Document ID: $documentId');
+      
+      final endpoint = '/users/$userId/documents/$documentId';
+      debugPrint('DELETE endpoint: $endpoint');
+      
+      await _delete(endpoint);
+      
+      debugPrint('Document deleted successfully');
+    } catch (e) {
+      debugPrint('Failed to delete document: $e');
+      rethrow;
+    }
+  }
+  
   // Extract user ID from JWT token
   String? _getUserIdFromToken(String token) {
     try {
@@ -307,7 +368,9 @@ class ApiService {
       debugPrint('Decoded token claims: $decodedToken');
       
       // Try different possible fields for user ID
+      // Priority: studentId -> mentorId -> fallback options
       var userId = decodedToken['studentId'] as String? ??
+                   decodedToken['mentorId'] as String? ??
                    decodedToken['userId'] as String? ??
                    decodedToken['sub'] as String? ??
                    decodedToken['id'] as String?;
