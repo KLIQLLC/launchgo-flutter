@@ -11,40 +11,53 @@ class ScheduleScreen extends StatelessWidget {
     final themeService = context.watch<ThemeService>();
     
     return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SvgPicture.asset(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: themeService.cardColor,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: themeService.borderColor,
+                  width: 1,
+                ),
+              ),
+              child: SvgPicture.asset(
                 'assets/icons/ic_schedule.svg',
-                width: 80,
-                height: 80,
-                colorFilter: const ColorFilter.mode(
-                  ThemeService.accent,
+                width: 48,
+                height: 48,
+                colorFilter: ColorFilter.mode(
+                  themeService.textTertiaryColor,
                   BlendMode.srcIn,
                 ),
               ),
-              const SizedBox(height: 20),
-              Text(
-                'Your Schedule',
-                style: TextStyle(
-                  color: themeService.textColor,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'No Schedule Yet',
+              style: TextStyle(
+                color: themeService.textColor,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
               ),
-              const SizedBox(height: 10),
-              Text(
-                'View and manage your learning schedule',
-                style: TextStyle(
-                  fontSize: 16, 
-                  color: themeService.textSecondaryColor,
-                ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Your learning schedule will appear here\nonce it\'s available',
+              style: TextStyle(
+                color: themeService.textSecondaryColor,
+                fontSize: 14,
+                height: 1.5,
               ),
-            ],
-          ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
-      );
+      ),
+    );
   }
 }

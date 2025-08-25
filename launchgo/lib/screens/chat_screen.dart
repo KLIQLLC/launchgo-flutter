@@ -13,36 +13,52 @@ class ChatScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: themeService.backgroundColor,
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SvgPicture.asset(
-              'assets/icons/ic_chat.svg',
-              width: 64,
-              height: 64,
-              colorFilter: ColorFilter.mode(
-                themeService.textTertiaryColor,
-                BlendMode.srcIn,
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: themeService.cardColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: themeService.borderColor,
+                    width: 1,
+                  ),
+                ),
+                child: SvgPicture.asset(
+                  'assets/icons/ic_chat.svg',
+                  width: 48,
+                  height: 48,
+                  colorFilter: ColorFilter.mode(
+                    themeService.textTertiaryColor,
+                    BlendMode.srcIn,
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Chat',
-              style: TextStyle(
-                color: themeService.textColor,
-                fontSize: 24,
-                fontWeight: FontWeight.w600,
+              const SizedBox(height: 24),
+              Text(
+                'No Messages Yet',
+                style: TextStyle(
+                  color: themeService.textColor,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'No messages yet',
-              style: TextStyle(
-                color: themeService.textSecondaryColor,
-                fontSize: 16,
+              const SizedBox(height: 8),
+              Text(
+                'Your messages and conversations\nwill appear here',
+                style: TextStyle(
+                  color: themeService.textSecondaryColor,
+                  fontSize: 14,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
