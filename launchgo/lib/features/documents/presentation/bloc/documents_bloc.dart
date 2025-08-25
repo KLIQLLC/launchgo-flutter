@@ -26,12 +26,12 @@ class DocumentsBloc extends Bloc<DocumentsEvent, DocumentsState> {
     emit(const DocumentsLoading());
     try {
       final documents = await getDocuments();
-      // Start with "All" selected (DocumentSortOption.course)
-      final sortedDocuments = _sortDocuments(documents, DocumentSortOption.course);
+      // Sort by creation date (newest first) by default
+      final sortedDocuments = documents..sort((a, b) => b.createdAt.compareTo(a.createdAt));
       emit(DocumentsLoaded(
         documents: documents,
         filteredDocuments: sortedDocuments,
-        sortOption: DocumentSortOption.course, // Explicitly set to "All"
+        sortOption: DocumentSortOption.course, // Keep for filter compatibility
       ));
     } catch (e) {
       emit(DocumentsError(e.toString()));
@@ -46,14 +46,19 @@ class DocumentsBloc extends Bloc<DocumentsEvent, DocumentsState> {
       final currentState = state as DocumentsLoaded;
       
       if (event.query.isEmpty) {
+        // Sort by creation date (newest first) when clearing search
+        final sortedDocs = List<DocumentEntity>.from(currentState.documents)
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
         emit(currentState.copyWith(
-          filteredDocuments: _sortDocuments(currentState.documents, currentState.sortOption),
+          filteredDocuments: sortedDocs,
           searchQuery: '',
         ));
       } else {
         final searchResults = await searchDocuments(event.query);
+        // Sort search results by creation date (newest first)
+        searchResults.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         emit(currentState.copyWith(
-          filteredDocuments: _sortDocuments(searchResults, currentState.sortOption),
+          filteredDocuments: searchResults,
           searchQuery: event.query,
         ));
       }
@@ -76,8 +81,11 @@ class DocumentsBloc extends Bloc<DocumentsEvent, DocumentsState> {
             .toList();
       }
       
+      // Sort filtered documents by creation date (newest first)
+      filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      
       emit(currentState.copyWith(
-        filteredDocuments: _sortDocuments(filtered, currentState.sortOption),
+        filteredDocuments: filtered,
         selectedCourseId: event.courseId,
       ));
     }
