@@ -63,7 +63,7 @@ class _MyAppState extends State<MyApp> {
     
     if (_showSplash) {
       return MaterialApp(
-        title: 'LaunchGo',
+        title: 'launchgo',
         theme: themeService.themeData,
         home: const SplashScreen(),
         debugShowCheckedModeBanner: false,
@@ -71,7 +71,7 @@ class _MyAppState extends State<MyApp> {
     }
 
     return MaterialApp.router(
-      title: 'LaunchGo',
+      title: 'launchgo',
       theme: themeService.themeData,
       routerConfig: _appRouter.router,
       debugShowCheckedModeBanner: false,

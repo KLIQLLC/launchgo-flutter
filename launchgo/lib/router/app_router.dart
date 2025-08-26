@@ -140,7 +140,7 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
         case '/chat':
           return 'Chat';
         default:
-          return 'LaunchGo';
+          return 'launchgo';
       }
     }
     
