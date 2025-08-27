@@ -9,6 +9,7 @@ import '../api/models/auth_request.dart';
 import 'api_service.dart';
 import '../config/environment.dart';
 import '../models/user_model.dart';
+import '../models/semester_model.dart';
 import 'secure_storage_service.dart';
 
 /// Service for managing user authentication with Google Sign-In and backend JWT tokens
@@ -37,6 +38,10 @@ class AuthService extends ChangeNotifier {
   bool get isStudent => _userInfo?.isStudent ?? false;
   bool get isCaseManager => _userInfo?.isCaseManager ?? false;
   List<Student> get students => _userInfo?.students ?? [];
+  
+  // Semester-related getters
+  List<Semester> get semesters => _userInfo?.semesters ?? [];
+  String? get selectedSemesterId => _userInfo?.selectedSemesterId;
 
   // Google Sign-In configuration
   static const List<String> _scopes = [
@@ -361,6 +366,30 @@ class AuthService extends ChangeNotifier {
     try {
       return _userInfo!.students.firstWhere(
         (student) => student.id == _selectedStudentId,
+      );
+    } catch (e) {
+      return null;
+    }
+  }
+  
+  /// Select a semester
+  void selectSemester(String semesterId) {
+    if (_userInfo != null) {
+      _userInfo = _userInfo!.copyWith(selectedSemesterId: semesterId);
+      debugPrint('Selected semester: $semesterId');
+      notifyListeners();
+    }
+  }
+  
+  /// Get currently selected semester
+  Semester? getSelectedSemester() {
+    if (_userInfo?.selectedSemesterId == null || _userInfo?.semesters == null) {
+      return null;
+    }
+    
+    try {
+      return _userInfo!.semesters.firstWhere(
+        (semester) => semester.id == _userInfo!.selectedSemesterId,
       );
     } catch (e) {
       return null;

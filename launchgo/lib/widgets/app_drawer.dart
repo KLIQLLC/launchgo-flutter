@@ -15,7 +15,6 @@ class AppDrawer extends StatefulWidget {
 }
 
 class _AppDrawerState extends State<AppDrawer> {
-  String _selectedSemester = 'Fall 2024';
 
   @override
   Widget build(BuildContext context) {
@@ -95,21 +94,30 @@ class _AppDrawerState extends State<AppDrawer> {
                     ),
                   ),
                 ),
+                // Semester Dropdown - always visible for all roles
                 Padding(
                   padding: const EdgeInsets.only(left: 32, right: 80),
-                  child: CupertinoDropdown(
-                    value: _selectedSemester,
-                    items: const ['Fall 2024', 'Spring 2024', 'Summer 2024'],
-                    hintText: 'Select semester',
-                    onChanged: (semester) {
-                        if (semester != null) {
-                          setState(() {
-                            _selectedSemester = semester;
-                          });
-                          // TODO: Handle semester change
-                          debugPrint('Selected semester: $semester');
-                        }
-                      },
+                  child: Consumer<AuthService>(
+                    builder: (context, authService, child) {
+                      final selectedSemester = authService.getSelectedSemester();
+                      final semesterNames = authService.semesters.map((s) => s.name).toList();
+                      
+                      return CupertinoDropdown(
+                        value: selectedSemester?.name,
+                        items: semesterNames.isNotEmpty ? semesterNames : [],
+                        hintText: semesterNames.isEmpty ? 'Loading semesters...' : 'Select semester',
+                        onChanged: semesterNames.isEmpty ? null : (semesterName) {
+                          if (semesterName != null) {
+                            // Find semester by name and select it
+                            final semester = authService.semesters.firstWhere(
+                              (s) => s.name == semesterName,
+                            );
+                            authService.selectSemester(semester.id);
+                            debugPrint('Selected semester: ${semester.name} (${semester.id})');
+                          }
+                        },
+                      );
+                    },
                   ),
                 ),
                 
