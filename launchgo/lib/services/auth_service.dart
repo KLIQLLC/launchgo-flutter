@@ -4,16 +4,19 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:dio/dio.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
-import '../api/api_service.dart';
 import '../api/dio_client.dart';
 import '../api/models/auth_request.dart';
+import 'api_service.dart';
 import '../config/environment.dart';
+import '../models/user_model.dart';
 import 'secure_storage_service.dart';
 
 /// Service for managing user authentication with Google Sign-In and backend JWT tokens
 class AuthService extends ChangeNotifier {
   GoogleSignInAccount? _currentUser;
   String? _accessToken;
+  UserModel? _userInfo;
+  String? _selectedStudentId; // For mentors to track selected student
   bool _isInitialized = false;
   bool _isSigningIn = false;
   Completer<void>? _signInCompleter;
@@ -22,10 +25,18 @@ class AuthService extends ChangeNotifier {
   // Getters
   GoogleSignInAccount? get currentUser => _currentUser;
   String? get accessToken => _accessToken;
+  UserModel? get userInfo => _userInfo;
+  String? get selectedStudentId => _selectedStudentId;
   bool get isInitialized => _isInitialized;
   bool get isSigningIn => _isSigningIn;
   bool get isAuthenticated => _currentUser != null && _accessToken != null;
   bool get hasAccessToken => _accessToken != null;
+  
+  // Role-based getters
+  bool get isMentor => _userInfo?.isMentor ?? false;
+  bool get isStudent => _userInfo?.isStudent ?? false;
+  bool get isCaseManager => _userInfo?.isCaseManager ?? false;
+  List<Student> get students => _userInfo?.students ?? [];
 
   // Google Sign-In configuration
   static const List<String> _scopes = [
@@ -43,8 +54,7 @@ class AuthService extends ChangeNotifier {
     
     // Initialize API client
     if (_apiService == null) {
-      final dio = DioClient.createDio();
-      _apiService = ApiService(dio, baseUrl: EnvironmentConfig.baseUrl);
+      _apiService = ApiService(authService: this);
     }
     
     // Migrate old tokens to environment-specific storage
@@ -178,6 +188,8 @@ class AuthService extends ChangeNotifier {
       await GoogleSignIn.instance.signOut();
       _currentUser = null;
       _accessToken = null;
+      _userInfo = null;
+      _selectedStudentId = null;
       await SecureStorageService.clearAllAuthData();
       notifyListeners();
     } catch (error) {
@@ -274,6 +286,9 @@ class AuthService extends ChangeNotifier {
         }
         
         notifyListeners();
+        
+        // Load user info after successful token storage
+        await loadUserInfo();
       }
     } catch (error) {
       rethrow;
@@ -303,4 +318,53 @@ class AuthService extends ChangeNotifier {
   void setApiService(ApiService apiService) {
     _apiService = apiService;
   }
+  
+  /// Load user information including role and students
+  Future<void> loadUserInfo() async {
+    if (_apiService == null) {
+      _apiService = ApiService(authService: this);
+    }
+    
+    try {
+      final userInfoData = await _apiService!.getUserInfo();
+      if (userInfoData != null) {
+        _userInfo = UserModel.fromJson(userInfoData);
+        debugPrint('User info loaded: ${_userInfo?.name} (${_userInfo?.role})');
+        
+        // If mentor has students, select the first one by default
+        if (_userInfo?.isMentor == true && _userInfo!.students.isNotEmpty) {
+          _selectedStudentId = _userInfo!.students.first.id;
+        }
+        
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Failed to load user info: $e');
+    }
+  }
+  
+  /// Select a student (for mentors)
+  void selectStudent(String studentId) {
+    if (_userInfo?.isMentor == true) {
+      _selectedStudentId = studentId;
+      debugPrint('Selected student: $studentId');
+      notifyListeners();
+    }
+  }
+  
+  /// Get currently selected student
+  Student? getSelectedStudent() {
+    if (_selectedStudentId == null || _userInfo?.students == null) {
+      return null;
+    }
+    
+    try {
+      return _userInfo!.students.firstWhere(
+        (student) => student.id == _selectedStudentId,
+      );
+    } catch (e) {
+      return null;
+    }
+  }
+  
 }

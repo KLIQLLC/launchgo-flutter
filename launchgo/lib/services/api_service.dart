@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:launchgo/config/environment.dart';
 import 'package:launchgo/services/auth_service.dart';
@@ -26,7 +25,6 @@ class ApiService {
     
     if (accessToken != null) {
       headers['Authorization'] = 'Bearer $accessToken';
-      debugPrint('accessToken: $accessToken');
     }
     
     return headers;
@@ -42,18 +40,11 @@ class ApiService {
       }
       
       final url = '$baseUrl$endpoint';
-      debugPrint('API GET Request: $url');
-      debugPrint('Headers: $headers');
       
       final response = await http.get(
         Uri.parse(url),
         headers: headers,
       );
-
-      debugPrint('Response status: ${response.statusCode}');
-      if (response.statusCode != 200) {
-        debugPrint('Response body: ${response.body}');
-      }
 
       if (response.statusCode == 200) {
         return json.decode(response.body);
@@ -65,7 +56,6 @@ class ApiService {
         throw Exception('Failed to load data: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('API GET error: $e');
       rethrow;
     }
   }
@@ -93,7 +83,6 @@ class ApiService {
         throw Exception('Failed to post data: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('API POST error: $e');
       rethrow;
     }
   }
@@ -121,7 +110,6 @@ class ApiService {
         throw Exception('Failed to update data: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('API PUT error: $e');
       rethrow;
     }
   }
@@ -149,18 +137,21 @@ class ApiService {
         throw Exception('Failed to delete data: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('API DELETE error: $e');
       rethrow;
     }
   }
 
-  // Example: Get user profile from your backend
-  Future<Map<String, dynamic>?> getUserProfile() async {
+  // Get current user information including role and students (for mentors)
+  Future<Map<String, dynamic>?> getUserInfo() async {
     try {
-      final response = await get('/user/profile');
+      final accessToken = _authService.accessToken;
+      if (accessToken == null) {
+        throw Exception('No access token available. Please sign in again.');
+      }
+      
+      final response = await get('/users/me');
       return response;
     } catch (e) {
-      debugPrint('Failed to get user profile: $e');
       return null;
     }
   }
@@ -168,47 +159,25 @@ class ApiService {
   // Test authentication endpoint
   Future<bool> testAuth() async {
     try {
-      debugPrint('=== Testing Authentication ===');
-      debugPrint('Environment: ${EnvironmentConfig.environmentName}');
-      debugPrint('Base URL: $baseUrl');
-      
       final accessToken = _authService.accessToken;
       if (accessToken == null) {
-        debugPrint('No access token available');
         return false;
-      }
-      
-      // Decode and display token info
-      try {
-        final decodedToken = JwtDecoder.decode(accessToken);
-        debugPrint('Token claims: $decodedToken');
-        debugPrint('Token expiry: ${JwtDecoder.getExpirationDate(accessToken)}');
-        debugPrint('Token is expired: ${JwtDecoder.isExpired(accessToken)}');
-      } catch (e) {
-        debugPrint('Failed to decode token: $e');
       }
       
       // Try a simple authenticated endpoint
       try {
-        final response = await get('/user');
-        debugPrint('Test auth successful: $response');
+        await get('/user');
         return true;
       } catch (e) {
-        debugPrint('Test auth failed with /user: $e');
+        // Try /me endpoint as fallback
+        try {
+          await get('/me');
+          return true;
+        } catch (e) {
+          return false;
+        }
       }
-      
-      // Try /me endpoint
-      try {
-        final response = await get('/me');
-        debugPrint('Test auth successful with /me: $response');
-        return true;
-      } catch (e) {
-        debugPrint('Test auth failed with /me: $e');
-      }
-      
-      return false;
     } catch (e) {
-      debugPrint('Test auth error: $e');
       return false;
     }
   }
@@ -221,19 +190,11 @@ class ApiService {
         throw Exception('No access token available. Please sign in again.');
       }
       
-      debugPrint('=== Getting Documents ===');
-      debugPrint('Environment: ${EnvironmentConfig.environmentName}');
-      debugPrint('Base URL: $baseUrl');
-      
       // Extract user ID from JWT token
       final userId = _getUserIdFromToken(accessToken);
-      //hardcoded userId for testing
-      // final userId = "e0a6da47-7328-4f48-bbbb-964e75eb7838";
-      debugPrint('User ID from token: $userId');
       
       // Call the documents endpoint
       final endpoint = userId != null ? '/users/$userId/documents' : '/documents';
-      debugPrint('Calling endpoint: $endpoint');
       
       final response = await get(endpoint);
       
@@ -254,10 +215,8 @@ class ApiService {
         return List<Map<String, dynamic>>.from(response);
       }
       
-      debugPrint('Unexpected response format: ${response.runtimeType}');
       return [];
     } catch (e) {
-      debugPrint('Failed to get documents: $e');
       rethrow;
     }
   }
@@ -270,25 +229,13 @@ class ApiService {
         throw Exception('No access token available. Please sign in again.');
       }
       
-      debugPrint('=== Creating Document ===');
-      debugPrint('Environment: ${EnvironmentConfig.environmentName}');
-      debugPrint('Base URL: $baseUrl');
-      
       final userId = _getUserIdFromToken(accessToken);
-      // Use hardcoded userId for now (same as in getDocuments)
-      // final userId = "e0a6da47-7328-4f48-bbbb-964e75eb7838";
-      debugPrint('User ID: $userId');
-      
       final endpoint = '/users/$userId/documents';
-      debugPrint('POST endpoint: $endpoint');
-      debugPrint('Document data: $documentData');
       
       final response = await post(endpoint, documentData);
       
-      debugPrint('Document created successfully: $response');
       return response;
     } catch (e) {
-      debugPrint('Failed to create document: $e');
       rethrow;
     }
   }
@@ -301,26 +248,13 @@ class ApiService {
         throw Exception('No access token available. Please sign in again.');
       }
       
-      debugPrint('=== Updating Document ===');
-      debugPrint('Environment: ${EnvironmentConfig.environmentName}');
-      debugPrint('Base URL: $baseUrl');
-      
       final userId = _getUserIdFromToken(accessToken);
-      // Use hardcoded userId for now (same as in getDocuments)
-      // final userId = "e0a6da47-7328-4f48-bbbb-964e75eb7838";
-      debugPrint('User ID: $userId');
-      debugPrint('Document ID: $documentId');
-      
       final endpoint = '/users/$userId/documents/$documentId';
-      debugPrint('PUT endpoint: $endpoint');
-      debugPrint('Document data: $documentData');
       
       final response = await _put(endpoint, documentData);
       
-      debugPrint('Document updated successfully: $response');
       return response;
     } catch (e) {
-      debugPrint('Failed to update document: $e');
       rethrow;
     }
   }
@@ -338,20 +272,11 @@ class ApiService {
         throw Exception('Unable to extract user ID from token.');
       }
       
-      debugPrint('=== Deleting Document ===');
-      debugPrint('Environment: ${EnvironmentConfig.environmentName}');
-      debugPrint('Base URL: $baseUrl');
-      debugPrint('User ID: $userId');
-      debugPrint('Document ID: $documentId');
-      
       final endpoint = '/users/$userId/documents/$documentId';
-      debugPrint('DELETE endpoint: $endpoint');
       
       await _delete(endpoint);
       
-      debugPrint('Document deleted successfully');
     } catch (e) {
-      debugPrint('Failed to delete document: $e');
       rethrow;
     }
   }
@@ -360,12 +285,10 @@ class ApiService {
   String? _getUserIdFromToken(String token) {
     try {
       if (JwtDecoder.isExpired(token)) {
-        debugPrint('JWT token is expired');
         return null;
       }
       
       final Map<String, dynamic> decodedToken = JwtDecoder.decode(token);
-      debugPrint('Decoded token claims: $decodedToken');
       
       // Try different possible fields for user ID
       // Priority: studentId -> mentorId -> fallback options
@@ -378,16 +301,11 @@ class ApiService {
       // Fix malformed UUID if it has extra characters
       // Standard UUID format: 8-4-4-4-12 characters
       if (userId != null && userId.length > 36) {
-        debugPrint('Detected malformed UUID: $userId');
         // Remove extra characters at the end if UUID is too long
         userId = userId.substring(0, 36);
-        debugPrint('Fixed UUID: $userId');
       }
-      
-      debugPrint('Extracted user ID: $userId');
       return userId;
     } catch (e) {
-      debugPrint('Error extracting user ID from token: $e');
       return null;
     }
   }

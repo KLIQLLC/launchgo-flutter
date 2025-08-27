@@ -112,6 +112,47 @@ class _AppDrawerState extends State<AppDrawer> {
                       },
                   ),
                 ),
+                
+                // Student Dropdown (only for mentors)
+                if (authService.isMentor && authService.students.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: Text(
+                      'Student',
+                      style: TextStyle(
+                        color: themeService.textTertiaryColor,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 32, right: 80),
+                    child: Consumer<AuthService>(
+                      builder: (context, authService, child) {
+                        final selectedStudent = authService.getSelectedStudent();
+                        return CupertinoDropdown(
+                          value: selectedStudent?.name ?? authService.students.first.name,
+                          items: authService.students.map((student) => student.name).toList(),
+                          hintText: 'Select student',
+                          onChanged: (studentName) {
+                            if (studentName != null) {
+                              // Find student by name and select them
+                              final student = authService.students.firstWhere(
+                                (s) => s.name == studentName,
+                              );
+                              authService.selectStudent(student.id);
+                              debugPrint('Selected student: ${student.name} (${student.id})');
+                            }
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+                
                 const SizedBox(height: 8),
                 // Navigation label
                 Padding(
