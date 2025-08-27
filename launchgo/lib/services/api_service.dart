@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:launchgo/config/environment.dart';
 import 'package:launchgo/services/auth_service.dart';
@@ -87,7 +88,8 @@ class ApiService {
     }
   }
 
-  Future<dynamic> _put(String endpoint, Map<String, dynamic> body) async {
+
+  Future<dynamic> _patch(String endpoint, Map<String, dynamic> body) async {
     try {
       final headers = await _getHeaders();
       final accessToken = _authService.accessToken;
@@ -96,18 +98,21 @@ class ApiService {
         throw Exception('No access token available. Please sign in again.');
       }
       
-      final response = await http.put(
+      final response = await http.patch(
         Uri.parse('$baseUrl$endpoint'),
         headers: headers,
         body: json.encode(body),
       );
 
+
       if (response.statusCode == 200 || response.statusCode == 201) {
         return json.decode(response.body);
       } else if (response.statusCode == 401) {
         throw Exception('Authentication failed. Please sign in again.');
+      } else if (response.statusCode == 404) {
+        throw Exception('Document not found. Status: ${response.statusCode}. Response: ${response.body}');
       } else {
-        throw Exception('Failed to update data: ${response.statusCode}');
+        throw Exception('Failed to update data: ${response.statusCode}. Response: ${response.body}');
       }
     } catch (e) {
       rethrow;
@@ -190,8 +195,8 @@ class ApiService {
         throw Exception('No access token available. Please sign in again.');
       }
       
-      // Extract user ID from JWT token
-      final userId = _getUserIdFromToken(accessToken);
+      // Get effective user ID (selected student for mentors, or current user)
+      final userId = _getEffectiveUserId();
       
       // Call the documents endpoint
       final endpoint = userId != null ? '/users/$userId/documents' : '/documents';
@@ -229,7 +234,7 @@ class ApiService {
         throw Exception('No access token available. Please sign in again.');
       }
       
-      final userId = _getUserIdFromToken(accessToken);
+      final userId = _getEffectiveUserId();
       final endpoint = '/users/$userId/documents';
       
       final response = await post(endpoint, documentData);
@@ -248,10 +253,10 @@ class ApiService {
         throw Exception('No access token available. Please sign in again.');
       }
       
-      final userId = _getUserIdFromToken(accessToken);
+      final userId = _getEffectiveUserId();
       final endpoint = '/users/$userId/documents/$documentId';
       
-      final response = await _put(endpoint, documentData);
+      final response = await _patch(endpoint, documentData);
       
       return response;
     } catch (e) {
@@ -267,9 +272,9 @@ class ApiService {
         throw Exception('No access token available. Please sign in again.');
       }
       
-      final userId = _getUserIdFromToken(accessToken);
+      final userId = _getEffectiveUserId();
       if (userId == null) {
-        throw Exception('Unable to extract user ID from token.');
+        throw Exception('Unable to determine user ID for document operation.');
       }
       
       final endpoint = '/users/$userId/documents/$documentId';
@@ -279,6 +284,20 @@ class ApiService {
     } catch (e) {
       rethrow;
     }
+  }
+  
+  // Get effective user ID - selected student ID for mentors, or current user ID
+  String? _getEffectiveUserId() {
+    final accessToken = _authService.accessToken;
+    if (accessToken == null) return null;
+    
+    // For mentors: use selected student ID if available, otherwise fall back to mentor ID
+    if (_authService.isMentor && _authService.selectedStudentId != null) {
+      return _authService.selectedStudentId;
+    }
+    
+    // For students and mentors without selected student: use user ID from token
+    return _getUserIdFromToken(accessToken);
   }
   
   // Extract user ID from JWT token
