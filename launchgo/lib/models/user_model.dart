@@ -139,22 +139,8 @@ class UserModel extends Equatable {
           .toList();
     }
     
-    // Parse semesters list if available
-    List<Semester> semestersList = [];
-    if (data['semesters'] != null && data['semesters'] is List) {
-      semestersList = (data['semesters'] as List)
-          .map((semester) => Semester.fromJson(semester))
-          .toList();
-    }
-    
-    // Find default semester if available
-    String? defaultSemesterId;
-    try {
-      final defaultSemester = semestersList.firstWhere((s) => s.isDefault);
-      defaultSemesterId = defaultSemester.id;
-    } catch (_) {
-      // No default semester found
-    }
+    // Semesters will now be loaded separately from /semesters endpoint
+    // Not included in user response anymore
 
     return UserModel(
       id: userData['id'] ?? userData['userId'] ?? '',
@@ -166,9 +152,9 @@ class UserModel extends Equatable {
           ? DateTime.parse(userData['createdAt'])
           : null,
       students: studentsList,
-      semesters: semestersList,
+      semesters: const [], // Semesters loaded separately now
       avatarUrl: userData['avatarUrl'] ?? userData['avatar'],
-      selectedSemesterId: defaultSemesterId,
+      selectedSemesterId: null, // Will be set when semesters are loaded
     );
   }
 

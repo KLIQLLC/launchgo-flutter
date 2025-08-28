@@ -15,6 +15,17 @@ class AppDrawer extends StatefulWidget {
 }
 
 class _AppDrawerState extends State<AppDrawer> {
+  @override
+  void initState() {
+    super.initState();
+    // Load semesters when drawer opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authService = context.read<AuthService>();
+      if (authService.semesters.isEmpty) {
+        authService.loadSemesters();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -112,8 +123,9 @@ class _AppDrawerState extends State<AppDrawer> {
                             final semester = authService.semesters.firstWhere(
                               (s) => s.name == semesterName,
                             );
-                            authService.selectSemester(semester.id);
-                            debugPrint('Selected semester: ${semester.name} (${semester.id})');
+                            authService.selectSemester(semester.id).then((_) {
+                              debugPrint('Selected semester: ${semester.name} (${semester.id})');
+                            });
                           }
                         },
                       );
@@ -151,8 +163,9 @@ class _AppDrawerState extends State<AppDrawer> {
                               final student = authService.students.firstWhere(
                                 (s) => s.name == studentName,
                               );
-                              authService.selectStudent(student.id);
-                              debugPrint('Selected student: ${student.name} (${student.id})');
+                              authService.selectStudent(student.id).then((_) {
+                                debugPrint('Selected student: ${student.name} (${student.id})');
+                              });
                             }
                           },
                         );

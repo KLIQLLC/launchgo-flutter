@@ -12,6 +12,7 @@ import '../models/user_model.dart';
 import '../models/semester_model.dart';
 import 'secure_storage_service.dart';
 import 'permissions_service.dart';
+import 'preferences_service.dart';
 
 /// Service for managing user authentication with Google Sign-In and backend JWT tokens
 class AuthService extends ChangeNotifier {
@@ -60,6 +61,10 @@ class AuthService extends ChangeNotifier {
   /// Initialize the authentication service
   Future<void> initialize() async {
     if (_isInitialized) return;
+    
+    // Initialize preferences service for user selections
+    await PreferencesService.initialize();
+    await PreferencesService.migrateOldPreferences();
     
     // Initialize API client
     if (_apiService == null) {
@@ -199,7 +204,11 @@ class AuthService extends ChangeNotifier {
       _accessToken = null;
       _userInfo = null;
       _selectedStudentId = null;
+      
+      // Clear secure storage and user preferences
       await SecureStorageService.clearAllAuthData();
+      await PreferencesService.clearAllPreferences();
+      
       notifyListeners();
     } catch (error) {
       // Handle sign out error
@@ -335,28 +344,98 @@ class AuthService extends ChangeNotifier {
     }
     
     try {
+      // Load user info first
       final userInfoData = await _apiService!.getUserInfo();
       if (userInfoData != null) {
         _userInfo = UserModel.fromJson(userInfoData);
         debugPrint('User info loaded: ${_userInfo?.name} (${_userInfo?.role})');
         
-        // If mentor has students, select the first one by default
+        // Restore saved student selection or select first student for mentors
         if (_userInfo?.isMentor == true && _userInfo!.students.isNotEmpty) {
-          _selectedStudentId = _userInfo!.students.first.id;
+          // Try to restore previously selected student
+          final savedStudentId = PreferencesService.getSelectedStudentId();
+          if (savedStudentId != null && 
+              _userInfo!.students.any((s) => s.id == savedStudentId)) {
+            _selectedStudentId = savedStudentId;
+          } else {
+            // Default to first student if no valid saved selection
+            _selectedStudentId = _userInfo!.students.first.id;
+            await PreferencesService.saveSelectedStudentId(_selectedStudentId);
+          }
         }
-        
-        notifyListeners();
       }
+      
+      // Load semesters separately from the new endpoint
+      await loadSemesters();
+      
+      notifyListeners();
     } catch (e) {
       debugPrint('Failed to load user info: $e');
     }
   }
   
+  /// Load semesters from the API
+  Future<void> loadSemesters() async {
+    if (_apiService == null) {
+      _apiService = ApiService(authService: this);
+    }
+    
+    try {
+      final semestersData = await _apiService!.getSemesters();
+      if (semestersData.isNotEmpty && _userInfo != null) {
+        final semesters = semestersData
+            .map((s) => Semester.fromJson(s))
+            .toList();
+        
+        // Restore saved semester selection or use default/first semester
+        String? selectedSemesterId;
+        
+        // Try to restore previously selected semester
+        final savedSemesterId = PreferencesService.getSelectedSemesterId();
+        if (savedSemesterId != null && 
+            semesters.any((s) => s.id == savedSemesterId)) {
+          selectedSemesterId = savedSemesterId;
+        } else {
+          // Fall back to default semester or first available
+          try {
+            final defaultSemester = semesters.firstWhere((s) => s.isDefault);
+            selectedSemesterId = defaultSemester.id;
+          } catch (_) {
+            // No default semester found, use first if available
+            if (semesters.isNotEmpty) {
+              selectedSemesterId = semesters.first.id;
+            }
+          }
+          
+          // Save the selected semester
+          if (selectedSemesterId != null) {
+            await PreferencesService.saveSelectedSemesterId(selectedSemesterId);
+          }
+        }
+        
+        // Update user info with semesters
+        _userInfo = _userInfo!.copyWith(
+          semesters: semesters,
+          selectedSemesterId: selectedSemesterId,
+        );
+        
+        debugPrint('Semesters loaded: ${semesters.length} semesters');
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Failed to load semesters: $e');
+    }
+  }
+  
   /// Select a student (for mentors)
-  void selectStudent(String studentId) {
+  Future<void> selectStudent(String studentId) async {
     if (_userInfo?.isMentor == true) {
       _selectedStudentId = studentId;
       debugPrint('Selected student: $studentId');
+      
+      // Persist the selection
+      await PreferencesService.saveSelectedStudentId(studentId);
+      
       notifyListeners();
     }
   }
@@ -376,12 +455,19 @@ class AuthService extends ChangeNotifier {
     }
   }
   
-  /// Select a semester
-  void selectSemester(String semesterId) {
+  /// Select a semester and update on backend
+  Future<void> selectSemester(String semesterId) async {
     if (_userInfo != null) {
       _userInfo = _userInfo!.copyWith(selectedSemesterId: semesterId);
       debugPrint('Selected semester: $semesterId');
+      
+      // Persist the selection
+      await PreferencesService.saveSelectedSemesterId(semesterId);
+      
       notifyListeners();
+      
+      // TODO: Call API to persist semester selection if needed
+      // await _apiService?.selectSemester(semesterId);
     }
   }
   

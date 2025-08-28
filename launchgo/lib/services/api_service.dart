@@ -161,6 +161,38 @@ class ApiService {
     }
   }
   
+  // Get semesters from backend
+  Future<List<Map<String, dynamic>>> getSemesters() async {
+    try {
+      final accessToken = _authService.accessToken;
+      if (accessToken == null) {
+        throw Exception('No access token available. Please sign in again.');
+      }
+      
+      final response = await get('/semesters');
+      
+      // Handle response format
+      if (response is Map<String, dynamic>) {
+        // If response has a 'data' field with array
+        if (response['data'] != null && response['data'] is List) {
+          return List<Map<String, dynamic>>.from(response['data']);
+        }
+        // If response has 'semesters' field
+        if (response['semesters'] != null && response['semesters'] is List) {
+          return List<Map<String, dynamic>>.from(response['semesters']);
+        }
+      } else if (response is List) {
+        // Direct array response
+        return List<Map<String, dynamic>>.from(response);
+      }
+      
+      return [];
+    } catch (e) {
+      debugPrint('Failed to get semesters: $e');
+      return [];
+    }
+  }
+  
   // Test authentication endpoint
   Future<bool> testAuth() async {
     try {
