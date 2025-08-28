@@ -53,6 +53,7 @@ class _DocumentCardState extends State<DocumentCard>
   @override
   Widget build(BuildContext context) {
     final themeService = context.watch<ThemeService>();
+    final authService = context.watch<AuthService>();
     
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -86,33 +87,39 @@ class _DocumentCardState extends State<DocumentCard>
                   return Transform.translate(
                     offset: Offset(-slideOffset, 0),
                     child: GestureDetector(
-                      onHorizontalDragUpdate: (details) {
-                        if (details.delta.dx < 0) {
-                          // Sliding left
-                          final progress = (_slideAnimation.value * _maxSlideDistance - details.delta.dx) / _maxSlideDistance;
-                          _animationController.value = progress.clamp(0.0, 1.0);
-                        } else if (details.delta.dx > 0) {
-                          // Sliding right
-                          final progress = (_slideAnimation.value * _maxSlideDistance - details.delta.dx) / _maxSlideDistance;
-                          _animationController.value = progress.clamp(0.0, 1.0);
-                        }
-                      },
-                      onHorizontalDragEnd: (details) {
-                        if (_slideAnimation.value > 0.5) {
-                          // If more than 50% swiped, trigger delete
-                          _showDeleteConfirmation(context).then((confirmed) {
-                            if (confirmed == true) {
-                              _deleteDocument(context);
+                      onHorizontalDragUpdate: authService.permissions.canDeleteDocuments 
+                        ? (details) {
+                            if (details.delta.dx < 0) {
+                              // Sliding left
+                              final progress = (_slideAnimation.value * _maxSlideDistance - details.delta.dx) / _maxSlideDistance;
+                              _animationController.value = progress.clamp(0.0, 1.0);
+                            } else if (details.delta.dx > 0) {
+                              // Sliding right
+                              final progress = (_slideAnimation.value * _maxSlideDistance - details.delta.dx) / _maxSlideDistance;
+                              _animationController.value = progress.clamp(0.0, 1.0);
+                            }
+                          }
+                        : null, // Disable swipe for students
+                      onHorizontalDragEnd: authService.permissions.canDeleteDocuments 
+                        ? (details) {
+                            if (_slideAnimation.value > 0.5) {
+                              // If more than 50% swiped, trigger delete
+                              _showDeleteConfirmation(context).then((confirmed) {
+                                if (confirmed == true) {
+                                  _deleteDocument(context);
+                                } else {
+                                  _animationController.reverse();
+                                }
+                              });
                             } else {
+                              // Snap back
                               _animationController.reverse();
                             }
-                          });
-                        } else {
-                          // Snap back
-                          _animationController.reverse();
-                        }
-                      },
-                      onTap: _slideAnimation.value == 0 ? () => _navigateToEditDocument(context) : null,
+                          }
+                        : null, // Disable swipe for students
+                      onTap: (_slideAnimation.value == 0 && authService.permissions.canEditDocuments) 
+                        ? () => _navigateToEditDocument(context) 
+                        : null, // Disable edit for students
                       child: Container(
                         decoration: _buildCardDecoration(themeService),
                         child: Padding(

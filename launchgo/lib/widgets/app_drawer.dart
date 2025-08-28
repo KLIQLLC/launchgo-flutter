@@ -121,8 +121,8 @@ class _AppDrawerState extends State<AppDrawer> {
                   ),
                 ),
                 
-                // Student Dropdown (only for mentors)
-                if (authService.isMentor && authService.students.isNotEmpty) ...[
+                // Student Dropdown (only for mentors with students)
+                if (authService.permissions.canShowStudentSelection) ...[
                   const SizedBox(height: 8),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),

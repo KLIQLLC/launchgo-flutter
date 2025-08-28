@@ -38,6 +38,20 @@ class AppRouter {
           return '/schedule';
         }
 
+        // Prevent unauthorized access based on role permissions
+        if (isAuthenticated) {
+          // Check for document creation/edit routes
+          if ((state.matchedLocation == '/new-document' && !authService.permissions.canCreateDocuments) ||
+              (state.matchedLocation.startsWith('/edit-document/') && !authService.permissions.canEditDocuments)) {
+            return '/documents'; // Redirect students away from document forms
+          }
+          
+          final redirect = authService.permissions.getRedirectRoute(state.matchedLocation);
+          if (redirect != null) {
+            return redirect;
+          }
+        }
+
         return null;
       },
       routes: [
@@ -126,6 +140,7 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final String location = GoRouterState.of(context).matchedLocation;
     final themeService = context.watch<ThemeService>();
+    final authService = context.watch<AuthService>();
     
     String getTitle() {
       switch (location) {
@@ -142,6 +157,89 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
         default:
           return 'launchgo';
       }
+    }
+    
+    // Build navigation items based on user role
+    List<BottomNavigationBarItem> buildNavigationItems() {
+      List<BottomNavigationBarItem> items = [
+        BottomNavigationBarItem(
+          icon: CustomIcon(
+            icon: CustomIconPath.schedule,
+            size: const Size(24, 24),
+            color: Colors.white.withValues(alpha: 0.5),
+          ),
+          activeIcon: CustomIcon(
+            icon: CustomIconPath.schedule,
+            size: const Size(24, 24),
+            color: const Color(0xFF7B8CDE),
+          ),
+          label: 'Schedule',
+        ),
+        BottomNavigationBarItem(
+          icon: CustomIcon(
+            icon: CustomIconPath.course,
+            size: const Size(24, 24),
+            color: Colors.white.withValues(alpha: 0.5),
+          ),
+          activeIcon: CustomIcon(
+            icon: CustomIconPath.course,
+            size: const Size(24, 24),
+            color: const Color(0xFF7B8CDE),
+          ),
+          label: 'Courses',
+        ),
+        BottomNavigationBarItem(
+          icon: CustomIcon(
+            icon: CustomIconPath.document,
+            size: const Size(24, 24),
+            color: Colors.white.withValues(alpha: 0.5),
+          ),
+          activeIcon: CustomIcon(
+            icon: CustomIconPath.document,
+            size: const Size(24, 24),
+            color: const Color(0xFF7B8CDE),
+          ),
+          label: 'Documents',
+        ),
+      ];
+
+      // Add Recaps tab based on permissions
+      if (authService.permissions.canShowRecapsTab) {
+        items.add(
+          BottomNavigationBarItem(
+            icon: CustomIcon(
+              icon: CustomIconPath.recap,
+              size: const Size(24, 24),
+              color: Colors.white.withValues(alpha: 0.5),
+            ),
+            activeIcon: CustomIcon(
+              icon: CustomIconPath.recap,
+              size: const Size(24, 24),
+              color: const Color(0xFF7B8CDE),
+            ),
+            label: 'Recaps',
+          ),
+        );
+      }
+
+      // Add Chat tab for all roles
+      items.add(
+        BottomNavigationBarItem(
+          icon: CustomIcon(
+            icon: CustomIconPath.chat,
+            size: const Size(24, 24),
+            color: Colors.white.withValues(alpha: 0.5),
+          ),
+          activeIcon: CustomIcon(
+            icon: CustomIconPath.chat,
+            size: const Size(24, 24),
+            color: const Color(0xFF7B8CDE),
+          ),
+          label: 'Chat',
+        ),
+      );
+
+      return items;
     }
     
     return Scaffold(
@@ -220,8 +318,8 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
       drawer: const AppDrawer(),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
-        currentIndex: _calculateSelectedIndex(context),
-        onTap: (index) => _onItemTapped(index, context),
+        currentIndex: _calculateSelectedIndex(context, authService),
+        onTap: (index) => _onItemTapped(index, context, authService),
         backgroundColor: const Color(0xFF1A1F2B),
         selectedItemColor: const Color(0xFF7B8CDE),
         unselectedItemColor: Colors.white.withValues(alpha: 0.5),
@@ -229,112 +327,24 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
         showUnselectedLabels: true,
         selectedFontSize: 12,
         unselectedFontSize: 12,
-        items: [
-          BottomNavigationBarItem(
-            icon: CustomIcon(
-              icon: CustomIconPath.schedule,
-              size: const Size(24, 24),
-              color: Colors.white.withValues(alpha: 0.5), // Unselected color
-            ),
-            activeIcon: CustomIcon(
-              icon: CustomIconPath.schedule,
-              size: const Size(24, 24),
-              color: const Color(0xFF7B8CDE), // Selected color
-            ),
-            label: 'Schedule',
-          ),
-          BottomNavigationBarItem(
-            icon: CustomIcon(
-              icon: CustomIconPath.course,
-              size: const Size(24, 24),
-              color: Colors.white.withValues(alpha: 0.5), // Unselected color
-            ),
-            activeIcon: CustomIcon(
-              icon: CustomIconPath.course,
-              size: const Size(24, 24),
-              color: const Color(0xFF7B8CDE), // Selected color
-            ),
-            label: 'Courses',
-          ),
-          BottomNavigationBarItem(
-            icon: CustomIcon(
-              icon: CustomIconPath.document,
-              size: const Size(24, 24),
-              color: Colors.white.withValues(alpha: 0.5), // Unselected color
-            ),
-            activeIcon: CustomIcon(
-              icon: CustomIconPath.document,
-              size: const Size(24, 24),
-              color: const Color(0xFF7B8CDE), // Selected color
-            ),
-            label: 'Documents',
-          ),
-          BottomNavigationBarItem(
-            icon: CustomIcon(
-              icon: CustomIconPath.recap,
-              size: const Size(24, 24),
-              color: Colors.white.withValues(alpha: 0.5), // Unselected color
-            ),
-            activeIcon: CustomIcon(
-              icon: CustomIconPath.recap,
-              size: const Size(24, 24),
-              color: const Color(0xFF7B8CDE), // Selected color
-            ),
-            label: 'Recaps',
-          ),
-          BottomNavigationBarItem(
-            icon: CustomIcon(
-              icon: CustomIconPath.chat,
-              size: const Size(24, 24),
-              color: Colors.white.withValues(alpha: 0.5), // Unselected color
-            ),
-            activeIcon: CustomIcon(
-              icon: CustomIconPath.chat,
-              size: const Size(24, 24),
-              color: const Color(0xFF7B8CDE), // Selected color
-            ),
-            label: 'Chat',
-          ),
-        ],
+        items: buildNavigationItems(),
       ),
     );
   }
 
-  static int _calculateSelectedIndex(BuildContext context) {
+  static int _calculateSelectedIndex(BuildContext context, AuthService authService) {
     final String location = GoRouterState.of(context).matchedLocation;
-    switch (location) {
-      case '/schedule':
-        return 0;
-      case '/courses':
-        return 1;
-      case '/documents':
-        return 2;
-      case '/recaps':
-        return 3;
-      case '/chat':
-        return 4;
-      default:
-        return 0;
-    }
+    
+    // Use permissions service to get the correct index
+    final index = authService.permissions.getNavigationIndex(location);
+    return index ?? 0; // Default to first tab if not found
   }
 
-  void _onItemTapped(int index, BuildContext context) {
-    switch (index) {
-      case 0:
-        context.go('/schedule');
-        break;
-      case 1:
-        context.go('/courses');
-        break;
-      case 2:
-        context.go('/documents');
-        break;
-      case 3:
-        context.go('/recaps');
-        break;
-      case 4:
-        context.go('/chat');
-        break;
+  void _onItemTapped(int index, BuildContext context, AuthService authService) {
+    // Use permissions service to get the correct route for the index
+    final route = authService.permissions.getRouteForIndex(index);
+    if (route != null) {
+      context.go(route);
     }
   }
 }

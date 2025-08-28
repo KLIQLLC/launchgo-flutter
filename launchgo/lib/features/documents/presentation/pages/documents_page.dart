@@ -64,23 +64,26 @@ class _DocumentsViewState extends State<DocumentsView> {
   @override
   Widget build(BuildContext context) {
     final themeService = context.watch<ThemeService>();
+    final authService = context.watch<AuthService>();
     
     return Scaffold(
       backgroundColor: themeService.backgroundColor,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          // Navigate to new document screen
-          final result = await context.push('/new-document');
-          if (result == true && context.mounted) {
-            // Refresh documents list if document was created successfully
-            _onRefresh();
-          }
-        },
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF1A1F2B),
-        icon: const Icon(Icons.add),
-        label: const Text('New Document'),
-      ),
+      floatingActionButton: authService.permissions.canCreateDocuments 
+        ? FloatingActionButton.extended(
+            onPressed: () async {
+              // Navigate to new document screen
+              final result = await context.push('/new-document');
+              if (result == true && context.mounted) {
+                // Refresh documents list if document was created successfully
+                _onRefresh();
+              }
+            },
+            backgroundColor: Colors.white,
+            foregroundColor: const Color(0xFF1A1F2B),
+            icon: const Icon(Icons.add),
+            label: const Text('New Document'),
+          )
+        : null, // Hide FAB for students
       body: SafeArea(
         child: Column(
           children: [

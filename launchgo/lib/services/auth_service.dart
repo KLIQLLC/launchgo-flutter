@@ -11,6 +11,7 @@ import '../config/environment.dart';
 import '../models/user_model.dart';
 import '../models/semester_model.dart';
 import 'secure_storage_service.dart';
+import 'permissions_service.dart';
 
 /// Service for managing user authentication with Google Sign-In and backend JWT tokens
 class AuthService extends ChangeNotifier {
@@ -42,6 +43,9 @@ class AuthService extends ChangeNotifier {
   // Semester-related getters
   List<Semester> get semesters => _userInfo?.semesters ?? [];
   String? get selectedSemesterId => _userInfo?.selectedSemesterId;
+  
+  // Permissions service
+  PermissionsService get permissions => PermissionsService(_userInfo);
 
   // Google Sign-In configuration
   static const List<String> _scopes = [
