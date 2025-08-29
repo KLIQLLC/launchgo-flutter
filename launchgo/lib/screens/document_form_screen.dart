@@ -30,6 +30,7 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _categoryController;
+  late TextEditingController _semesterController;
   String? _selectedCourse;
   bool _isSubmitting = false;
 
@@ -64,6 +65,7 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
           break;
       }
       _categoryController = TextEditingController(text: initialCategory);
+      _semesterController = TextEditingController();
       
       // Map courseId to course name
       if (widget.document!.courseId != null) {
@@ -76,7 +78,45 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
       // Create mode - default values
       _nameController = TextEditingController();
       _categoryController = TextEditingController(text: 'Notes');
+      _semesterController = TextEditingController();
       _selectedCourse = null;
+    }
+    
+    // Load semesters when form opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authService = context.read<AuthService>();
+      if (authService.semesters.isEmpty) {
+        authService.loadSemesters().then((_) {
+          _setSemesterValue(authService);
+        });
+      } else {
+        _setSemesterValue(authService);
+      }
+    });
+  }
+
+  void _setSemesterValue(AuthService authService) {
+    if (isEditMode && widget.document != null && widget.document!.semesterId != null) {
+      // In edit mode, find semester by document's semesterId
+      try {
+        final semester = authService.semesters.firstWhere(
+          (s) => s.id == widget.document!.semesterId,
+        );
+        setState(() {
+          _semesterController.text = semester.name;
+        });
+        debugPrint('Set semester for edit mode: ${semester.name} (${semester.id})');
+      } catch (e) {
+        debugPrint('Warning: Document semester not found: ${widget.document!.semesterId}');
+        // Leave semester unselected if not found
+      }
+    } else {
+      // In create mode, use currently selected semester as initial value
+      final selectedSemester = authService.getSelectedSemester();
+      setState(() {
+        _semesterController.text = selectedSemester?.name ?? '';
+      });
+      debugPrint('Set initial semester for create mode: ${selectedSemester?.name ?? 'none'}');
     }
   }
 
@@ -84,6 +124,7 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
   void dispose() {
     _nameController.dispose();
     _categoryController.dispose();
+    _semesterController.dispose();
     super.dispose();
   }
 
@@ -100,9 +141,33 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
       final authService = Provider.of<AuthService>(context, listen: false);
       final apiService = ApiService(authService: authService);
       
+      // Find semester ID from name
+      final selectedSemesterName = _semesterController.text.trim();
+      String? semesterId;
+      
+      try {
+        final semester = authService.semesters.firstWhere(
+          (s) => s.name == selectedSemesterName,
+        );
+        semesterId = semester.id;
+      } catch (e) {
+        // Semester not found
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please select a valid semester'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() {
+          _isSubmitting = false;
+        });
+        return;
+      }
+      
       final documentData = {
         'name': _nameController.text.trim(),
         'category': _categoryController.text.trim().toLowerCase().replaceAll(' ', '-'), // Category in lowercase with dashes
+        'semesterId': semesterId,
         'courseId': (_selectedCourse != null && _selectedCourse != 'Select course (optional)') 
             ? _selectedCourse!.toLowerCase() 
             : '', // Course as courseId, empty string if not selected
@@ -254,6 +319,40 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
                       return 'Please select a category';
                     }
                     return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+
+                // Semester Field
+                Text(
+                  'Semester',
+                  style: TextStyle(
+                    color: themeService.textColor,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Consumer<AuthService>(
+                  builder: (context, authService, child) {
+                    final semesterNames = authService.semesters.map((s) => s.name).toList();
+                    return CupertinoDropdown(
+                      value: _semesterController.text.isEmpty ? null : _semesterController.text,
+                      items: semesterNames.isNotEmpty ? semesterNames : [],
+                      hintText: semesterNames.isEmpty ? 'Loading semesters...' : 'Select semester',
+                      isRequired: true,
+                      onChanged: semesterNames.isEmpty ? null : (value) {
+                        setState(() {
+                          _semesterController.text = value ?? '';
+                        });
+                      },
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please select a semester';
+                        }
+                        return null;
+                      },
+                    );
                   },
                 ),
                 const SizedBox(height: 24),

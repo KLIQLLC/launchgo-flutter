@@ -14,6 +14,7 @@ class DocumentEntity extends Equatable {
   final String ownerId;
   final String fileId;
   final String? courseId;
+  final String? semesterId;
   final String link;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -25,6 +26,7 @@ class DocumentEntity extends Equatable {
     required this.ownerId,
     required this.fileId,
     this.courseId,
+    this.semesterId,
     required this.link,
     required this.createdAt,
     required this.updatedAt,
@@ -68,6 +70,7 @@ class DocumentEntity extends Equatable {
         ownerId,
         fileId,
         courseId,
+        semesterId,
         link,
         createdAt,
         updatedAt,

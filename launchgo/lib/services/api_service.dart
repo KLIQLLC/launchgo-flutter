@@ -230,8 +230,10 @@ class ApiService {
       // Get effective user ID (selected student for mentors, or current user)
       final userId = _getEffectiveUserId();
       
-      // Call the documents endpoint
-      final endpoint = userId != null ? '/users/$userId/documents' : '/documents';
+      final semesterId = _authService.selectedSemesterId;
+      
+      // Build endpoint with userId and semesterId
+      final endpoint = '/users/$userId/documents?semesterId=$semesterId';
       
       final response = await get(endpoint);
       
