@@ -26,8 +26,8 @@ class DocumentsBloc extends Bloc<DocumentsEvent, DocumentsState> {
     emit(const DocumentsLoading());
     try {
       final documents = await getDocuments();
-      // Sort by creation date (newest first) by default
-      final sortedDocuments = documents..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      // Sort by last opened date (most recent first) by default
+      final sortedDocuments = documents..sort((a, b) => b.lastOpened.compareTo(a.lastOpened));
       emit(DocumentsLoaded(
         documents: documents,
         filteredDocuments: sortedDocuments,
@@ -46,17 +46,17 @@ class DocumentsBloc extends Bloc<DocumentsEvent, DocumentsState> {
       final currentState = state as DocumentsLoaded;
       
       if (event.query.isEmpty) {
-        // Sort by creation date (newest first) when clearing search
+        // Sort by last opened date (most recent first) when clearing search
         final sortedDocs = List<DocumentEntity>.from(currentState.documents)
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          ..sort((a, b) => b.lastOpened.compareTo(a.lastOpened));
         emit(currentState.copyWith(
           filteredDocuments: sortedDocs,
           searchQuery: '',
         ));
       } else {
         final searchResults = await searchDocuments(event.query);
-        // Sort search results by creation date (newest first)
-        searchResults.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        // Sort search results by last opened date (most recent first)
+        searchResults.sort((a, b) => b.lastOpened.compareTo(a.lastOpened));
         emit(currentState.copyWith(
           filteredDocuments: searchResults,
           searchQuery: event.query,
@@ -81,8 +81,8 @@ class DocumentsBloc extends Bloc<DocumentsEvent, DocumentsState> {
             .toList();
       }
       
-      // Sort filtered documents by creation date (newest first)
-      filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      // Sort filtered documents by last opened date (most recent first)
+      filtered.sort((a, b) => b.lastOpened.compareTo(a.lastOpened));
       
       emit(currentState.copyWith(
         filteredDocuments: filtered,
