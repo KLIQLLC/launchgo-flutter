@@ -45,6 +45,9 @@ class _CupertinoDropdownState extends State<CupertinoDropdown> {
   }
 
   void _showPicker(BuildContext context, ThemeService themeService) {
+    // Don't show picker if items list is empty
+    if (widget.items.isEmpty) return;
+    
     int initialIndex = 0;
     if (_selectedValue != null) {
       final index = widget.items.indexOf(_selectedValue!);
@@ -153,7 +156,7 @@ class _CupertinoDropdownState extends State<CupertinoDropdown> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         GestureDetector(
-          onTap: () => _showPicker(context, themeService),
+          onTap: widget.items.isEmpty ? null : () => _showPicker(context, themeService),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(

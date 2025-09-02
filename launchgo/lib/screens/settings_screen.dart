@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/theme_service.dart';
+import 'package:launchgo/utils/debug_utils.dart';
 import 'package:provider/provider.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -104,6 +106,112 @@ class SettingsScreen extends StatelessWidget {
           
           Divider(color: themeService.borderColor),
           
+          // Debug Section (only in debug mode)
+          if (kDebugMode) ...[
+            Container(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '🔧 Debug Tools',
+                    style: TextStyle(
+                      color: themeService.textColor,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Token Testing',
+                    style: TextStyle(
+                      color: themeService.textSecondaryColor,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _DebugButton(
+                        label: 'Expire Now',
+                        onPressed: () async {
+                          await DebugUtils.expireTokenNow();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Token expired. Next API call will trigger login'),
+                                backgroundColor: Colors.orange,
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                      _DebugButton(
+                        label: 'Expire in 5s',
+                        onPressed: () async {
+                          await DebugUtils.expireTokenIn(const Duration(seconds: 5));
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Token will expire in 5 seconds'),
+                                backgroundColor: Colors.orange,
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                      _DebugButton(
+                        label: 'Clear Token',
+                        onPressed: () async {
+                          await DebugUtils.clearToken();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Token cleared. Next API call will fail'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                      _DebugButton(
+                        label: 'Corrupt Token',
+                        onPressed: () async {
+                          await DebugUtils.corruptToken();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Token corrupted. Next API call will fail'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                      _DebugButton(
+                        label: 'Check Status',
+                        onPressed: () async {
+                          await DebugUtils.checkTokenStatus();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Check console for token status'),
+                                backgroundColor: Colors.blue,
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Divider(color: themeService.borderColor),
+          ],
+          
           // Logout Button
           Padding(
             padding: const EdgeInsets.all(20),
@@ -153,6 +261,36 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _DebugButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onPressed;
+  
+  const _DebugButton({
+    required this.label,
+    required this.onPressed,
+  });
+  
+  @override
+  Widget build(BuildContext context) {
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.grey.shade700,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        minimumSize: Size.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(6),
+        ),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(fontSize: 12),
       ),
     );
   }

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../features/documents/domain/entities/document_entity.dart';
-import '../services/api_service.dart';
+import '../services/api_service_retrofit.dart';
 import '../services/auth_service.dart';
 import '../services/theme_service.dart';
 import '../widgets/cupertino_dropdown.dart';
@@ -139,7 +139,7 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
 
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
-      final apiService = ApiService(authService: authService);
+      final apiService = ApiServiceRetrofit(authService: authService);
       
       // Find semester ID from name
       final selectedSemesterName = _semesterController.text.trim();

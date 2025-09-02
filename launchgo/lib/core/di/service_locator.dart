@@ -1,6 +1,6 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
-import '../../services/api_service.dart';
+import '../../services/api_service_retrofit.dart';
 import '../../services/auth_service.dart';
 
 /// Service Locator using GetIt for dependency injection
@@ -26,9 +26,9 @@ Future<void> setupServiceLocator() async {
     () => AuthService(),
   );
   
-  // Network services depend on AuthService
-  getIt.registerLazySingleton<ApiService>(
-    () => ApiService(authService: getIt<AuthService>()),
+  // Network services depend on AuthService - Using Retrofit version
+  getIt.registerLazySingleton<ApiServiceRetrofit>(
+    () => ApiServiceRetrofit(authService: getIt<AuthService>()),
   );
   
   // Initialize services that need it

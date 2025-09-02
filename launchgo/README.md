@@ -106,8 +106,10 @@ flutter pub outdated
       - `data/` - Data layer (models, API implementation)
   - `widgets/` - Reusable UI components
   - `services/` - Business logic and API services
-    - `auth_service.dart` - Authentication with Google Sign-In
-    - `api_service.dart` - HTTP API communication
+    - `auth_service.dart` - Authentication with Google Sign-In and user management
+    - `api_service.dart` - HTTP API communication with role-based endpoints
+    - `permissions_service.dart` - Centralized role-based permissions and UI logic
+    - `preferences_service.dart` - User preferences storage (UserDefaults/SharedPreferences)
     - `theme_service.dart` - Theme management
     - `secure_storage_service.dart` - Secure token storage
   - `router/` - Navigation configuration (AppRouter with go_router)
@@ -134,16 +136,30 @@ flutter pub outdated
 
 ### Document Management
 - **Document List**: Browse documents with search and filter
-- **CRUD Operations**: Create, read, update, delete documents
-- **Swipe to Delete**: Touch gesture for document deletion (40% swipe limit)
+- **Role-Based CRUD Operations**: 
+  - Students: Read-only access (view and open documents)
+  - Mentors/Case Managers: Full CRUD (create, read, update, delete)
+- **Conditional UI Elements**: Create button and edit/delete actions hidden for students
+- **Swipe to Delete**: Touch gesture for document deletion (disabled for students)
 - **Course Filtering**: Filter documents by course
 - **Search**: Real-time search by name and category
-- **Sorting**: Documents sorted by creation date (newest first)
+- **Sorting**: Documents sorted by last opened date (most recent first)
 - **Empty States**: Consistent UI for empty content
 
+### Role-Based System
+- **User Roles**: Support for student, mentor, and case manager roles
+- **Centralized Permissions**: `PermissionsService` manages all role-based logic in one place
+- **Dynamic Navigation**: Role-based bottom navigation tabs
+  - Students: 4 tabs (Schedule, Courses, Documents, Chat) - Recaps hidden
+  - Mentors/Case Managers: 5 tabs (Schedule, Courses, Documents, Recaps, Chat)
+- **Student Selection**: Mentors can select students from dropdown in app drawer
+- **Persistent Selections**: Selected student and semester saved using UserDefaults (iOS) / SharedPreferences (Android)
+- **API Context**: Document operations use selected student ID for mentors
+- **Route Protection**: Prevents unauthorized access to role-restricted screens
+
 ### Navigation & UI
-- **Bottom Navigation**: 5 main tabs (Schedule, Courses, Documents, Recaps, Chat)
-- **Protected Routes**: Automatic authentication redirects
+- **Dynamic Bottom Navigation**: Tab count varies by role (4-5 tabs)
+- **Protected Routes**: Automatic authentication redirects and role-based access
 - **Dark/Light Theme**: Full theme support
 - **Consistent Empty States**: Uniform design across all screens
 - **Version Display**: Shows app version with environment indicator

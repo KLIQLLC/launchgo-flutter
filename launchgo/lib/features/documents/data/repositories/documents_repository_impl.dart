@@ -1,12 +1,12 @@
 import '../../domain/entities/document_entity.dart';
 import '../../domain/repositories/documents_repository.dart';
 import '../models/document_model.dart';
-import '../../../../services/api_service.dart';
+import '../../../../services/api_service_retrofit.dart';
 
 class DocumentsRepositoryImpl implements DocumentsRepository {
-  final ApiService _apiService;
+  final ApiServiceRetrofit _apiService;
 
-  DocumentsRepositoryImpl({required ApiService apiService}) : _apiService = apiService;
+  DocumentsRepositoryImpl({required ApiServiceRetrofit apiService}) : _apiService = apiService;
 
   @override
   Future<List<DocumentEntity>> getDocuments() async {

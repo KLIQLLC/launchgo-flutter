@@ -18,13 +18,7 @@ class _AppDrawerState extends State<AppDrawer> {
   @override
   void initState() {
     super.initState();
-    // Load semesters when drawer opens
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final authService = context.read<AuthService>();
-      if (authService.semesters.isEmpty) {
-        authService.loadSemesters();
-      }
-    });
+    // Semesters are now loaded automatically via loadUserInfo()
   }
 
   @override
@@ -112,6 +106,11 @@ class _AppDrawerState extends State<AppDrawer> {
                     builder: (context, authService, child) {
                       final selectedSemester = authService.getSelectedSemester();
                       final semesterNames = authService.semesters.map((s) => s.name).toList();
+                      
+                      debugPrint('🔧 Dropdown build: semesters count=${authService.semesters.length}');
+                      debugPrint('🔧 Dropdown build: userInfo=${authService.userInfo != null}');
+                      debugPrint('🔧 Dropdown build: semester names=$semesterNames');
+                      debugPrint('🔧 Dropdown build: selected=${selectedSemester?.name}');
                       
                       return CupertinoDropdown(
                         value: selectedSemester?.name,

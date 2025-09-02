@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../../services/api_service.dart';
+import '../../../../services/api_service_retrofit.dart';
 import '../../../../services/auth_service.dart';
 import '../../../../services/theme_service.dart';
 import '../../domain/entities/document_entity.dart';
@@ -344,7 +344,7 @@ class _DocumentCardState extends State<DocumentCard>
   Future<void> _deleteDocument(BuildContext context) async {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
-      final apiService = ApiService(authService: authService);
+      final apiService = ApiServiceRetrofit(authService: authService);
       
       await apiService.deleteDocument(widget.document.id);
       

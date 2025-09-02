@@ -4,7 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../../../services/auth_service.dart';
-import '../../../../services/api_service.dart';
+import '../../../../services/api_service_retrofit.dart';
 import '../../../../services/theme_service.dart';
 import '../../../../widgets/cupertino_dropdown.dart';
 import '../../data/repositories/documents_repository_impl.dart';
@@ -23,7 +23,7 @@ class DocumentsPage extends StatelessWidget {
     return BlocProvider(
       create: (context) {
         final authService = Provider.of<AuthService>(context, listen: false);
-        final apiService = ApiService(authService: authService);
+        final apiService = ApiServiceRetrofit(authService: authService);
         final repository = DocumentsRepositoryImpl(apiService: apiService);
         return DocumentsBloc(
           getDocuments: GetDocuments(repository),
@@ -44,6 +44,7 @@ class DocumentsView extends StatefulWidget {
 
 class _DocumentsViewState extends State<DocumentsView> {
   final TextEditingController _searchController = TextEditingController();
+  String? _previousSelectedSemesterId;
 
   @override
   void dispose() {
@@ -65,6 +66,16 @@ class _DocumentsViewState extends State<DocumentsView> {
   Widget build(BuildContext context) {
     final themeService = context.watch<ThemeService>();
     final authService = context.watch<AuthService>();
+    
+    // Check if semester changed and trigger documents reload
+    final currentSemesterId = authService.selectedSemesterId;
+    if (_previousSelectedSemesterId != currentSemesterId && currentSemesterId != null) {
+      _previousSelectedSemesterId = currentSemesterId;
+      // Trigger reload after build completes
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.read<DocumentsBloc>().add(const LoadDocuments());
+      });
+    }
     
     return Scaffold(
       backgroundColor: themeService.backgroundColor,

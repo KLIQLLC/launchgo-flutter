@@ -6,7 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import '../api/dio_client.dart';
 import '../api/models/auth_request.dart';
-import 'api_service.dart';
+import 'api_service_retrofit.dart';
 import '../config/environment.dart';
 import '../models/user_model.dart';
 import '../models/semester_model.dart';
@@ -23,7 +23,7 @@ class AuthService extends ChangeNotifier {
   bool _isInitialized = false;
   bool _isSigningIn = false;
   Completer<void>? _signInCompleter;
-  ApiService? _apiService;
+  ApiServiceRetrofit? _apiService;
 
   // Getters
   GoogleSignInAccount? get currentUser => _currentUser;
@@ -43,7 +43,7 @@ class AuthService extends ChangeNotifier {
   
   // Semester-related getters
   List<Semester> get semesters => _userInfo?.semesters ?? [];
-  String? get selectedSemesterId => _userInfo?.selectedSemesterId;
+  String? get selectedSemesterId => _userInfo?.selectedSemesterId ?? PreferencesService.getSelectedSemesterId();
   
   // Permissions service
   PermissionsService get permissions => PermissionsService(_userInfo);
@@ -68,7 +68,7 @@ class AuthService extends ChangeNotifier {
     
     // Initialize API client
     if (_apiService == null) {
-      _apiService = ApiService(authService: this);
+      _apiService = ApiServiceRetrofit(authService: this);
     }
     
     // Migrate old tokens to environment-specific storage
@@ -98,6 +98,12 @@ class AuthService extends ChangeNotifier {
       // Attempt silent sign-in only if we have a valid token
       if (_accessToken != null && !JwtDecoder.isExpired(_accessToken!)) {
         await _attemptSilentSignIn();
+        
+        // Load user info and semesters immediately for valid tokens
+        if (_accessToken != null) {
+          debugPrint('🔐 Loading user data during initialization...');
+          await loadUserInfo();
+        }
         
         // Request new token if needed
         if (_currentUser != null && (_accessToken == null || JwtDecoder.isExpired(_accessToken!))) {
@@ -129,8 +135,15 @@ class AuthService extends ChangeNotifier {
       if (_currentUser != null && shouldRequestServerAuth()) {
         // User will need to explicitly sign in to get backend token
       }
+      
+      // Load user info and semesters for silent sign-in
+      if (_currentUser != null && _accessToken != null) {
+        debugPrint('🔐 Loading user info during silent sign-in...');
+        await loadUserInfo();
+      }
     } catch (error) {
       // Silent sign-in failure is expected for new users
+      debugPrint('🔐 Silent sign-in failed: $error');
     }
   }
 
@@ -262,13 +275,16 @@ class AuthService extends ChangeNotifier {
     final request = GoogleAuthRequest(code: serverAuthCode);
     
     try {
+      debugPrint('🔐 Sending auth code to backend...');
       final dio = DioClient.createDio();
       dio.options.baseUrl = EnvironmentConfig.baseUrl;
       
+      debugPrint('🔐 POST ${dio.options.baseUrl}/users/auth/google/mobile');
       final rawResponse = await dio.post(
         '/users/auth/google/mobile',
         data: request.toJson(),
       );
+      debugPrint('🔐 Auth response received: ${rawResponse.statusCode}');
       
       Map<String, dynamic> responseData;
       if (rawResponse.data is String) {
@@ -292,23 +308,31 @@ class AuthService extends ChangeNotifier {
       }
       
       if (accessToken != null) {
+        debugPrint('🔐 Access token received successfully');
         _accessToken = accessToken;
         
         // Store token securely
         await SecureStorageService.saveAccessToken(_accessToken!);
+        debugPrint('🔐 Token saved to secure storage');
         
         // Store token expiry if available
         if (expiresIn != null) {
           final expiry = DateTime.now().add(Duration(seconds: expiresIn));
           await SecureStorageService.saveTokenExpiry(expiry);
+          debugPrint('🔐 Token expiry set to: $expiry');
         }
         
         notifyListeners();
         
         // Load user info after successful token storage
+        debugPrint('🔐 Loading user info...');
         await loadUserInfo();
+        debugPrint('🔐 Sign-in complete!');
+      } else {
+        debugPrint('❌ No access token in response');
       }
     } catch (error) {
+      debugPrint('❌ Error during authentication: $error');
       rethrow;
     }
   }
@@ -333,22 +357,25 @@ class AuthService extends ChangeNotifier {
   }
 
   /// Set API service for dependency injection
-  void setApiService(ApiService apiService) {
+  void setApiService(ApiServiceRetrofit apiService) {
     _apiService = apiService;
   }
   
   /// Load user information including role and students
   Future<void> loadUserInfo() async {
     if (_apiService == null) {
-      _apiService = ApiService(authService: this);
+      _apiService = ApiServiceRetrofit(authService: this);
     }
     
     try {
       // Load user info first
+      debugPrint('🔄 Calling getUserInfo API...');
       final userInfoData = await _apiService!.getUserInfo();
       if (userInfoData != null) {
+        debugPrint('✅ User info data received: ${userInfoData['id']} - ${userInfoData['name']}');
         _userInfo = UserModel.fromJson(userInfoData);
-        debugPrint('User info loaded: ${_userInfo?.name} (${_userInfo?.role})');
+        debugPrint('✅ User info parsed: ${_userInfo?.id} - ${_userInfo?.name} (${_userInfo?.role})');
+        
         
         // Restore saved student selection or select first student for mentors
         if (_userInfo?.isMentor == true && _userInfo!.students.isNotEmpty) {
@@ -377,25 +404,34 @@ class AuthService extends ChangeNotifier {
   /// Load semesters from the API
   Future<void> loadSemesters() async {
     if (_apiService == null) {
-      _apiService = ApiService(authService: this);
+      _apiService = ApiServiceRetrofit(authService: this);
     }
     
     try {
+      debugPrint('🔄 Loading semesters from API...');
       final semestersData = await _apiService!.getSemesters();
+      debugPrint('✅ Received ${semestersData.length} semesters');
+      
       if (semestersData.isNotEmpty && _userInfo != null) {
+        debugPrint('📝 Parsing semesters...');
         final semesters = semestersData
             .map((s) => Semester.fromJson(s))
             .toList();
+        debugPrint('✅ Parsed ${semesters.length} semesters: ${semesters.map((s) => s.name).join(', ')}');
         
         // Restore saved semester selection or use default/first semester
         String? selectedSemesterId;
         
         // Try to restore previously selected semester
         final savedSemesterId = PreferencesService.getSelectedSemesterId();
+        debugPrint('🔄 Trying to restore saved semester: $savedSemesterId');
+        
         if (savedSemesterId != null && 
             semesters.any((s) => s.id == savedSemesterId)) {
           selectedSemesterId = savedSemesterId;
+          debugPrint('✅ Restored saved semester: $savedSemesterId');
         } else {
+          debugPrint('⚠️ No saved semester found, using default/first');
           // Fall back to default semester or first available
           try {
             final defaultSemester = semesters.firstWhere((s) => s.isDefault);
@@ -419,7 +455,8 @@ class AuthService extends ChangeNotifier {
           selectedSemesterId: selectedSemesterId,
         );
         
-        debugPrint('Semesters loaded: ${semesters.length} semesters');
+        debugPrint('✅ Semesters loaded: ${semesters.length} semesters, selected: $selectedSemesterId');
+        debugPrint('📝 UserInfo now has ${_userInfo!.semesters.length} semesters');
         notifyListeners();
       }
     } catch (e) {
@@ -466,6 +503,9 @@ class AuthService extends ChangeNotifier {
       
       notifyListeners();
       
+      // Notify dependent features to refresh their data
+      debugPrint('📢 Semester changed - dependent features should refresh');
+      
       // TODO: Call API to persist semester selection if needed
       // await _apiService?.selectSemester(semesterId);
     }
@@ -473,15 +513,24 @@ class AuthService extends ChangeNotifier {
   
   /// Get currently selected semester
   Semester? getSelectedSemester() {
-    if (_userInfo?.selectedSemesterId == null || _userInfo?.semesters == null) {
+    final currentSemesters = semesters; // Use the getter
+    final currentSelectedId = selectedSemesterId; // Use the getter that includes preferences
+    
+    debugPrint('🔍 getSelectedSemester: selectedId=$currentSelectedId, semestersCount=${currentSemesters.length}');
+    
+    if (currentSelectedId == null || currentSemesters.isEmpty) {
+      debugPrint('🔍 getSelectedSemester: returning null (missing data)');
       return null;
     }
     
     try {
-      return _userInfo!.semesters.firstWhere(
-        (semester) => semester.id == _userInfo!.selectedSemesterId,
+      final result = currentSemesters.firstWhere(
+        (semester) => semester.id == currentSelectedId,
       );
+      debugPrint('🔍 getSelectedSemester: found semester ${result.name}');
+      return result;
     } catch (e) {
+      debugPrint('🔍 getSelectedSemester: semester not found in list');
       return null;
     }
   }

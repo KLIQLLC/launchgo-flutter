@@ -1,4 +1,5 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:launchgo/config/environment.dart';
 
 /// Service for secure storage of authentication tokens with environment-specific keys
@@ -92,9 +93,25 @@ class SecureStorageService {
   
   /// Check if token is expired
   static Future<bool> isTokenExpired() async {
+    // First try to get stored expiry
     final expiry = await getTokenExpiry();
-    if (expiry == null) return true;
-    return DateTime.now().isAfter(expiry);
+    if (expiry != null) {
+      return DateTime.now().isAfter(expiry);
+    }
+    
+    // If no expiry stored, try to decode from JWT token
+    final token = await getAccessToken();
+    if (token != null) {
+      try {
+        return JwtDecoder.isExpired(token);
+      } catch (e) {
+        // If JWT decode fails, assume token is valid
+        return false;
+      }
+    }
+    
+    // No token means not authenticated, not expired
+    return false;
   }
   
   /// Migrate old tokens to environment-specific storage
