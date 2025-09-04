@@ -6,6 +6,7 @@ import 'package:launchgo/services/api_service_retrofit.dart';
 import 'package:provider/provider.dart';
 import 'course_form_screen.dart';
 import '../widgets/course_card.dart';
+import '../widgets/extended_fab.dart';
 
 class CoursesScreen extends StatefulWidget {
   const CoursesScreen({super.key});
@@ -77,10 +78,9 @@ class _CoursesScreenState extends State<CoursesScreen> {
     return Scaffold(
       backgroundColor: themeService.backgroundColor,
       floatingActionButton: authService.permissions.canCreateDocuments 
-        ? FloatingActionButton(
+        ? ExtendedFAB(
+            label: 'New Course',
             onPressed: _navigateToAddCourse,
-            backgroundColor: ThemeService.accent,
-            child: const Icon(Icons.add, color: Colors.white),
           )
         : null,
       body: _isLoading

@@ -7,6 +7,7 @@ import '../../../../services/auth_service.dart';
 import '../../../../services/api_service_retrofit.dart';
 import '../../../../services/theme_service.dart';
 import '../../../../widgets/cupertino_dropdown.dart';
+import '../../../../widgets/extended_fab.dart';
 import '../../data/repositories/documents_repository_impl.dart';
 import '../../domain/usecases/get_documents.dart';
 import '../../domain/usecases/search_documents.dart';
@@ -80,7 +81,8 @@ class _DocumentsViewState extends State<DocumentsView> {
     return Scaffold(
       backgroundColor: themeService.backgroundColor,
       floatingActionButton: authService.permissions.canCreateDocuments 
-        ? FloatingActionButton.extended(
+        ? ExtendedFAB(
+            label: 'New Document',
             onPressed: () async {
               // Navigate to new document screen
               final result = await context.push('/new-document');
@@ -89,10 +91,6 @@ class _DocumentsViewState extends State<DocumentsView> {
                 _onRefresh();
               }
             },
-            backgroundColor: Colors.white,
-            foregroundColor: const Color(0xFF1A1F2B),
-            icon: const Icon(Icons.add),
-            label: const Text('New Document'),
           )
         : null, // Hide FAB for students
       body: SafeArea(
