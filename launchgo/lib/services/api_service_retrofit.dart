@@ -152,6 +152,88 @@ class ApiServiceRetrofit {
     }
   }
   
+  // Course endpoints
+  
+  Future<List<Map<String, dynamic>>> getCourses() async {
+    try {
+      final userId = _getEffectiveUserId();
+      if (userId == null) {
+        debugPrint('❌ Cannot get courses: User ID is null');
+        return [];
+      }
+      
+      final semesterId = _authService.selectedSemesterId;
+      if (semesterId == null) {
+        debugPrint('❌ Cannot get courses: No semester selected');
+        return [];
+      }
+      
+      debugPrint('📚 Getting courses for user: $userId, semester: $semesterId');
+      final response = await _retrofit.getCourses(userId, semesterId);
+      final data = response.data;
+      
+      // Parse JSON string response for getCourses
+      if (data is String) {
+        final parsedData = json.decode(data);
+        if (parsedData['data'] is List) {
+          return List<Map<String, dynamic>>.from(parsedData['data']);
+        }
+      } else if (data is Map<String, dynamic>) {
+        final parsed = _parseResponse(data);
+        if (parsed['data'] != null && parsed['data'] is List) {
+          return List<Map<String, dynamic>>.from(parsed['data']);
+        }
+      }
+      
+      return [];
+    } catch (e) {
+      debugPrint('Failed to get courses: $e');
+      return [];
+    }
+  }
+  
+  Future<Map<String, dynamic>> createCourse(Map<String, dynamic> courseData) async {
+    try {
+      final userId = _getEffectiveUserId();
+      if (userId == null) {
+        throw Exception('User ID is required');
+      }
+      
+      // Ensure semesterId is included
+      final dataWithSemester = {
+        ...courseData,
+        if (!courseData.containsKey('semesterId'))
+          'semesterId': _authService.selectedSemesterId,
+      };
+      
+      debugPrint('📚 Creating course for user: $userId');
+      final response = await _retrofit.createCourse(userId, dataWithSemester);
+      final data = response.data;
+      
+      // Parse JSON string response
+      if (data is String) {
+        final parsedData = json.decode(data);
+        if (parsedData['data'] != null) {
+          return parsedData['data'];
+        }
+        return parsedData;
+      } else if (data is Map<String, dynamic>) {
+        final parsed = _parseResponse(data);
+        if (parsed['data'] != null) {
+          return parsed['data'];
+        }
+        return parsed;
+      }
+      
+      return {};
+    } catch (e) {
+      debugPrint('Failed to create course: $e');
+      rethrow;
+    }
+  }
+  
+  // Document endpoints
+  
   Future<Map<String, dynamic>> createDocument(Map<String, dynamic> documentData) async {
     try {
       final userId = _getEffectiveUserId();
@@ -217,27 +299,6 @@ class ApiServiceRetrofit {
     } catch (e) {
       debugPrint('Failed to delete document: $e');
       rethrow;
-    }
-  }
-  
-  // Course endpoints
-  
-  Future<List<Map<String, dynamic>>> getCourses() async {
-    try {
-      final response = await _retrofit.getCourses();
-      final data = response.data;
-      
-      if (data is Map<String, dynamic>) {
-        final parsed = _parseResponse(data);
-        if (parsed['data'] != null && parsed['data'] is List) {
-          return List<Map<String, dynamic>>.from(parsed['data']);
-        }
-      }
-      
-      return [];
-    } catch (e) {
-      debugPrint('Failed to get courses: $e');
-      return [];
     }
   }
 }

@@ -48,8 +48,17 @@ abstract class ApiService {
   );
 
   // Course endpoints
-  @GET("/courses")
-  Future<HttpResponse<dynamic>> getCourses();
+  @GET("/users/{userId}/courses")
+  Future<HttpResponse<dynamic>> getCourses(
+    @Path("userId") String userId,
+    @Query("semesterId") String semesterId,
+  );
+
+  @POST("/users/{userId}/courses")
+  Future<HttpResponse<dynamic>> createCourse(
+    @Path("userId") String userId,
+    @Body() Map<String, dynamic> courseData,
+  );
 
   // Schedule endpoints
   @GET("/users/{userId}/schedule")

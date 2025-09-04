@@ -239,9 +239,12 @@ class _ApiService implements ApiService {
   }
 
   @override
-  Future<HttpResponse<dynamic>> getCourses() async {
+  Future<HttpResponse<dynamic>> getCourses(
+    String userId,
+    String semesterId,
+  ) async {
     final _extra = <String, dynamic>{};
-    final queryParameters = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{r'semesterId': semesterId};
     final _headers = <String, dynamic>{};
     const Map<String, dynamic>? _data = null;
     final _options = _setStreamType<HttpResponse<dynamic>>(Options(
@@ -251,7 +254,39 @@ class _ApiService implements ApiService {
     )
         .compose(
           _dio.options,
-          '/courses',
+          '/users/${userId}/courses',
+          queryParameters: queryParameters,
+          data: _data,
+        )
+        .copyWith(
+            baseUrl: _combineBaseUrls(
+          _dio.options.baseUrl,
+          baseUrl,
+        )));
+    final _result = await _dio.fetch(_options);
+    final _value = _result.data;
+    final httpResponse = HttpResponse(_value, _result);
+    return httpResponse;
+  }
+
+  @override
+  Future<HttpResponse<dynamic>> createCourse(
+    String userId,
+    Map<String, dynamic> courseData,
+  ) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    final _data = <String, dynamic>{};
+    _data.addAll(courseData);
+    final _options = _setStreamType<HttpResponse<dynamic>>(Options(
+      method: 'POST',
+      headers: _headers,
+      extra: _extra,
+    )
+        .compose(
+          _dio.options,
+          '/users/${userId}/courses',
           queryParameters: queryParameters,
           data: _data,
         )
