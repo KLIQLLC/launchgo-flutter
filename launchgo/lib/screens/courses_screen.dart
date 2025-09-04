@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/api_service_retrofit.dart';
 import 'package:provider/provider.dart';
-import 'course_form_screen.dart';
 import '../widgets/course_card.dart';
 import '../widgets/extended_fab.dart';
 
@@ -49,15 +49,73 @@ class _CoursesScreenState extends State<CoursesScreen> {
   }
 
   Future<void> _navigateToAddCourse() async {
-    final result = await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const CourseFormScreen(),
-      ),
-    );
+    final result = await context.push('/new-course');
     
-    if (result == true) {
+    if (result == true && mounted) {
       _loadCourses();
     }
+  }
+
+  Future<void> _navigateToEditCourse(Map<String, dynamic> course) async {
+    final result = await context.push(
+      '/edit-course/${course['id']}',
+      extra: course,
+    );
+    
+    if (result == true && mounted) {
+      _loadCourses();
+    }
+  }
+
+  Future<void> _deleteCourse(String courseId) async {
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final apiService = ApiServiceRetrofit(authService: authService);
+      
+      await apiService.deleteCourse(courseId);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Course deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _loadCourses();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete course: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<bool> _confirmDelete(BuildContext context, String courseName) async {
+    return await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Course'),
+          content: Text('Are you sure you want to delete "$courseName"?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    ) ?? false;
   }
 
   @override
@@ -144,6 +202,9 @@ class _CoursesScreenState extends State<CoursesScreen> {
   }
 
   Widget _buildCoursesList(ThemeService themeService) {
+    final authService = context.watch<AuthService>();
+    final canDelete = authService.permissions.canDeleteDocuments;
+    
     return RefreshIndicator(
       onRefresh: _loadCourses,
       child: ListView.builder(
@@ -151,10 +212,51 @@ class _CoursesScreenState extends State<CoursesScreen> {
         itemCount: _courses.length,
         itemBuilder: (context, index) {
           final course = _courses[index];
-          return CourseCard(
-            course: course,
-            themeService: themeService,
-          );
+          
+          // Only wrap in Dismissible if user has permission to delete
+          if (canDelete) {
+            return Dismissible(
+              key: Key(course['id']?.toString() ?? index.toString()),
+              direction: DismissDirection.endToStart,
+              confirmDismiss: (direction) async {
+                return await _confirmDelete(context, course['name'] ?? 'this course');
+              },
+              onDismissed: (direction) {
+                if (course['id'] != null) {
+                  _deleteCourse(course['id']);
+                }
+              },
+              background: Container(
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.only(right: 20),
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.delete,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+              child: CourseCard(
+                course: course,
+                themeService: themeService,
+                onTap: authService.permissions.canEditDocuments 
+                  ? () => _navigateToEditCourse(course)
+                  : null,
+              ),
+            );
+          } else {
+            return CourseCard(
+              course: course,
+              themeService: themeService,
+              onTap: authService.permissions.canEditDocuments 
+                ? () => _navigateToEditCourse(course)
+                : null,
+            );
+          }
         },
       ),
     );

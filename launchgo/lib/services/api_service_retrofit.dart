@@ -231,6 +231,61 @@ class ApiServiceRetrofit {
       rethrow;
     }
   }
+
+  Future<Map<String, dynamic>> updateCourse(String courseId, Map<String, dynamic> courseData) async {
+    try {
+      final userId = _getEffectiveUserId();
+      if (userId == null) {
+        throw Exception('User ID is required');
+      }
+      
+      // Ensure semesterId is included
+      final dataWithSemester = {
+        ...courseData,
+        if (!courseData.containsKey('semesterId'))
+          'semesterId': _authService.selectedSemesterId,
+      };
+      
+      debugPrint('📝 Updating course $courseId for user: $userId');
+      final response = await _retrofit.updateCourse(userId, courseId, dataWithSemester);
+      final data = response.data;
+      
+      // Parse JSON string response
+      if (data is String) {
+        final parsedData = json.decode(data);
+        if (parsedData['data'] != null) {
+          return parsedData['data'];
+        }
+        return parsedData;
+      } else if (data is Map<String, dynamic>) {
+        final parsed = _parseResponse(data);
+        if (parsed['data'] != null) {
+          return parsed['data'];
+        }
+        return parsed;
+      }
+      
+      return {};
+    } catch (e) {
+      debugPrint('Failed to update course: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteCourse(String courseId) async {
+    try {
+      final userId = _getEffectiveUserId();
+      if (userId == null) {
+        throw Exception('User ID is required');
+      }
+      
+      debugPrint('🗑️ Deleting course $courseId for user: $userId');
+      await _retrofit.deleteCourse(userId, courseId);
+    } catch (e) {
+      debugPrint('Failed to delete course: $e');
+      rethrow;
+    }
+  }
   
   // Document endpoints
   

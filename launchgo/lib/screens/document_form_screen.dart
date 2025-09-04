@@ -6,6 +6,7 @@ import '../services/api_service_retrofit.dart';
 import '../services/auth_service.dart';
 import '../services/theme_service.dart';
 import '../widgets/cupertino_dropdown.dart';
+import '../widgets/form_submit_button.dart';
 
 enum DocumentScreenMode {
   create,
@@ -380,32 +381,10 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
                 const SizedBox(height: 32),
 
                 // Submit Button (Alternative to top bar Save)
-                SizedBox(
-                  width: double.infinity,
-                  height: 54,
-                  child: ElevatedButton(
-                    onPressed: _isSubmitting ? null : _submitDocument,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: const Color(0xFF1A1F2B),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: _isSubmitting
-                        ? const CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          )
-                        : Text(
-                            isEditMode ? 'Update Document' : 'Create Document',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                  ),
+                FormSubmitButton(
+                  text: isEditMode ? 'Update Document' : 'Create Document',
+                  onPressed: _submitDocument,
+                  isLoading: _isSubmitting,
                 ),
               ],
             ),

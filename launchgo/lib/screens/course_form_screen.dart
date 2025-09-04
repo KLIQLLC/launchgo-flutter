@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../services/theme_service.dart';
 import '../services/auth_service.dart';
 import '../services/api_service_retrofit.dart';
+import '../widgets/form_submit_button.dart';
 
 class CourseFormScreen extends StatefulWidget {
   final Map<String, dynamic>? course;
@@ -74,9 +75,9 @@ class _CourseFormScreenState extends State<CourseFormScreen> {
         'semesterId': authService.selectedSemesterId,
       };
 
-      if (widget.course != null) {
-        // Update existing course (if implemented)
-        // await apiService.updateCourse(widget.course!['id'], courseData);
+      if (widget.course != null && widget.course!['id'] != null) {
+        // Update existing course
+        await apiService.updateCourse(widget.course!['id'], courseData);
       } else {
         // Create new course
         await apiService.createCourse(courseData);
@@ -117,7 +118,7 @@ class _CourseFormScreenState extends State<CourseFormScreen> {
           widget.course != null ? 'Edit Course' : 'Add New Course',
           style: TextStyle(
             color: themeService.textColor,
-            fontSize: 17,
+            fontSize: 20,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -233,60 +234,11 @@ class _CourseFormScreenState extends State<CourseFormScreen> {
               ),
               const SizedBox(height: 32),
 
-              // Action Buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          side: BorderSide(color: themeService.borderColor),
-                        ),
-                      ),
-                      child: Text(
-                        'Cancel',
-                        style: TextStyle(
-                          color: themeService.textColor,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _saveCourse,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: ThemeService.accent,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
-                          : Text(
-                              widget.course != null ? 'Update Course' : 'Create Course',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 17,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                    ),
-                  ),
-                ],
+              // Submit Button
+              FormSubmitButton(
+                text: widget.course != null ? 'Update Course' : 'Create Course',
+                onPressed: _saveCourse,
+                isLoading: _isLoading,
               ),
             ],
           ),

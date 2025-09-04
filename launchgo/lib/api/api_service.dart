@@ -60,6 +60,19 @@ abstract class ApiService {
     @Body() Map<String, dynamic> courseData,
   );
 
+  @PATCH("/users/{userId}/courses/{courseId}")
+  Future<HttpResponse<dynamic>> updateCourse(
+    @Path("userId") String userId,
+    @Path("courseId") String courseId,
+    @Body() Map<String, dynamic> courseData,
+  );
+
+  @DELETE("/users/{userId}/courses/{courseId}")
+  Future<HttpResponse<void>> deleteCourse(
+    @Path("userId") String userId,
+    @Path("courseId") String courseId,
+  );
+
   // Schedule endpoints
   @GET("/users/{userId}/schedule")
   Future<HttpResponse<dynamic>> getSchedule(@Path("userId") String userId);

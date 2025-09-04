@@ -5,6 +5,7 @@ import 'package:launchgo/features/documents/domain/entities/document_entity.dart
 import 'package:launchgo/features/documents/presentation/pages/documents_page.dart';
 import 'package:launchgo/screens/chat_screen.dart';
 import 'package:launchgo/screens/courses_screen.dart';
+import 'package:launchgo/screens/course_form_screen.dart';
 import 'package:launchgo/screens/login_screen.dart';
 import 'package:launchgo/screens/document_form_screen.dart';
 import 'package:launchgo/screens/recaps_screen.dart';
@@ -40,10 +41,12 @@ class AppRouter {
 
         // Prevent unauthorized access based on role permissions
         if (isAuthenticated) {
-          // Check for document creation/edit routes
+          // Check for document and course creation/edit routes
           if ((state.matchedLocation == '/new-document' && !authService.permissions.canCreateDocuments) ||
-              (state.matchedLocation.startsWith('/edit-document/') && !authService.permissions.canEditDocuments)) {
-            return '/documents'; // Redirect students away from document forms
+              (state.matchedLocation == '/new-course' && !authService.permissions.canCreateDocuments) ||
+              (state.matchedLocation.startsWith('/edit-document/') && !authService.permissions.canEditDocuments) ||
+              (state.matchedLocation.startsWith('/edit-course/') && !authService.permissions.canEditDocuments)) {
+            return '/courses'; // Redirect students away from document/course forms
           }
           
           final redirect = authService.permissions.getRedirectRoute(state.matchedLocation);
@@ -79,6 +82,19 @@ class AppRouter {
               mode: DocumentScreenMode.edit,
               document: document,
             );
+          },
+        ),
+        GoRoute(
+          path: '/new-course',
+          name: 'newCourse',
+          builder: (context, state) => const CourseFormScreen(),
+        ),
+        GoRoute(
+          path: '/edit-course/:courseId',
+          name: 'editCourse',
+          builder: (context, state) {
+            final course = state.extra as Map<String, dynamic>;
+            return CourseFormScreen(course: course);
           },
         ),
         ShellRoute(
