@@ -4,6 +4,7 @@ import '../services/theme_service.dart';
 import '../services/auth_service.dart';
 import '../services/api_service_retrofit.dart';
 import '../widgets/form_submit_button.dart';
+import '../widgets/cupertino_dropdown.dart';
 
 class CourseFormScreen extends StatefulWidget {
   final Map<String, dynamic>? course;
@@ -36,14 +37,13 @@ class _CourseFormScreenState extends State<CourseFormScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.course != null) {
-      _nameController.text = widget.course!['name'] ?? '';
-      _codeController.text = widget.course!['code'] ?? '';
-      _creditsController.text = widget.course!['credits']?.toString() ?? '';
-      _instructorController.text = widget.course!['instructor'] ?? '';
-      _descriptionController.text = widget.course!['description'] ?? '';
-      _selectedGrade = widget.course!['grade'] ?? 'A+';
-    }
+    final course = widget.course;
+    _nameController.text = course?['name'] ?? '';
+    _codeController.text = course?['code'] ?? '';
+    _creditsController.text = course?['credits']?.toString() ?? '1';
+    _instructorController.text = course?['instructor'] ?? '';
+    _descriptionController.text = course?['description'] ?? '';
+    _selectedGrade = course?['grade'] ?? 'A+';
   }
 
   @override
@@ -138,7 +138,7 @@ class _CourseFormScreenState extends State<CourseFormScreen> {
               _buildLabel('Course Name*', themeService),
               _buildTextField(
                 controller: _nameController,
-                hintText: 'Enter course name',
+                hintText: 'Intro to Computer Science',
                 themeService: themeService,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -153,7 +153,7 @@ class _CourseFormScreenState extends State<CourseFormScreen> {
               _buildLabel('Course Code*', themeService),
               _buildTextField(
                 controller: _codeController,
-                hintText: 'Enter course code',
+                hintText: 'CS101',
                 themeService: themeService,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -168,7 +168,7 @@ class _CourseFormScreenState extends State<CourseFormScreen> {
               _buildLabel('Course Credits', themeService),
               _buildTextField(
                 controller: _creditsController,
-                hintText: 'Enter credits',
+                hintText: '3',
                 themeService: themeService,
                 keyboardType: TextInputType.number,
               ),
@@ -178,7 +178,7 @@ class _CourseFormScreenState extends State<CourseFormScreen> {
               _buildLabel('Instructor*', themeService),
               _buildTextField(
                 controller: _instructorController,
-                hintText: 'Enter instructor name',
+                hintText: 'Dr. Smith',
                 themeService: themeService,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -228,7 +228,7 @@ class _CourseFormScreenState extends State<CourseFormScreen> {
               _buildLabel('Course Description', themeService),
               _buildTextField(
                 controller: _descriptionController,
-                hintText: 'Enter course description',
+                hintText: 'This course is an introduction to computer science.',
                 themeService: themeService,
                 maxLines: 4,
               ),
@@ -308,38 +308,15 @@ class _CourseFormScreenState extends State<CourseFormScreen> {
   }
 
   Widget _buildGradeDropdown(ThemeService themeService) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: themeService.cardColor,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: themeService.borderColor),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: _selectedGrade,
-          isExpanded: true,
-          icon: Icon(Icons.arrow_drop_down, color: themeService.textSecondaryColor),
-          dropdownColor: themeService.cardColor,
-          items: _grades.map((grade) {
-            return DropdownMenuItem(
-              value: grade,
-              child: Text(
-                grade,
-                style: TextStyle(
-                  color: themeService.textColor,
-                  fontSize: 17,
-                ),
-              ),
-            );
-          }).toList(),
-          onChanged: (value) {
-            if (value != null) {
-              setState(() => _selectedGrade = value);
-            }
-          },
-        ),
-      ),
+    return CupertinoDropdown(
+      value: _selectedGrade,
+      items: _grades,
+      hintText: 'Select grade',
+      onChanged: (value) {
+        if (value != null) {
+          setState(() => _selectedGrade = value);
+        }
+      },
     );
   }
 }

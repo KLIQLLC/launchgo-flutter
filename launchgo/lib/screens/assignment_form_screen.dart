@@ -4,6 +4,7 @@ import '../services/theme_service.dart';
 import '../services/auth_service.dart';
 import '../services/api_service_retrofit.dart';
 import '../widgets/form_submit_button.dart';
+import '../widgets/cupertino_dropdown.dart';
 
 class AssignmentFormScreen extends StatefulWidget {
   final Map<String, dynamic>? course;
@@ -342,38 +343,26 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
   }
 
   Widget _buildStatusDropdown(ThemeService themeService) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: themeService.cardColor,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: themeService.borderColor),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: _selectedStatus,
-          isExpanded: true,
-          icon: Icon(Icons.arrow_drop_down, color: themeService.textSecondaryColor),
-          dropdownColor: themeService.cardColor,
-          items: _statusOptions.map((status) {
-            return DropdownMenuItem(
-              value: status,
-              child: Text(
-                status.replaceAll('_', ' ').toUpperCase(),
-                style: TextStyle(
-                  color: themeService.textColor,
-                  fontSize: 17,
-                ),
-              ),
-            );
-          }).toList(),
-          onChanged: (value) {
-            if (value != null) {
-              setState(() => _selectedStatus = value);
-            }
-          },
-        ),
-      ),
+    // Display the formatted version of the selected status
+    final displayValue = _selectedStatus.replaceAll('_', ' ').toUpperCase();
+    
+    return CupertinoDropdown(
+      value: displayValue,
+      items: _statusOptions.map((status) => 
+        status.replaceAll('_', ' ').toUpperCase()
+      ).toList(),
+      hintText: 'Select status',
+      onChanged: (value) {
+        if (value != null) {
+          // Find the original status value from the formatted display text
+          final index = _statusOptions.indexWhere((status) => 
+            status.replaceAll('_', ' ').toUpperCase() == value
+          );
+          if (index != -1) {
+            setState(() => _selectedStatus = _statusOptions[index]);
+          }
+        }
+      },
     );
   }
 }
