@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../core/constants/swipe_constants.dart';
 
 /// A reusable swipeable card widget with consistent swipe-to-delete behavior
@@ -9,7 +10,8 @@ class SwipeableCard extends StatefulWidget {
   final bool canSwipe;
   final bool canTap;
   final Color deleteBackgroundColor;
-  final IconData deleteIcon;
+  final String? deleteIconPath;
+  final IconData? deleteIcon;
   
   const SwipeableCard({
     super.key,
@@ -19,7 +21,8 @@ class SwipeableCard extends StatefulWidget {
     this.canSwipe = true,
     this.canTap = true,
     this.deleteBackgroundColor = Colors.red,
-    this.deleteIcon = Icons.delete,
+    this.deleteIconPath = 'assets/icons/ic_delete.svg',
+    this.deleteIcon,
   });
 
   @override
@@ -131,11 +134,21 @@ class _SwipeableCardState extends State<SwipeableCard>
                           color: widget.deleteBackgroundColor,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Icon(
-                          widget.deleteIcon,
-                          color: Colors.white.withValues(alpha: progress),
-                          size: 28,
-                        ),
+                        child: widget.deleteIconPath != null
+                          ? SvgPicture.asset(
+                              widget.deleteIconPath!,
+                              width: 28,
+                              height: 28,
+                              colorFilter: ColorFilter.mode(
+                                Colors.white.withValues(alpha: progress),
+                                BlendMode.srcIn,
+                              ),
+                            )
+                          : Icon(
+                              widget.deleteIcon,
+                              color: Colors.white.withValues(alpha: progress),
+                              size: 28,
+                            ),
                       ),
                     );
                   },

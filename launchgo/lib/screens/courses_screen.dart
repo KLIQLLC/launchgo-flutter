@@ -238,8 +238,6 @@ class _CoursesScreenState extends State<CoursesScreen> {
                 }
                 return confirmed;
               },
-              deleteBackgroundColor: Colors.red,
-              deleteIcon: Icons.delete,
               child: CourseCard(
                 course: course,
                 themeService: themeService,

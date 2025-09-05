@@ -31,8 +31,6 @@ class DocumentCard extends StatelessWidget {
         canTap: authService.permissions.canEditDocuments,
         onTap: () => _navigateToEditDocument(context),
         onSwipeToDelete: () => _showDeleteConfirmation(context),
-        deleteBackgroundColor: Colors.red,
-        deleteIcon: Icons.delete,
         child: Container(
           decoration: _buildCardDecoration(themeService),
           child: Padding(
