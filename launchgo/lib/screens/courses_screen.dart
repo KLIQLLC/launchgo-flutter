@@ -7,6 +7,7 @@ import 'package:launchgo/services/api_service_retrofit.dart';
 import 'package:provider/provider.dart';
 import '../widgets/course_card.dart';
 import '../widgets/extended_fab.dart';
+import '../widgets/swipeable_card.dart';
 
 class CoursesScreen extends StatefulWidget {
   const CoursesScreen({super.key});
@@ -67,9 +68,9 @@ class _CoursesScreenState extends State<CoursesScreen> {
     }
   }
 
-  Future<void> _navigateToAddAssignment(Map<String, dynamic> course) async {
+  Future<void> _navigateToAssignments(Map<String, dynamic> course) async {
     final result = await context.push(
-      '/course/${course['id']}/assignments/new',
+      '/course/${course['id']}/assignments',
       extra: course,
     );
     
@@ -224,52 +225,29 @@ class _CoursesScreenState extends State<CoursesScreen> {
         itemBuilder: (context, index) {
           final course = _courses[index];
           
-          // Only wrap in Dismissible if user has permission to delete
-          if (canDelete) {
-            return Dismissible(
-              key: Key(course['id']?.toString() ?? index.toString()),
-              direction: DismissDirection.endToStart,
-              confirmDismiss: (direction) async {
-                return await _confirmDelete(context, course['name'] ?? 'this course');
-              },
-              onDismissed: (direction) {
-                if (course['id'] != null) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: SwipeableCard(
+              canSwipe: canDelete,
+              canTap: authService.permissions.canEditDocuments,
+              onTap: () => _navigateToEditCourse(course),
+              onSwipeToDelete: () async {
+                final confirmed = await _confirmDelete(context, course['name'] ?? 'this course');
+                if (confirmed && course['id'] != null) {
                   _deleteCourse(course['id']);
                 }
+                return confirmed;
               },
-              background: Container(
-                alignment: Alignment.centerRight,
-                padding: const EdgeInsets.only(right: 20),
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: Colors.red,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.delete,
-                  color: Colors.white,
-                  size: 28,
-                ),
-              ),
+              deleteBackgroundColor: Colors.red,
+              deleteIcon: Icons.delete,
               child: CourseCard(
                 course: course,
                 themeService: themeService,
-                onTap: authService.permissions.canEditDocuments 
-                  ? () => _navigateToEditCourse(course)
-                  : null,
-                onAssignmentsTap: () => _navigateToAddAssignment(course),
+                onTap: null, // Handled by SwipeableCard
+                onAssignmentsTap: () => _navigateToAssignments(course),
               ),
-            );
-          } else {
-            return CourseCard(
-              course: course,
-              themeService: themeService,
-              onTap: authService.permissions.canEditDocuments 
-                ? () => _navigateToEditCourse(course)
-                : null,
-              onAssignmentsTap: () => _navigateToAddAssignment(course),
-            );
-          }
+            ),
+          );
         },
       ),
     );

@@ -53,6 +53,12 @@ abstract class ApiService {
     @Path("userId") String userId,
     @Query("semesterId") String semesterId,
   );
+  
+  @GET("/users/{userId}/courses/{courseId}")
+  Future<HttpResponse<dynamic>> getCourse(
+    @Path("userId") String userId,
+    @Path("courseId") String courseId,
+  );
 
   @POST("/users/{userId}/courses")
   Future<HttpResponse<dynamic>> createCourse(
@@ -80,4 +86,11 @@ abstract class ApiService {
   // Assignment endpoints
   @GET("/users/{userId}/assignments")
   Future<HttpResponse<dynamic>> getAssignments(@Path("userId") String userId);
+
+  @POST("/users/{userId}/courses/{courseId}/assignments")
+  Future<HttpResponse<dynamic>> createAssignment(
+    @Path("userId") String userId,
+    @Path("courseId") String courseId,
+    @Body() Map<String, dynamic> assignmentData,
+  );
 }

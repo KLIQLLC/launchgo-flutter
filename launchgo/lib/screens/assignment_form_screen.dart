@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/theme_service.dart';
 import '../services/auth_service.dart';
+import '../services/api_service_retrofit.dart';
 import '../widgets/form_submit_button.dart';
 
 class AssignmentFormScreen extends StatefulWidget {
@@ -63,23 +64,27 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // TODO: Implement assignment save logic with API
+      final apiService = context.read<ApiServiceRetrofit>();
+      
       final assignmentData = {
         'title': _titleController.text,
         'description': _descriptionController.text,
-        'points': int.tryParse(_pointsController.text) ?? 0,
+        'pointsGoal': int.tryParse(_pointsController.text) ?? 0,
+        'pointsEarned': 0,
         'status': _selectedStatus,
-        'dueDate': _dueDate?.toIso8601String(),
-        'courseId': widget.course?['id'],
+        'dueDateAt': _dueDate?.toIso8601String(),
       };
 
-      debugPrint('Assignment data: $assignmentData');
+      debugPrint('Creating assignment with data: $assignmentData');
       
-      // Simulate API call
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      if (mounted) {
-        Navigator.of(context).pop(true);
+      if (widget.course != null && widget.course!['id'] != null) {
+        await apiService.createAssignment(widget.course!['id'], assignmentData);
+        
+        if (mounted) {
+          Navigator.of(context).pop(true);
+        }
+      } else {
+        throw Exception('Course ID is required');
       }
     } catch (e) {
       if (mounted) {

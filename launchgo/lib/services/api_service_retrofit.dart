@@ -192,6 +192,39 @@ class ApiServiceRetrofit {
     }
   }
   
+  Future<Map<String, dynamic>?> getCourse(String courseId) async {
+    try {
+      final userId = _getEffectiveUserId();
+      if (userId == null) {
+        debugPrint('User ID is null, cannot get course');
+        return null;
+      }
+      
+      final response = await _retrofit.getCourse(userId, courseId);
+      final data = response.data;
+      
+      // Parse JSON string response if needed
+      if (data is String) {
+        final parsedData = json.decode(data);
+        if (parsedData['data'] != null) {
+          return parsedData['data'] as Map<String, dynamic>;
+        }
+        return parsedData as Map<String, dynamic>;
+      } else if (data is Map<String, dynamic>) {
+        final parsed = _parseResponse(data);
+        if (parsed['data'] != null) {
+          return parsed['data'] as Map<String, dynamic>;
+        }
+        return parsed;
+      }
+      
+      return null;
+    } catch (e) {
+      debugPrint('Failed to get course: $e');
+      return null;
+    }
+  }
+  
   Future<Map<String, dynamic>> createCourse(Map<String, dynamic> courseData) async {
     try {
       final userId = _getEffectiveUserId();
@@ -353,6 +386,26 @@ class ApiServiceRetrofit {
       await _retrofit.deleteDocument(userId, documentId);
     } catch (e) {
       debugPrint('Failed to delete document: $e');
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> createAssignment(String courseId, Map<String, dynamic> assignmentData) async {
+    try {
+      final userId = _getEffectiveUserId();
+      if (userId == null) {
+        throw Exception('User ID is required');
+      }
+      
+      final response = await _retrofit.createAssignment(userId, courseId, assignmentData);
+      
+      // Handle both direct object and JSON string responses
+      if (response.data is String) {
+        return json.decode(response.data);
+      }
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      debugPrint('Failed to create assignment: $e');
       rethrow;
     }
   }

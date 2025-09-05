@@ -6,9 +6,10 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../services/api_service_retrofit.dart';
 import '../../../../services/auth_service.dart';
 import '../../../../services/theme_service.dart';
+import '../../../../widgets/swipeable_card.dart';
 import '../../domain/entities/document_entity.dart';
 
-class DocumentCard extends StatefulWidget {
+class DocumentCard extends StatelessWidget {
   final DocumentEntity document;
   final VoidCallback? onDeleted;
 
@@ -19,132 +20,37 @@ class DocumentCard extends StatefulWidget {
   });
 
   @override
-  State<DocumentCard> createState() => _DocumentCardState();
-}
-
-class _DocumentCardState extends State<DocumentCard>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _slideAnimation;
-  double _maxSlideDistance = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 200),
-      vsync: this,
-    );
-    _slideAnimation = Tween<double>(
-      begin: 0,
-      end: 1,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOut,
-    ));
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final themeService = context.watch<ThemeService>();
     final authService = context.watch<AuthService>();
     
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          _maxSlideDistance = constraints.maxWidth * 0.4; // 40% of width
-          
-          return Stack(
-            children: [
-              // Delete background - only visible when sliding
-              Positioned.fill(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.red,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  alignment: Alignment.centerRight,
-                  padding: const EdgeInsets.only(right: 20),
-                  child: const Icon(
-                    Icons.delete,
-                    color: Colors.white,
-                    size: 28,
-                  ),
-                ),
-              ),
-              // Main card that slides
-              AnimatedBuilder(
-                animation: _slideAnimation,
-                builder: (context, child) {
-                  final slideOffset = _slideAnimation.value * _maxSlideDistance;
-                  return Transform.translate(
-                    offset: Offset(-slideOffset, 0),
-                    child: GestureDetector(
-                      onHorizontalDragUpdate: authService.permissions.canDeleteDocuments 
-                        ? (details) {
-                            if (details.delta.dx < 0) {
-                              // Sliding left
-                              final progress = (_slideAnimation.value * _maxSlideDistance - details.delta.dx) / _maxSlideDistance;
-                              _animationController.value = progress.clamp(0.0, 1.0);
-                            } else if (details.delta.dx > 0) {
-                              // Sliding right
-                              final progress = (_slideAnimation.value * _maxSlideDistance - details.delta.dx) / _maxSlideDistance;
-                              _animationController.value = progress.clamp(0.0, 1.0);
-                            }
-                          }
-                        : null, // Disable swipe for students
-                      onHorizontalDragEnd: authService.permissions.canDeleteDocuments 
-                        ? (details) {
-                            if (_slideAnimation.value > 0.5) {
-                              // If more than 50% swiped, trigger delete
-                              _showDeleteConfirmation(context).then((confirmed) {
-                                if (confirmed == true) {
-                                  _deleteDocument(context);
-                                } else {
-                                  _animationController.reverse();
-                                }
-                              });
-                            } else {
-                              // Snap back
-                              _animationController.reverse();
-                            }
-                          }
-                        : null, // Disable swipe for students
-                      onTap: (_slideAnimation.value == 0 && authService.permissions.canEditDocuments) 
-                        ? () => _navigateToEditDocument(context) 
-                        : null, // Disable edit for students
-                      child: Container(
-                        decoration: _buildCardDecoration(themeService),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildTitle(themeService),
-                              const SizedBox(height: 12),
-                              _buildTypeTag(themeService),
-                              const SizedBox(height: 12),
-                              _buildLastOpenedText(themeService),
-                              const SizedBox(height: 16),
-                              _buildOpenButton(themeService),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ],
-          );
-        },
+      child: SwipeableCard(
+        canSwipe: authService.permissions.canDeleteDocuments,
+        canTap: authService.permissions.canEditDocuments,
+        onTap: () => _navigateToEditDocument(context),
+        onSwipeToDelete: () => _showDeleteConfirmation(context),
+        deleteBackgroundColor: Colors.red,
+        deleteIcon: Icons.delete,
+        child: Container(
+          decoration: _buildCardDecoration(themeService),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildTitle(themeService),
+                const SizedBox(height: 12),
+                _buildTypeTag(themeService),
+                const SizedBox(height: 12),
+                _buildLastOpenedText(themeService),
+                const SizedBox(height: 16),
+                _buildOpenButton(themeService),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -153,7 +59,7 @@ class _DocumentCardState extends State<DocumentCard>
   
   Widget _buildTitle(ThemeService themeService) {
     return Text(
-      widget.document.title,
+      document.title,
       style: TextStyle(
         color: themeService.textColor,
         fontSize: 16,
@@ -163,7 +69,7 @@ class _DocumentCardState extends State<DocumentCard>
   }
 
   Widget _buildTypeTag(ThemeService themeService) {
-    final tagColors = _getTagColors(themeService, widget.document.type);
+    final tagColors = _getTagColors(themeService, document.type);
     
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -172,7 +78,7 @@ class _DocumentCardState extends State<DocumentCard>
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
-        widget.document.typeLabel,
+        document.typeLabel,
         style: TextStyle(
           color: tagColors.textColor,
           fontSize: 12,
@@ -184,7 +90,7 @@ class _DocumentCardState extends State<DocumentCard>
 
   Widget _buildLastOpenedText(ThemeService themeService) {
     return Text(
-      'Last Opened: ${DateFormat('M/d/yyyy').format(widget.document.lastOpened)}',
+      'Last Opened: ${DateFormat('M/d/yyyy').format(document.lastOpened)}',
       style: TextStyle(
         color: themeService.textSecondaryColor,
         fontSize: 14,
@@ -196,7 +102,7 @@ class _DocumentCardState extends State<DocumentCard>
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
-        onPressed: () => _openInGoogleDocs(widget.document.link),
+        onPressed: () => _openInGoogleDocs(document.link),
         icon: Icon(
           Icons.open_in_new,
           size: 18,
@@ -304,10 +210,10 @@ class _DocumentCardState extends State<DocumentCard>
   // MARK: - Actions
 
   void _navigateToEditDocument(BuildContext context) async {
-    final result = await context.push('/edit-document/${widget.document.id}', extra: widget.document);
+    final result = await context.push('/edit-document/${document.id}', extra: document);
     if (result == true && context.mounted) {
       // Notify parent that document was edited
-      widget.onDeleted?.call();
+      onDeleted?.call();
     }
   }
 
@@ -318,12 +224,12 @@ class _DocumentCardState extends State<DocumentCard>
     }
   }
 
-  Future<bool?> _showDeleteConfirmation(BuildContext context) async {
-    return showDialog<bool>(
+  Future<bool> _showDeleteConfirmation(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Document'),
-        content: Text('Are you sure you want to delete "${widget.document.title}"? This action cannot be undone.'),
+        content: Text('Are you sure you want to delete "${document.title}"? This action cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -339,6 +245,12 @@ class _DocumentCardState extends State<DocumentCard>
         ],
       ),
     );
+    
+    if (confirmed == true && context.mounted) {
+      await _deleteDocument(context);
+      return true;
+    }
+    return false;
   }
 
   Future<void> _deleteDocument(BuildContext context) async {
@@ -346,7 +258,7 @@ class _DocumentCardState extends State<DocumentCard>
       final authService = Provider.of<AuthService>(context, listen: false);
       final apiService = ApiServiceRetrofit(authService: authService);
       
-      await apiService.deleteDocument(widget.document.id);
+      await apiService.deleteDocument(document.id);
       
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -357,7 +269,7 @@ class _DocumentCardState extends State<DocumentCard>
         );
         
         // Notify parent that document was deleted
-        widget.onDeleted?.call();
+        onDeleted?.call();
       }
     } catch (e) {
       if (context.mounted) {
