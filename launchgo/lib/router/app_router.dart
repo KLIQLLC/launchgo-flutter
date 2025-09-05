@@ -6,6 +6,7 @@ import 'package:launchgo/features/documents/presentation/pages/documents_page.da
 import 'package:launchgo/screens/chat_screen.dart';
 import 'package:launchgo/screens/courses_screen.dart';
 import 'package:launchgo/screens/course_form_screen.dart';
+import 'package:launchgo/screens/assignment_form_screen.dart';
 import 'package:launchgo/screens/login_screen.dart';
 import 'package:launchgo/screens/document_form_screen.dart';
 import 'package:launchgo/screens/recaps_screen.dart';
@@ -95,6 +96,14 @@ class AppRouter {
           builder: (context, state) {
             final course = state.extra as Map<String, dynamic>;
             return CourseFormScreen(course: course);
+          },
+        ),
+        GoRoute(
+          path: '/course/:courseId/assignments/new',
+          name: 'newAssignment',
+          builder: (context, state) {
+            final course = state.extra as Map<String, dynamic>;
+            return AssignmentFormScreen(course: course);
           },
         ),
         ShellRoute(

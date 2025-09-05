@@ -8,12 +8,14 @@ class CourseCard extends StatelessWidget {
   final Map<String, dynamic> course;
   final ThemeService themeService;
   final VoidCallback? onTap;
+  final VoidCallback? onAssignmentsTap;
 
   const CourseCard({
     super.key,
     required this.course,
     required this.themeService,
     this.onTap,
+    this.onAssignmentsTap,
   });
 
   @override
@@ -183,43 +185,46 @@ class CourseCard extends StatelessWidget {
               
               // Assignments section
               const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: themeService.backgroundColor,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    SvgPicture.asset(
-                      'assets/icons/ic_course.svg',
-                      width: 20,
-                      height: 20,
-                      colorFilter: ColorFilter.mode(
-                         themeService.textColor,
-                        BlendMode.srcIn,
+              GestureDetector(
+                onTap: onAssignmentsTap,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: themeService.backgroundColor,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      SvgPicture.asset(
+                        'assets/icons/ic_course.svg',
+                        width: 20,
+                        height: 20,
+                        colorFilter: ColorFilter.mode(
+                           themeService.textColor,
+                          BlendMode.srcIn,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Assignments (${assignments.length})',
-                      style: TextStyle(
-                        color: themeService.textColor,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
+                      const SizedBox(width: 8),
+                      Text(
+                        'Assignments (${assignments.length})',
+                        style: TextStyle(
+                          color: themeService.textColor,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    ),
-                    const Spacer(),
-                    SvgPicture.asset(
-                      'assets/icons/ic_arrow.svg',
-                      width: 16,
-                      height: 16,
-                      colorFilter: ColorFilter.mode(
-                        themeService.textSecondaryColor,
-                        BlendMode.srcIn,
+                      const Spacer(),
+                      SvgPicture.asset(
+                        'assets/icons/ic_arrow.svg',
+                        width: 16,
+                        height: 16,
+                        colorFilter: ColorFilter.mode(
+                          themeService.textSecondaryColor,
+                          BlendMode.srcIn,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],

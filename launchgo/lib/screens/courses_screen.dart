@@ -67,6 +67,17 @@ class _CoursesScreenState extends State<CoursesScreen> {
     }
   }
 
+  Future<void> _navigateToAddAssignment(Map<String, dynamic> course) async {
+    final result = await context.push(
+      '/course/${course['id']}/assignments/new',
+      extra: course,
+    );
+    
+    if (result == true && mounted) {
+      _loadCourses();
+    }
+  }
+
   Future<void> _deleteCourse(String courseId) async {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
@@ -246,6 +257,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
                 onTap: authService.permissions.canEditDocuments 
                   ? () => _navigateToEditCourse(course)
                   : null,
+                onAssignmentsTap: () => _navigateToAddAssignment(course),
               ),
             );
           } else {
@@ -255,6 +267,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
               onTap: authService.permissions.canEditDocuments 
                 ? () => _navigateToEditCourse(course)
                 : null,
+              onAssignmentsTap: () => _navigateToAddAssignment(course),
             );
           }
         },
