@@ -9,6 +9,7 @@ import '../services/theme_service.dart';
 import '../services/auth_service.dart';
 import '../widgets/extended_fab.dart';
 import '../widgets/swipeable_card.dart';
+import '../theme/app_colors.dart';
 
 class AssignmentsScreen extends StatefulWidget {
   final Map<String, dynamic> course;
@@ -99,31 +100,6 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
     }
   }
 
-  Color _getStatusColor(String? status) {
-    switch (status?.toLowerCase()) {
-      case 'completed':
-        return const Color(0xFF4CAF50); // Green
-      case 'overdue':
-        return const Color(0xFFF44336); // Red
-      case 'pending':
-        return const Color(0xFF1976D2); // Blue-700 equivalent for text
-      default:
-        return const Color(0xFF1976D2); // Default to blue
-    }
-  }
-  
-  Color _getStatusBackgroundColor(String? status) {
-    switch (status?.toLowerCase()) {
-      case 'completed':
-        return const Color(0xFF4CAF50); // Green base
-      case 'overdue':
-        return const Color(0xFFF44336); // Red base
-      case 'pending':
-        return const Color(0xFF2196F3); // Blue-500 equivalent
-      default:
-        return const Color(0xFF2196F3); // Default to blue
-    }
-  }
 
 
 
@@ -150,7 +126,7 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
         elevation: 0,
         centerTitle: true,
         title: Text(
-          '${_currentCourse['name'] ?? widget.course['name']} · ${_currentCourse['code'] ?? widget.course['code']}',
+          '${_currentCourse['name'] ?? widget.course['name']} • ${_currentCourse['code'] ?? widget.course['code']}',
           style: TextStyle(
             color: themeService.textColor,
             fontSize: 18,
@@ -239,8 +215,8 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
   }
 
   Widget _buildAssignmentCard(Map<String, dynamic> assignment, ThemeService themeService) {
-    final statusColor = _getStatusColor(assignment['status']);
-    final statusBgColor = _getStatusBackgroundColor(assignment['status']);
+    final statusColor = AppColors.getStatusColor(assignment['status']);
+    final statusBgColor = AppColors.getStatusBackgroundColor(assignment['status']);
     final authService = context.watch<AuthService>();
     
     return Container(

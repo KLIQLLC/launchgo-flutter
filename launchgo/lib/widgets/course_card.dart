@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../services/theme_service.dart';
 import '../services/auth_service.dart';
+import '../theme/app_colors.dart';
 
 class CourseCard extends StatelessWidget {
   final Map<String, dynamic> course;
@@ -84,13 +85,13 @@ class CourseCard extends StatelessWidget {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF37474F),
+                                color: AppColors.badgeGrey,
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Text(
                                 '${course['credits'] ?? 0} credit${course['credits'] != 1 ? 's' : ''}',
                                 style: const TextStyle(
-                                  color: Colors.white,
+                                  color: AppColors.textPrimary,
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -148,18 +149,18 @@ class CourseCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 4),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2), // Increased horizontal padding for better width
                     decoration: BoxDecoration(
-                      color: _getGradeBackgroundColor(course['grade']),
-                      borderRadius: BorderRadius.circular(16),
+                      color: AppColors.getGradeBackground(course['grade']),
+                      borderRadius: BorderRadius.circular(12), // Slightly less rounded
                     ),
                     child: Text(
                       course['grade'] ?? 'N/A',
                       style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
+                        color: AppColors.getGradeTextColor(course['grade']), // Dynamic text color based on background
+                        fontSize: 13, // Slightly smaller font
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -233,27 +234,4 @@ class CourseCard extends StatelessWidget {
     );
   }
 
-  Color _getGradeColor(String? grade) {
-    if (grade == null) return Colors.grey;
-    
-    if (grade.startsWith('A')) return Colors.green;
-    if (grade.startsWith('B')) return Colors.blue;
-    if (grade.startsWith('C')) return Colors.orange;
-    if (grade.startsWith('D')) return Colors.deepOrange;
-    if (grade == 'F') return Colors.red;
-    
-    return Colors.grey;
-  }
-
-  Color _getGradeBackgroundColor(String? grade) {
-    if (grade == null) return Colors.grey;
-    
-    if (grade.startsWith('A')) return const Color(0xFF4CAF50);
-    if (grade.startsWith('B')) return const Color(0xFF2196F3);
-    if (grade.startsWith('C')) return const Color(0xFFFF9800);
-    if (grade.startsWith('D')) return const Color(0xFFFF5722);
-    if (grade == 'F') return const Color(0xFFF44336);
-    
-    return Colors.grey;
-  }
 }
