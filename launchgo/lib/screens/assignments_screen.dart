@@ -1,11 +1,14 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../api/dio_client_enhanced.dart';
+import '../services/api_service_retrofit.dart';
 import '../services/theme_service.dart';
 import '../services/auth_service.dart';
-import '../services/api_service_retrofit.dart';
 import '../widgets/extended_fab.dart';
+import '../widgets/swipeable_card.dart';
 
 class AssignmentsScreen extends StatefulWidget {
   final Map<String, dynamic> course;
@@ -20,6 +23,7 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
   List<Map<String, dynamic>> _assignments = [];
   bool _isLoading = false;
   Map<String, dynamic> _currentCourse = {};
+  bool _hasChanges = false; // Track if any assignments were modified
 
   @override
   void initState() {
@@ -32,24 +36,50 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
     setState(() => _isLoading = true);
     
     try {
-      // Try to fetch updated course data from API
-      final apiService = context.read<ApiServiceRetrofit>();
+      // Try to fetch updated course data from API to get latest assignments
+      final authService = Provider.of<AuthService>(context, listen: false);
       final courseId = _currentCourse['id'] ?? widget.course['id'];
       
       if (courseId != null) {
-        final updatedCourse = await apiService.getCourse(courseId);
-        if (updatedCourse != null) {
-          _currentCourse = updatedCourse;
+        // Get updated courses list which includes assignments
+        final userId = authService.userInfo?.isMentor == true && authService.selectedStudentId != null 
+            ? authService.selectedStudentId 
+            : authService.userInfo?.id;
+        final semesterId = authService.selectedSemesterId;
+        
+        if (userId != null && semesterId != null) {
+          debugPrint('🔄 Refreshing course data for assignments...');
+          
+          // Make API call to get courses (which includes assignments)
+          final dio = DioClientEnhanced(authService: authService).dio;
+          final response = await dio.get('/users/$userId/courses?semesterId=$semesterId');
+          
+          if (response.data != null) {
+            final coursesData = response.data is String 
+                ? json.decode(response.data)['data'] 
+                : response.data['data'];
+            
+            // Find our specific course in the updated data
+            final updatedCourse = (coursesData as List).firstWhere(
+              (course) => course['id'] == courseId,
+              orElse: () => _currentCourse,
+            );
+            
+            _currentCourse = updatedCourse;
+            debugPrint('✅ Course data refreshed');
+          }
         }
       }
       
-      // Get assignments from the course data
+      // Get assignments from the updated course data
       final assignments = _currentCourse['assignments'] as List? ?? [];
       _assignments = List<Map<String, dynamic>>.from(assignments);
+      
+      debugPrint('Loaded ${_assignments.length} assignments');
     } catch (e) {
       debugPrint('Error loading assignments: $e');
-      // Fall back to using the assignments from the widget
-      final assignments = _currentCourse['assignments'] as List? ?? [];
+      // Fall back to using existing course data
+      final assignments = _currentCourse['assignments'] as List? ?? widget.course['assignments'] as List? ?? [];
       _assignments = List<Map<String, dynamic>>.from(assignments);
     }
     
@@ -63,36 +93,39 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
     );
     
     if (result == true && mounted) {
-      // TODO: Refresh assignments from API
+      // Refresh assignments after creating new one
+      _hasChanges = true;
       _loadAssignments();
     }
   }
 
-  String _getStatusColor(String? status) {
+  Color _getStatusColor(String? status) {
     switch (status?.toLowerCase()) {
       case 'completed':
-        return '#4CAF50'; // Green
-      case 'in_progress':
-        return '#FF9800'; // Orange
+        return const Color(0xFF4CAF50); // Green
       case 'overdue':
-        return '#F44336'; // Red
+        return const Color(0xFFF44336); // Red
+      case 'pending':
+        return const Color(0xFF1976D2); // Blue-700 equivalent for text
       default:
-        return '#9E9E9E'; // Grey for pending
+        return const Color(0xFF1976D2); // Default to blue
+    }
+  }
+  
+  Color _getStatusBackgroundColor(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'completed':
+        return const Color(0xFF4CAF50); // Green base
+      case 'overdue':
+        return const Color(0xFFF44336); // Red base
+      case 'pending':
+        return const Color(0xFF2196F3); // Blue-500 equivalent
+      default:
+        return const Color(0xFF2196F3); // Default to blue
     }
   }
 
-  String _getStatusText(String? status) {
-    switch (status?.toLowerCase()) {
-      case 'in_progress':
-        return 'IN PROGRESS';
-      case 'completed':
-        return 'COMPLETED';
-      case 'overdue':
-        return 'OVERDUE';
-      default:
-        return 'PENDING';
-    }
-  }
+
 
   String _formatDate(String? dateStr) {
     if (dateStr == null) return 'No due date';
@@ -117,7 +150,7 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
         elevation: 0,
         centerTitle: true,
         title: Text(
-          '${_currentCourse['name'] ?? widget.course['name']} - ${_currentCourse['code'] ?? widget.course['code']}',
+          '${_currentCourse['name'] ?? widget.course['name']} · ${_currentCourse['code'] ?? widget.course['code']}',
           style: TextStyle(
             color: themeService.textColor,
             fontSize: 18,
@@ -126,12 +159,12 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
         ),
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: themeService.textColor),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => Navigator.of(context).pop(_hasChanges), // Return true only if changes were made
         ),
       ),
       floatingActionButton: authService.permissions.canCreateDocuments 
         ? ExtendedFAB(
-            label: 'New Assignment',
+            label: 'Add Assignment',
             onPressed: _navigateToAddAssignment,
           )
         : null,
@@ -206,73 +239,89 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
   }
 
   Widget _buildAssignmentCard(Map<String, dynamic> assignment, ThemeService themeService) {
-    final statusColor = Color(int.parse(_getStatusColor(assignment['status']).substring(1), radix: 16) + 0xFF000000);
+    final statusColor = _getStatusColor(assignment['status']);
+    final statusBgColor = _getStatusBackgroundColor(assignment['status']);
+    final authService = context.watch<AuthService>();
     
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: themeService.cardColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: themeService.borderColor),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
+      child: SwipeableCard(
+        canSwipe: authService.permissions.canDeleteDocuments,
+        canTap: authService.permissions.canEditDocuments,
+        onTap: () => _navigateToEditAssignment(assignment),
+        onSwipeToDelete: () => _showDeleteConfirmation(assignment),
+        child: Container(
+          decoration: BoxDecoration(
+            color: themeService.cardColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: themeService.borderColor),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Assignment header
-            Row(
+            // Assignment header with inline status
+            Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        assignment['title'] ?? 'Untitled Assignment',
+                // Title row with status badge
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      assignment['title'] ?? 'Untitled Assignment',
+                      style: TextStyle(
+                        color: themeService.textColor,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 8), // Small gap between title and status
+                    // Status badge with shadow effect
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: statusBgColor.withValues(alpha: 0.2), // 20% opacity background
+                        borderRadius: BorderRadius.circular(12), // Rounded full
+                        border: Border.all(
+                          color: statusBgColor.withValues(alpha: 0.3), // 30% opacity border
+                          width: 1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: statusBgColor.withValues(alpha: 0.1), // 10% shadow
+                            blurRadius: 8,
+                            spreadRadius: 0,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        (assignment['status'] as String? ?? 'pending').toLowerCase(),
                         style: TextStyle(
-                          color: themeService.textColor,
-                          fontSize: 16,
+                          color: statusColor, // Darker text color (blue-700 for pending)
+                          fontSize: 11,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      if (assignment['description'] != null && assignment['description'].toString().isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          assignment['description'],
-                          style: TextStyle(
-                            color: themeService.textSecondaryColor,
-                            fontSize: 14,
-                            height: 1.4,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // Status badge
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: statusColor.withValues(alpha: 0.3),
-                      width: 1,
                     ),
-                  ),
-                  child: Text(
-                    _getStatusText(assignment['status']),
+                  ],
+                ),
+                // Description below title
+                if (assignment['description'] != null && assignment['description'].toString().isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    assignment['description'],
                     style: TextStyle(
-                      color: statusColor,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                      color: themeService.textSecondaryColor,
+                      fontSize: 14,
+                      height: 1.4,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
+                ],
               ],
             ),
             const SizedBox(height: 12),
@@ -280,11 +329,15 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
             // Assignment details
             Row(
               children: [
-                // Due date
-                Icon(
-                  Icons.schedule,
-                  size: 16,
-                  color: themeService.textSecondaryColor,
+                // Due date with calendar icon
+                SvgPicture.asset(
+                  'assets/icons/ic_calendar.svg',
+                  width: 16,
+                  height: 16,
+                  colorFilter: ColorFilter.mode(
+                    themeService.textSecondaryColor,
+                    BlendMode.srcIn,
+                  ),
                 ),
                 const SizedBox(width: 4),
                 Text(
@@ -295,11 +348,15 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
                   ),
                 ),
                 const SizedBox(width: 16),
-                // Points
-                Icon(
-                  Icons.stars,
-                  size: 16,
-                  color: themeService.textSecondaryColor,
+                // Points with clock icon
+                SvgPicture.asset(
+                  'assets/icons/ic_clock.svg',
+                  width: 16,
+                  height: 16,
+                  colorFilter: ColorFilter.mode(
+                    themeService.textSecondaryColor,
+                    BlendMode.srcIn,
+                  ),
                 ),
                 const SizedBox(width: 4),
                 Text(
@@ -312,8 +369,89 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
               ],
             ),
           ],
+            ),
+          ),
         ),
       ),
     );
+  }
+
+  Future<void> _navigateToEditAssignment(Map<String, dynamic> assignment) async {
+    final result = await context.push(
+      '/course/${widget.course['id']}/assignments/${assignment['id']}/edit',
+      extra: {
+        'course': widget.course,
+        'assignment': assignment,
+      },
+    );
+    
+    if (result == true && mounted) {
+      // Refresh assignments list after editing
+      _hasChanges = true;
+      _loadAssignments();
+    }
+  }
+
+  Future<bool> _showDeleteConfirmation(Map<String, dynamic> assignment) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Assignment'),
+        content: Text('Are you sure you want to delete "${assignment['title']}"? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmed == true && mounted) {
+      await _deleteAssignment(assignment);
+      return true;
+    }
+    return false;
+  }
+
+  Future<void> _deleteAssignment(Map<String, dynamic> assignment) async {
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final apiService = ApiServiceRetrofit(authService: authService);
+      
+      await apiService.deleteAssignment(
+        widget.course['id'].toString(),
+        assignment['id'].toString(),
+      );
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Assignment deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        
+        // Refresh assignments list after deletion
+        _hasChanges = true;
+        _loadAssignments();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete assignment: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }

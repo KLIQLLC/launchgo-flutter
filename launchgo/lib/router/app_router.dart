@@ -115,6 +115,19 @@ class AppRouter {
             return AssignmentFormScreen(course: course);
           },
         ),
+        GoRoute(
+          path: '/course/:courseId/assignments/:assignmentId/edit',
+          name: 'editAssignment',
+          builder: (context, state) {
+            final extras = state.extra as Map<String, dynamic>;
+            final course = extras['course'] as Map<String, dynamic>;
+            final assignment = extras['assignment'] as Map<String, dynamic>;
+            return AssignmentFormScreen(
+              course: course,
+              assignment: assignment,
+            );
+          },
+        ),
         ShellRoute(
           navigatorKey: _shellNavigatorKey,
           builder: (context, state, child) => 

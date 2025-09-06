@@ -93,4 +93,19 @@ abstract class ApiService {
     @Path("courseId") String courseId,
     @Body() Map<String, dynamic> assignmentData,
   );
+
+  @PATCH("/users/{userId}/courses/{courseId}/assignments/{assignmentId}")
+  Future<HttpResponse<dynamic>> updateAssignment(
+    @Path("userId") String userId,
+    @Path("courseId") String courseId,
+    @Path("assignmentId") String assignmentId,
+    @Body() Map<String, dynamic> assignmentData,
+  );
+
+  @DELETE("/users/{userId}/courses/{courseId}/assignments/{assignmentId}")
+  Future<HttpResponse<void>> deleteAssignment(
+    @Path("userId") String userId,
+    @Path("courseId") String courseId,
+    @Path("assignmentId") String assignmentId,
+  );
 }

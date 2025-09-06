@@ -409,4 +409,39 @@ class ApiServiceRetrofit {
       rethrow;
     }
   }
+
+  Future<Map<String, dynamic>> updateAssignment(String courseId, String assignmentId, Map<String, dynamic> assignmentData) async {
+    try {
+      final userId = _getEffectiveUserId();
+      if (userId == null) {
+        throw Exception('User ID is required');
+      }
+      
+      final response = await _retrofit.updateAssignment(userId, courseId, assignmentId, assignmentData);
+      
+      // Handle both direct object and JSON string responses
+      if (response.data is String) {
+        return json.decode(response.data);
+      }
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      debugPrint('Failed to update assignment: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteAssignment(String courseId, String assignmentId) async {
+    try {
+      final userId = _getEffectiveUserId();
+      if (userId == null) {
+        throw Exception('User ID is required');
+      }
+      
+      await _retrofit.deleteAssignment(userId, courseId, assignmentId);
+      debugPrint('✅ Assignment deleted successfully');
+    } catch (e) {
+      debugPrint('Failed to delete assignment: $e');
+      rethrow;
+    }
+  }
 }
