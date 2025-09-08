@@ -161,7 +161,7 @@ class _AppDrawerState extends State<AppDrawer> {
                       builder: (context, authService, child) {
                         final selectedStudent = authService.getSelectedStudent();
                         return CupertinoDropdown(
-                          value: selectedStudent?.name ?? authService.students.first.name,
+                          value: selectedStudent?.name ?? (authService.students.isNotEmpty ? authService.students.first.name : null),
                           items: authService.students.map((student) => student.name).toList(),
                           hintText: 'Select student',
                           onChanged: (studentName) {
