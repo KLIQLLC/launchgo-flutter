@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../theme/app_colors.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -325,7 +326,7 @@ class _DocumentsViewState extends State<DocumentsView> {
                         children: [
                           Icon(
                             Icons.error_outline,
-                            color: Colors.red,
+                            color: AppColors.error,
                             size: 64,
                           ),
                           const SizedBox(height: 16),

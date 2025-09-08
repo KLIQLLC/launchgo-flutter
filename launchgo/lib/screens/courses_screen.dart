@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../widgets/course_card.dart';
 import '../widgets/extended_fab.dart';
 import '../widgets/swipeable_card.dart';
+import '../theme/app_colors.dart';
 
 class CoursesScreen extends StatefulWidget {
   const CoursesScreen({super.key});
@@ -90,7 +91,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Course deleted successfully'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
           ),
         );
         _loadCourses();
@@ -100,7 +101,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to delete course: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -121,7 +122,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              style: TextButton.styleFrom(foregroundColor: AppColors.error),
               child: const Text('Delete'),
             ),
           ],

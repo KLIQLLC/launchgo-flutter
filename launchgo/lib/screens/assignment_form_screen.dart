@@ -6,6 +6,7 @@ import '../services/auth_service.dart';
 import '../services/api_service_retrofit.dart';
 import '../widgets/form_submit_button.dart';
 import '../widgets/cupertino_dropdown.dart';
+import '../theme/app_colors.dart';
 
 class AssignmentFormScreen extends StatefulWidget {
   final Map<String, dynamic>? course;
@@ -243,7 +244,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to save assignment: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -502,7 +503,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.red),
+          borderSide: const BorderSide(color: AppColors.error),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       ),
@@ -550,7 +551,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('File "${file.name}" exceeds 5MB limit'),
-                backgroundColor: Colors.red,
+                backgroundColor: AppColors.error,
               ),
             );
           }
@@ -566,7 +567,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('File attached: ${file.name}'),
-              backgroundColor: Colors.green,
+              backgroundColor: AppColors.success,
             ),
           );
         }
@@ -576,7 +577,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error picking files: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }

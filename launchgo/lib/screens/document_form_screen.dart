@@ -7,6 +7,7 @@ import '../services/auth_service.dart';
 import '../services/theme_service.dart';
 import '../widgets/cupertino_dropdown.dart';
 import '../widgets/form_submit_button.dart';
+import '../theme/app_colors.dart';
 
 enum DocumentScreenMode {
   create,
@@ -156,7 +157,7 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Please select a valid semester'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
         setState(() {
@@ -186,7 +187,7 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
             content: Text(isEditMode 
                 ? 'Document updated successfully' 
                 : 'Document created successfully'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
           ),
         );
         context.pop(true); // Return true to indicate success
@@ -198,7 +199,7 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
             content: Text(isEditMode 
                 ? 'Failed to update document: ${e.toString()}'
                 : 'Failed to create document: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -282,7 +283,7 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
                     errorBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: const BorderSide(
-                        color: Colors.red,
+                        color: AppColors.error,
                       ),
                     ),
                   ),

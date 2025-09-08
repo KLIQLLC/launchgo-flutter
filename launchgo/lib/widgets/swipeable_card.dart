@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../core/constants/swipe_constants.dart';
+import '../theme/app_colors.dart';
 
 /// A reusable swipeable card widget with consistent swipe-to-delete behavior
 class SwipeableCard extends StatefulWidget {
@@ -140,13 +141,13 @@ class _SwipeableCardState extends State<SwipeableCard>
                               width: 28,
                               height: 28,
                               colorFilter: ColorFilter.mode(
-                                Colors.white.withValues(alpha: progress),
+                                AppColors.textPrimary.withValues(alpha: progress),
                                 BlendMode.srcIn,
                               ),
                             )
                           : Icon(
                               widget.deleteIcon,
-                              color: Colors.white.withValues(alpha: progress),
+                              color: AppColors.textPrimary.withValues(alpha: progress),
                               size: 28,
                             ),
                       ),

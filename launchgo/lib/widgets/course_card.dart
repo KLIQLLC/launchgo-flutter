@@ -68,7 +68,7 @@ class CourseCard extends StatelessWidget {
                                 color: themeService.borderColor.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.3),
+                                  color: AppColors.textWhite30,
                                   width: 1,
                                 ),
                               ),
@@ -113,7 +113,7 @@ class CourseCard extends StatelessWidget {
                               const Text(
                                 ' • ',
                                 style: TextStyle(
-                                  color: Colors.grey,
+                                  color: AppColors.textGrey,
                                   fontSize: 14,
                                 ),
                               ),

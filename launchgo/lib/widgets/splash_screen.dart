@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../theme/app_colors.dart';
 
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
@@ -13,8 +14,8 @@ class SplashScreen extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFFFE3732), // Red color from your gradient
-              Color(0xFFFF894B), // Orange color from your gradient
+              AppColors.gradient1, // Red color from your gradient
+              AppColors.gradient2, // Orange color from your gradient
             ],
           ),
         ),

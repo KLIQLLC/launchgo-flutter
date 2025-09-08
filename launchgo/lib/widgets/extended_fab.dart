@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../theme/app_colors.dart';
 
 class ExtendedFAB extends StatelessWidget {
   final String label;
@@ -15,7 +16,7 @@ class ExtendedFAB extends StatelessWidget {
   Widget build(BuildContext context) {
     return FloatingActionButton.extended(
       onPressed: onPressed,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.buttonPrimary,
       foregroundColor: const Color(0xFF1A1F2B),
       icon: SvgPicture.asset(
         'assets/icons/ic_plus.svg',

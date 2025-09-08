@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_colors.dart';
 
 class MessagesScreen extends StatelessWidget {
   const MessagesScreen({super.key});
@@ -29,7 +30,7 @@ class MessagesScreen extends StatelessWidget {
               const SizedBox(height: 10),
               const Text(
                 'Stay connected with your instructors and peers',
-                style: TextStyle(fontSize: 16, color: Colors.grey),
+                style: TextStyle(fontSize: 16, color: AppColors.textGrey),
               ),
             ],
           ),

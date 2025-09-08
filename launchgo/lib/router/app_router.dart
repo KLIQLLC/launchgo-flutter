@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import '../theme/app_colors.dart';
 import 'package:launchgo/features/documents/domain/entities/document_entity.dart';
 import 'package:launchgo/features/documents/presentation/pages/documents_page.dart';
 import 'package:launchgo/screens/chat_screen.dart';
@@ -213,12 +214,12 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
           icon: CustomIcon(
             icon: CustomIconPath.schedule,
             size: const Size(24, 24),
-            color: Colors.white.withValues(alpha: 0.5),
+            color: AppColors.bottomNavUnselected,
           ),
           activeIcon: CustomIcon(
             icon: CustomIconPath.schedule,
             size: const Size(24, 24),
-            color: const Color(0xFF7B8CDE),
+            color: AppColors.accent,
           ),
           label: 'Schedule',
         ),
@@ -226,12 +227,12 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
           icon: CustomIcon(
             icon: CustomIconPath.course,
             size: const Size(24, 24),
-            color: Colors.white.withValues(alpha: 0.5),
+            color: AppColors.bottomNavUnselected,
           ),
           activeIcon: CustomIcon(
             icon: CustomIconPath.course,
             size: const Size(24, 24),
-            color: const Color(0xFF7B8CDE),
+            color: AppColors.accent,
           ),
           label: 'Courses',
         ),
@@ -239,12 +240,12 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
           icon: CustomIcon(
             icon: CustomIconPath.document,
             size: const Size(24, 24),
-            color: Colors.white.withValues(alpha: 0.5),
+            color: AppColors.bottomNavUnselected,
           ),
           activeIcon: CustomIcon(
             icon: CustomIconPath.document,
             size: const Size(24, 24),
-            color: const Color(0xFF7B8CDE),
+            color: AppColors.accent,
           ),
           label: 'Documents',
         ),
@@ -257,12 +258,12 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
             icon: CustomIcon(
               icon: CustomIconPath.recap,
               size: const Size(24, 24),
-              color: Colors.white.withValues(alpha: 0.5),
+              color: AppColors.bottomNavUnselected,
             ),
             activeIcon: CustomIcon(
               icon: CustomIconPath.recap,
               size: const Size(24, 24),
-              color: const Color(0xFF7B8CDE),
+              color: AppColors.accent,
             ),
             label: 'Recaps',
           ),
@@ -275,12 +276,12 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
           icon: CustomIcon(
             icon: CustomIconPath.chat,
             size: const Size(24, 24),
-            color: Colors.white.withValues(alpha: 0.5),
+            color: AppColors.bottomNavUnselected,
           ),
           activeIcon: CustomIcon(
             icon: CustomIconPath.chat,
             size: const Size(24, 24),
-            color: const Color(0xFF7B8CDE),
+            color: AppColors.accent,
           ),
           label: 'Chat',
         ),
@@ -333,7 +334,7 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.all(4),
                     decoration: const BoxDecoration(
-                      color: Colors.red,
+                      color: AppColors.badgeRed,
                       shape: BoxShape.circle,
                     ),
                     constraints: const BoxConstraints(
@@ -344,7 +345,7 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
                       child: Text(
                         '3',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: AppColors.textPrimary,
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),
@@ -367,9 +368,9 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
         type: BottomNavigationBarType.fixed,
         currentIndex: _calculateSelectedIndex(context, authService),
         onTap: (index) => _onItemTapped(index, context, authService),
-        backgroundColor: const Color(0xFF1A1F2B),
-        selectedItemColor: const Color(0xFF7B8CDE),
-        unselectedItemColor: Colors.white.withValues(alpha: 0.5),
+        backgroundColor: AppColors.bottomNavBackground,
+        selectedItemColor: AppColors.bottomNavSelected,
+        unselectedItemColor: AppColors.bottomNavUnselected,
         showSelectedLabels: true,
         showUnselectedLabels: true,
         selectedFontSize: 12,

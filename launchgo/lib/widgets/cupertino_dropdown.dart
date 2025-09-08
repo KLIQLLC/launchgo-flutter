@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:launchgo/services/theme_service.dart';
+import 'package:launchgo/theme/app_colors.dart';
 import 'package:provider/provider.dart';
 
 class CupertinoDropdown extends StatefulWidget {
@@ -163,7 +164,7 @@ class _CupertinoDropdownState extends State<CupertinoDropdown> {
               color: themeService.cardColor,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: errorText != null ? Colors.red : themeService.borderColor,
+                color: errorText != null ? AppColors.error : themeService.borderColor,
                 width: errorText != null ? 1 : 1,
               ),
             ),
@@ -199,7 +200,7 @@ class _CupertinoDropdownState extends State<CupertinoDropdown> {
             child: Text(
               errorText,
               style: const TextStyle(
-                color: Colors.red,
+                color: AppColors.error,
                 fontSize: 12,
               ),
             ),

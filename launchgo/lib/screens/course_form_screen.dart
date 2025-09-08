@@ -5,6 +5,7 @@ import '../services/auth_service.dart';
 import '../services/api_service_retrofit.dart';
 import '../widgets/form_submit_button.dart';
 import '../widgets/cupertino_dropdown.dart';
+import '../theme/app_colors.dart';
 
 class CourseFormScreen extends StatefulWidget {
   final Map<String, dynamic>? course;
@@ -93,7 +94,7 @@ class _CourseFormScreenState extends State<CourseFormScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to save course: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -302,7 +303,7 @@ class _CourseFormScreenState extends State<CourseFormScreen> {
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Colors.red),
+          borderSide: const BorderSide(color: AppColors.error),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),

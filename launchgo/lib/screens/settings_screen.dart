@@ -5,6 +5,7 @@ import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/utils/debug_utils.dart';
 import 'package:provider/provider.dart';
+import '../theme/app_colors.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -121,7 +122,7 @@ class SettingsScreen extends StatelessWidget {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Token expired. Next API call will trigger login'),
-                                backgroundColor: Colors.orange,
+                                backgroundColor: AppColors.warning,
                               ),
                             );
                           }
@@ -135,7 +136,7 @@ class SettingsScreen extends StatelessWidget {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Token will expire in 5 seconds'),
-                                backgroundColor: Colors.orange,
+                                backgroundColor: AppColors.warning,
                               ),
                             );
                           }
@@ -149,7 +150,7 @@ class SettingsScreen extends StatelessWidget {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Token cleared. Next API call will fail'),
-                                backgroundColor: Colors.red,
+                                backgroundColor: AppColors.error,
                               ),
                             );
                           }
@@ -163,7 +164,7 @@ class SettingsScreen extends StatelessWidget {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Token corrupted. Next API call will fail'),
-                                backgroundColor: Colors.red,
+                                backgroundColor: AppColors.error,
                               ),
                             );
                           }
@@ -177,7 +178,7 @@ class SettingsScreen extends StatelessWidget {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Check console for token status'),
-                                backgroundColor: Colors.blue,
+                                backgroundColor: AppColors.info,
                               ),
                             );
                           }
@@ -211,7 +212,7 @@ class SettingsScreen extends StatelessWidget {
                         onPressed: () => Navigator.pop(context, true),
                         child: const Text(
                           'Logout',
-                          style: TextStyle(color: Colors.red),
+                          style: TextStyle(color: AppColors.error),
                         ),
                       ),
                     ],
@@ -226,8 +227,8 @@ class SettingsScreen extends StatelessWidget {
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
+                backgroundColor: AppColors.error,
+                foregroundColor: AppColors.textPrimary,
                 minimumSize: const Size(double.infinity, 50),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -259,8 +260,8 @@ class _DebugButton extends StatelessWidget {
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.grey.shade700,
-        foregroundColor: Colors.white,
+        backgroundColor: AppColors.buttonGrey,
+        foregroundColor: AppColors.textPrimary,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         minimumSize: Size.zero,
         shape: RoundedRectangleBorder(

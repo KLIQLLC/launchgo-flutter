@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_colors.dart';
 
 class FormSubmitButton extends StatelessWidget {
   final String text;
@@ -20,7 +21,7 @@ class FormSubmitButton extends StatelessWidget {
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.white,
+          backgroundColor: AppColors.buttonPrimary,
           foregroundColor: const Color(0xFF1A1F2B),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),

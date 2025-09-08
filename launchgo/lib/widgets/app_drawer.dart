@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/theme_service.dart';
+import 'package:launchgo/theme/app_colors.dart';
 import 'package:launchgo/widgets/cupertino_dropdown.dart';
 import 'package:launchgo/widgets/version_environment_widget.dart';
 import 'package:provider/provider.dart';
@@ -39,7 +40,7 @@ class _AppDrawerState extends State<AppDrawer> {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFFFE3732), Color(0xFFFF894B)],
+                colors: [AppColors.gradient1, AppColors.gradient2],
               ),
             ),
             child: SafeArea(
@@ -61,7 +62,7 @@ class _AppDrawerState extends State<AppDrawer> {
                     Text(
                       authService.currentUser?.displayName ?? 'Unknown',
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
@@ -70,7 +71,7 @@ class _AppDrawerState extends State<AppDrawer> {
                     Text(
                       authService.currentUser?.email ?? '',
                       style: const TextStyle(
-                        color: Colors.white70,
+                        color: AppColors.textWhite70,
                         fontSize: 12,
                       ),
                       maxLines: 1,
@@ -208,12 +209,12 @@ class _AppDrawerState extends State<AppDrawer> {
                   child: ListTile(
                     leading: const Icon(
                       Icons.logout,
-                      color: Color(0xFFFF6B35), // Warm orange-red
+                      color: AppColors.logoutColor,
                     ),
                     title: const Text(
                       'Logout',
                       style: TextStyle(
-                        color: Color(0xFFFF6B35), // Warm orange-red
+                        color: AppColors.logoutColor,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -235,7 +236,7 @@ class _AppDrawerState extends State<AppDrawer> {
                               onPressed: () => Navigator.pop(context, true),
                               child: const Text(
                                 'Logout',
-                                style: TextStyle(color: Colors.red),
+                                style: TextStyle(color: AppColors.error),
                               ),
                             ),
                           ],

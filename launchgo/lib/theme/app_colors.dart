@@ -7,19 +7,48 @@ class AppColors {
   // Private constructor to prevent instantiation
   AppColors._();
 
-  // ===== Primary Brand Colors =====
-  static const Color primaryBlue = Color(0xFF2196F3);
-  static const Color primaryDark = Color(0xFF1976D2);
-  static const Color primaryLight = Color(0xFFBBDEFB);
+  // ===== Core Theme Colors =====
+  static const Color darkBackground = Color(0xFF0F1318);
+  static const Color darkCard = Color(0xFF1A1F2B);
+  static const Color darkBorder = Color(0xFF2A303E);
+  static const Color accent = Color(0xFF7B8CDE);
+  static const Color gradient1 = Color(0xFFFE3732);
+  static const Color gradient2 = Color(0xFFFF894B);
   
-  // ===== Neutral Colors =====
-  static const Color backgroundDark = Color(0xFF1A1B1E);
-  static const Color cardDark = Color(0xFF2D2E33);
-  static const Color borderDark = Color(0xFF3A3B40);
-  
+  // ===== Text Colors =====
   static const Color textPrimary = Color(0xFFFFFFFF);
   static const Color textSecondary = Color(0xFFB0B0B0);
   static const Color textTertiary = Color(0xFF808080);
+  static Color textSecondaryTranslucent = Colors.white.withValues(alpha: 0.7);
+  static Color textTertiaryTranslucent = Colors.white.withValues(alpha: 0.5);
+  static Color textWhite30 = Colors.white.withValues(alpha: 0.3);
+  static const Color textWhite70 = Colors.white70;
+  static const Color textGrey = Colors.grey;
+  
+  // ===== Semantic Colors =====
+  static const Color success = Color(0xFF4CAF50);
+  static const Color error = Color(0xFFF44336);
+  static const Color warning = Color(0xFFFF9800);
+  static const Color info = Color(0xFF2196F3);
+  
+  // ===== Button Colors =====
+  static const Color buttonPrimary = Colors.white;
+  static const Color buttonDanger = error;
+  static const Color buttonDangerText = Colors.white;
+  static const Color buttonGrey = Color(0xFF616161); // grey.shade700
+  
+  // ===== Badge Colors =====
+  static const Color badgeGrey = Color(0xFF37474F);
+  static const Color badgeRed = error;
+  
+  // ===== Bottom Navigation Colors =====
+  static const Color bottomNavBackground = darkCard;
+  static const Color bottomNavSelected = accent;
+  static Color bottomNavUnselected = Colors.white.withValues(alpha: 0.5);
+  
+  // ===== Special UI Colors =====
+  static const Color logoutColor = Color(0xFFFF6B35); // Warm orange-red
+  static const Color dividerColor = darkBorder;
   
   // ===== Grade Colors System =====
   // Each grade has a light background with dark text for accessibility
@@ -30,27 +59,27 @@ class AppColors {
   
   // Grade B - Blue theme  
   static const Color gradeBBackground = Color(0xFFDBE9FE);
-  static const Color gradeBText = Color(0xFF1E40AF); // Darker blue text
+  static const Color gradeBText = Color(0xFF1E40AF);
   
   // Grade C - Yellow theme
   static const Color gradeCBackground = Color(0xFFFEF3C7);
-  static const Color gradeCText = Color(0xFF92400E); // Darker brown/amber text
+  static const Color gradeCText = Color(0xFF92400E);
   
   // Grade D - Orange theme
-  static const Color gradeDBackground = Color(0xFFFFEDD7); // sRGB(255, 237, 215) - light peach background
-  static const Color gradeDText = Color(0xFF9A3412); // Darker orange/rust text
+  static const Color gradeDBackground = Color(0xFFFFEDD7);
+  static const Color gradeDText = Color(0xFF9A3412);
   
   // Grade F - Red theme
-  static const Color gradeFBackground = Color(0xFFFEE2E2); // Light pink/red background
-  static const Color gradeFText = Color(0xFF991B1B); // Darker red text
+  static const Color gradeFBackground = Color(0xFFFEE2E2);
+  static const Color gradeFText = Color(0xFF991B1B);
   
   // Grade W (Withdrawal) - Light grey theme
-  static const Color gradeWBackground = Color(0xFFF3F4F6); // sRGB(243, 244, 246) - light grey background
-  static const Color gradeWText = Color(0xFF1F2937); // Darker grey/almost black text
+  static const Color gradeWBackground = Color(0xFFF3F4F6);
+  static const Color gradeWText = Color(0xFF1F2937);
   
   // Grade IP (In Progress) - Light grey theme
-  static const Color gradeIPBackground = Color(0xFFF3F4F6); // Very light grey/almost white background
-  static const Color gradeIPText = Color(0xFF374151); // Dark grey text
+  static const Color gradeIPBackground = Color(0xFFF3F4F6);
+  static const Color gradeIPText = Color(0xFF374151);
   
   // Grade N/A or null
   static const Color gradeNABackground = Color(0xFFF3F4F6);
@@ -61,27 +90,14 @@ class AppColors {
   // Pending - Blue
   static const Color statusPendingBackground = Color(0xFF2196F3);
   static const Color statusPendingText = Color(0xFF1976D2);
-  static const Color statusPendingBorder = Color(0xFF2196F3);
   
   // Completed - Green
   static const Color statusCompletedBackground = Color(0xFF4CAF50);
   static const Color statusCompletedText = Color(0xFF2E7D32);
-  static const Color statusCompletedBorder = Color(0xFF4CAF50);
   
   // Overdue - Red
   static const Color statusOverdueBackground = Color(0xFFF44336);
   static const Color statusOverdueText = Color(0xFFD32F2F);
-  static const Color statusOverdueBorder = Color(0xFFF44336);
-  
-  // ===== Semantic Colors =====
-  static const Color success = Color(0xFF4CAF50);
-  static const Color warning = Color(0xFFFF9800);
-  static const Color error = Color(0xFFF44336);
-  static const Color info = Color(0xFF2196F3);
-  
-  // ===== Badge Colors =====
-  static const Color badgeGrey = Color(0xFF37474F);
-  static const Color badgeLightGrey = Color(0xFF9E9E9E);
   
   // ===== Document Tag Colors =====
   // Study Guide
@@ -95,22 +111,6 @@ class AppColors {
   // Notes
   static const Color documentNotesBackgroundDark = Color(0xFF16A34A);
   static const Color documentNotesTextDark = Color(0xFFFFFFFF);
-  
-  // ===== Button Colors =====
-  static const Color buttonPrimary = primaryBlue;
-  static const Color buttonSecondary = Color(0xFF37474F);
-  static const Color buttonDanger = error;
-  static const Color buttonDisabled = Color(0xFF9E9E9E);
-  
-  // ===== Special UI Elements =====
-  static const Color fabBackground = primaryBlue;
-  static const Color fabIcon = Colors.white;
-  static const Color accent = Color(0xFF00C853);
-  
-  // ===== Shadow Colors =====
-  static const Color shadowLight = Color(0x1A000000);
-  static const Color shadowMedium = Color(0x33000000);
-  static const Color shadowDark = Color(0x66000000);
   
   // ===== Helper Methods =====
   
@@ -173,26 +173,4 @@ class AppColors {
         return statusPendingBackground;
     }
   }
-  
-  /// Get semantic color based on type
-  static Color getSemanticColor(SemanticColorType type) {
-    switch (type) {
-      case SemanticColorType.success:
-        return success;
-      case SemanticColorType.warning:
-        return warning;
-      case SemanticColorType.error:
-        return error;
-      case SemanticColorType.info:
-        return info;
-    }
-  }
-}
-
-/// Enum for semantic color types
-enum SemanticColorType {
-  success,
-  warning,
-  error,
-  info,
 }

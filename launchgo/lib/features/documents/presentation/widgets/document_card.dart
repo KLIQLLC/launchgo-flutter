@@ -160,8 +160,8 @@ class DocumentCard extends StatelessWidget {
         );
       default:
         return const TagColors(
-          backgroundColor: Color(0xFF3A3A3A),
-          textColor: Color(0xFFB0B0B0),
+          backgroundColor: AppColors.badgeGrey,
+          textColor: AppColors.textSecondary,
         );
     }
   }
@@ -197,7 +197,7 @@ class DocumentCard extends StatelessWidget {
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: TextButton.styleFrom(
-              foregroundColor: Colors.red,
+              foregroundColor: AppColors.error,
             ),
             child: const Text('Delete'),
           ),
@@ -223,7 +223,7 @@ class DocumentCard extends StatelessWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Document deleted successfully'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
           ),
         );
         
@@ -235,7 +235,7 @@ class DocumentCard extends StatelessWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to delete document: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }

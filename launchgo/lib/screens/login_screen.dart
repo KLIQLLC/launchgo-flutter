@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:provider/provider.dart';
+import '../theme/app_colors.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -23,7 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Welcome, ${authService.currentUser?.displayName ?? authService.currentUser?.email}!'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
           ),
         );
         context.go('/schedule');
@@ -31,7 +32,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Sign in failed'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -85,12 +86,12 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: ElevatedButton(
                           onPressed: authService.isSigningIn ? null : _handleSignIn,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
+                            backgroundColor: AppColors.textPrimary,
                             foregroundColor: Colors.black87,
                             elevation: 1,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
-                              side: const BorderSide(color: Colors.grey),
+                              side: const BorderSide(color: AppColors.textGrey),
                             ),
                           ),
                           child: authService.isSigningIn
@@ -99,7 +100,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   height: 20,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.textGrey),
                                   ),
                                 )
                               : Row(
@@ -132,7 +133,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: const Text(
                             'Sign in with different account',
                             style: TextStyle(
-                              color: Colors.white70,
+                              color: AppColors.textWhite70,
                               fontSize: 14,
                             ),
                           ),
@@ -147,8 +148,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: ElevatedButton(
                           onPressed: _handleSignOut,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            foregroundColor: Colors.white,
+                            backgroundColor: AppColors.error,
+                            foregroundColor: AppColors.textPrimary,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),

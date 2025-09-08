@@ -382,7 +382,7 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: TextButton.styleFrom(
-              foregroundColor: Colors.red,
+              foregroundColor: AppColors.error,
             ),
             child: const Text('Delete'),
           ),
@@ -411,7 +411,7 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Assignment deleted successfully'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
           ),
         );
         
@@ -424,7 +424,7 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to delete assignment: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }

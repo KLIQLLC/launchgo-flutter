@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:launchgo/core/di/service_locator.dart';
 import 'package:launchgo/router/app_router.dart';
 import 'package:launchgo/services/auth_service.dart';
+import 'package:launchgo/theme/app_colors.dart';
 import 'package:provider/provider.dart';
 
 /// Alternative main file using GetIt for dependency injection
@@ -49,7 +50,7 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp.router(
       title: 'launchgo',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        colorScheme: ColorScheme.fromSeed(seedColor: AppColors.info),
         useMaterial3: true,
       ),
       routerConfig: _appRouter.router,

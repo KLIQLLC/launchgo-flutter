@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_colors.dart';
 
 class StudyGuideScreen extends StatelessWidget {
   const StudyGuideScreen({super.key});
@@ -29,7 +30,7 @@ class StudyGuideScreen extends StatelessWidget {
               const SizedBox(height: 10),
               const Text(
                 'Access your learning materials and guides',
-                style: TextStyle(fontSize: 16, color: Colors.grey),
+                style: TextStyle(fontSize: 16, color: AppColors.textGrey),
               ),
             ],
           ),
