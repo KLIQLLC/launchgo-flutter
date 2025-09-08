@@ -51,14 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
         return Scaffold(
           body: Container(
             decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [
-                  Color(0xFFFE3732), // Red color from your gradient
-                  Color(0xFFFF894B), // Orange color from your gradient
-                ],
-              ),
+              color: AppColors.splashBackground,
             ),
             child: SafeArea(
               child: Center(

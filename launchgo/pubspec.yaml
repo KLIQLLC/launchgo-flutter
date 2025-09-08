@@ -126,6 +126,24 @@ flutter_launcher_icons:
   macos:
     generate: false
 
+# Flutter Native Splash configuration
+flutter_native_splash:
+  # Background color (hex color) - solid color only, no image
+  color: "0B131E"
+  
+  # The color_dark parameter is optional and sets the color of the splash screen 
+  # background in dark mode.
+  color_dark: "0B131E"
+
+  # Android 12 handles the splash screen differently than previous versions.
+  android_12:
+    # The color parameter sets the background color of the splash screen.
+    color: "0B131E"
+    
+    # The color_dark parameter is optional and sets the color of the splash screen
+    # background in dark mode.
+    color_dark: "0B131E"
+
 # The following section is specific to Flutter packages.
 flutter:
 

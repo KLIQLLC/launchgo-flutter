@@ -14,6 +14,7 @@ class AppColors {
   static const Color accent = Color(0xFF7B8CDE);
   static const Color gradient1 = Color(0xFFFE3732);
   static const Color gradient2 = Color(0xFFFF894B);
+  static const Color splashBackground = Color(0xFF0B131E);
   
   // ===== Text Colors =====
   static const Color textPrimary = Color(0xFFFFFFFF);
@@ -47,7 +48,7 @@ class AppColors {
   static Color bottomNavUnselected = Colors.white.withValues(alpha: 0.5);
   
   // ===== Special UI Colors =====
-  static const Color logoutColor = Color(0xFFFF6B35); // Warm orange-red
+  static const Color logoutColor = Color(0xFF7F1E1D); // Dark red
   static const Color dividerColor = darkBorder;
   
   // ===== Grade Colors System =====

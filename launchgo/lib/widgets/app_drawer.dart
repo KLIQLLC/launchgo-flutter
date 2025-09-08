@@ -16,6 +16,13 @@ class AppDrawer extends StatefulWidget {
 }
 
 class _AppDrawerState extends State<AppDrawer> {
+  // Constants
+  static const double _drawerHeaderHeight = 210.0;
+  static const double _logoHeight = 50.0;
+  static const double _logoWidth = 120.0;
+  static const double _horizontalPadding = 16.0;
+  static const double _itemIndentPadding = 16.0;
+
   @override
   void initState() {
     super.initState();
@@ -29,19 +36,15 @@ class _AppDrawerState extends State<AppDrawer> {
     final currentRoute = GoRouterState.of(context).matchedLocation;
 
     return Drawer(
-      backgroundColor: themeService.backgroundColor,
+      backgroundColor: AppColors.splashBackground,
       child: Column(
         children: [
-          // Drawer Header with gradient
+          // Drawer Header with solid color
           Container(
-            height: 210,
+            height: _drawerHeaderHeight,
             width: double.infinity,
             decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [AppColors.gradient1, AppColors.gradient2],
-              ),
+              color: AppColors.splashBackground,
             ),
             child: SafeArea(
               child: Padding(
@@ -52,8 +55,8 @@ class _AppDrawerState extends State<AppDrawer> {
                     // Logo
                     SvgPicture.asset(
                       'assets/images/launchgo_logo.svg',
-                      height: 50,
-                      width: 120,
+                      height: _logoHeight,
+                      width: _logoWidth,
                       fit: BoxFit.contain,
                       colorFilter: null
                     ),
@@ -89,7 +92,11 @@ class _AppDrawerState extends State<AppDrawer> {
               padding: EdgeInsets.zero,
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  padding: const EdgeInsets.symmetric(horizontal: _horizontalPadding),
+                  child: Divider(color: themeService.borderColor, height: 1),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(_horizontalPadding, _horizontalPadding, _horizontalPadding, 8),
                   child: Text(
                     'Semester',
                     style: TextStyle(
@@ -137,7 +144,7 @@ class _AppDrawerState extends State<AppDrawer> {
                 if (authService.permissions.canShowStudentSelection) ...[
                   const SizedBox(height: 8),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    padding: const EdgeInsets.fromLTRB(_horizontalPadding, _horizontalPadding, _horizontalPadding, 8),
                     child: Text(
                       'Student',
                       style: TextStyle(
@@ -177,7 +184,7 @@ class _AppDrawerState extends State<AppDrawer> {
                 const SizedBox(height: 8),
                 // Navigation label
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  padding: const EdgeInsets.fromLTRB(_horizontalPadding, _horizontalPadding, _horizontalPadding, 8),
                   child: Text(
                     'Navigation',
                     style: TextStyle(
@@ -190,13 +197,12 @@ class _AppDrawerState extends State<AppDrawer> {
                 ),
                 // Settings with indent
                 Padding(
-                  padding: const EdgeInsets.only(left: 16),
+                  padding: const EdgeInsets.only(left: _itemIndentPadding),
                   child: _buildDrawerItem(
                     context: context,
-                    icon: Icons.settings,
                     title: 'Settings',
-                    route: null,
                     isSelected: currentRoute == '/settings',
+                    svgPath: 'assets/icons/ic_settings.svg',
                     onTap: () {
                       Navigator.pop(context); // Close drawer
                       context.push('/settings');
@@ -205,55 +211,11 @@ class _AppDrawerState extends State<AppDrawer> {
                 ),
                 // Logout Button with indent
                 Padding(
-                  padding: const EdgeInsets.only(left: 16),
-                  child: ListTile(
-                    leading: const Icon(
-                      Icons.logout,
-                      color: AppColors.logoutColor,
-                    ),
-                    title: const Text(
-                      'Logout',
-                      style: TextStyle(
-                        color: AppColors.logoutColor,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    onTap: () async {
-                      // Show confirmation dialog
-                      final shouldLogout = await showDialog<bool>(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('Logout'),
-                          content: const Text(
-                            'Are you sure you want to logout?',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context, false),
-                              child: const Text('Cancel'),
-                            ),
-                            TextButton(
-                              onPressed: () => Navigator.pop(context, true),
-                              child: const Text(
-                                'Logout',
-                                style: TextStyle(color: AppColors.error),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-
-                      if (shouldLogout == true && context.mounted) {
-                        await authService.signOut();
-                        if (context.mounted) {
-                          context.go('/login');
-                        }
-                      }
-                    },
-                  ),
+                  padding: const EdgeInsets.only(left: _itemIndentPadding),
+                  child: _buildLogoutItem(context, authService),
                 ),
                 Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: _horizontalPadding),
                   child: Divider(color: themeService.borderColor, height: 1),
                 ),
                 // Version Info (compact)
@@ -268,20 +230,33 @@ class _AppDrawerState extends State<AppDrawer> {
 
   Widget _buildDrawerItem({
     required BuildContext context,
-    required IconData icon,
     required String title,
-    required String? route,
     required bool isSelected,
+    IconData? icon,
+    String? svgPath,
+    String? route,
     VoidCallback? onTap,
   }) {
+    assert(icon != null || svgPath != null, 'Either icon or svgPath must be provided');
+    assert(!(icon != null && svgPath != null), 'Cannot provide both icon and svgPath');
+    
     final themeService = context.watch<ThemeService>();
+    final iconColor = isSelected ? ThemeService.accent : themeService.textSecondaryColor;
+    
+    Widget leadingWidget;
+    if (icon != null) {
+      leadingWidget = Icon(icon, color: iconColor);
+    } else {
+      leadingWidget = SvgPicture.asset(
+        svgPath!,
+        width: 24,
+        height: 24,
+        colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
+      );
+    }
+    
     return ListTile(
-      leading: Icon(
-        icon,
-        color: isSelected
-            ? ThemeService.accent
-            : themeService.textSecondaryColor,
-      ),
+      leading: leadingWidget,
       title: Text(
         title,
         style: TextStyle(
@@ -293,14 +268,67 @@ class _AppDrawerState extends State<AppDrawer> {
       ),
       selected: isSelected,
       selectedTileColor: ThemeService.accent.withValues(alpha: 0.1),
-      onTap:
-          onTap ??
-          (route != null
-              ? () {
-                  Navigator.pop(context); // Close drawer
-                  context.go(route);
-                }
-              : null),
+      onTap: onTap ?? _defaultOnTap(context, route),
+    );
+  }
+
+  VoidCallback? _defaultOnTap(BuildContext context, String? route) {
+    return route != null
+        ? () {
+            Navigator.pop(context); // Close drawer
+            context.go(route);
+          }
+        : null;
+  }
+
+  Widget _buildLogoutItem(BuildContext context, AuthService authService) {
+    return ListTile(
+      leading: const Icon(
+        Icons.logout,
+        color: AppColors.logoutColor,
+      ),
+      title: const Text(
+        'Logout',
+        style: TextStyle(
+          color: AppColors.logoutColor,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      onTap: () => _handleLogout(context, authService),
+    );
+  }
+
+  Future<void> _handleLogout(BuildContext context, AuthService authService) async {
+    final shouldLogout = await _showLogoutConfirmationDialog(context);
+    
+    if (shouldLogout == true && context.mounted) {
+      await authService.signOut();
+      if (context.mounted) {
+        context.go('/login');
+      }
+    }
+  }
+
+  Future<bool?> _showLogoutConfirmationDialog(BuildContext context) {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Logout',
+              style: TextStyle(color: AppColors.logoutColor),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
