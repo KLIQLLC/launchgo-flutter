@@ -122,10 +122,10 @@ class _DocumentsViewState extends State<DocumentsView> {
                           .read<DocumentsBloc>()
                           .add(SearchDocumentsEvent(value));
                     },
-                    style: TextStyle(color: themeService.textColor),
+                    style: TextStyle(color: themeService.inputTextColor),
                     decoration: InputDecoration(
                       hintText: 'Search documents...',
-                      hintStyle: TextStyle(color: themeService.textTertiaryColor),
+                      hintStyle: TextStyle(color: themeService.inputPlaceholderColor),
                       prefixIcon: Icon(
                         Icons.search,
                         color: themeService.textTertiaryColor,

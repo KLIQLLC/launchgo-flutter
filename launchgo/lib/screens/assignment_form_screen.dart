@@ -478,13 +478,13 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
       keyboardType: keyboardType,
       maxLines: maxLines,
       style: TextStyle(
-        color: themeService.textColor,
+        color: themeService.inputTextColor,
         fontSize: 16,
       ),
       decoration: InputDecoration(
         hintText: hintText,
         hintStyle: TextStyle(
-          color: themeService.textSecondaryColor,
+          color: themeService.inputPlaceholderColor,
           fontSize: 17,
         ),
         filled: true,
@@ -775,7 +775,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                   child: TextFormField(
                     controller: controller,
                     style: TextStyle(
-                      color: themeService.textColor,
+                      color: themeService.inputTextColor,
                       fontSize: 16,
                     ),
                     decoration: InputDecoration(
@@ -831,13 +831,13 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
               child: TextField(
                 controller: _newStepController,
                 style: TextStyle(
-                  color: themeService.textColor,
+                  color: themeService.inputTextColor,
                   fontSize: 16,
                 ),
                 decoration: InputDecoration(
                   hintText: 'Add a step...',
                   hintStyle: TextStyle(
-                    color: themeService.textSecondaryColor,
+                    color: themeService.inputPlaceholderColor,
                     fontSize: 16,
                   ),
                   filled: true,

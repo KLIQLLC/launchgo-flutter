@@ -26,6 +26,10 @@ class AppColors {
   static const Color textWhite70 = Colors.white70;
   static const Color textGrey = Colors.grey;
   
+  // ===== Input Field Colors =====
+  static const Color inputText = Color(0xFFE6E8EA);
+  static const Color inputPlaceholder = Color(0xFF93A2B7);
+  
   // ===== Semantic Colors =====
   static const Color success = Color(0xFF4CAF50);
   static const Color error = Color(0xFFF44336);

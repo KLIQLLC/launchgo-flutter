@@ -278,13 +278,13 @@ class _CourseFormScreenState extends State<CourseFormScreen> {
       keyboardType: keyboardType,
       maxLines: maxLines,
       style: TextStyle(
-        color: themeService.textColor,
+        color: themeService.inputTextColor,
         fontSize: 17,
       ),
       decoration: InputDecoration(
         hintText: hintText,
         hintStyle: TextStyle(
-          color: themeService.textSecondaryColor,
+          color: themeService.inputPlaceholderColor,
           fontSize: 17,
         ),
         filled: true,

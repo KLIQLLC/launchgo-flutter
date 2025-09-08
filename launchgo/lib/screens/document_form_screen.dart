@@ -255,10 +255,10 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _nameController,
-                  style: TextStyle(color: themeService.textColor),
+                  style: TextStyle(color: themeService.inputTextColor),
                   decoration: InputDecoration(
                     hintText: 'Enter document name',
-                    hintStyle: TextStyle(color: themeService.textTertiaryColor),
+                    hintStyle: TextStyle(color: themeService.inputPlaceholderColor),
                     filled: true,
                     fillColor: themeService.cardColor,
                     border: OutlineInputBorder(

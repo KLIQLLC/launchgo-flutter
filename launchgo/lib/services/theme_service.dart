@@ -19,6 +19,10 @@ class ThemeService extends ChangeNotifier {
   Color get textTertiaryColor => AppColors.textTertiaryTranslucent;
   Color get iconColor => AppColors.textSecondaryTranslucent;
   
+  // Input field specific colors
+  Color get inputTextColor => AppColors.inputText;
+  Color get inputPlaceholderColor => AppColors.inputPlaceholder;
+  
   // Constructor - no need to load theme since it's always dark
   ThemeService();
   
