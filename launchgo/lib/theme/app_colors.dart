@@ -83,6 +83,19 @@ class AppColors {
   static const Color badgeGrey = Color(0xFF37474F);
   static const Color badgeLightGrey = Color(0xFF9E9E9E);
   
+  // ===== Document Tag Colors =====
+  // Study Guide
+  static const Color documentStudyGuideBackground = Color(0xFFF6F9FB);
+  static const Color documentStudyGuideText = Color(0xFF0D1220);
+  
+  // Assignment
+  static const Color documentAssignmentBackgroundDark = Color(0xFF1E293B);
+  static const Color documentAssignmentTextDark = Color(0xFFFFFFFF);
+  
+  // Notes
+  static const Color documentNotesBackgroundDark = Color(0xFF16A34A);
+  static const Color documentNotesTextDark = Color(0xFFFFFFFF);
+  
   // ===== Button Colors =====
   static const Color buttonPrimary = primaryBlue;
   static const Color buttonSecondary = Color(0xFF37474F);

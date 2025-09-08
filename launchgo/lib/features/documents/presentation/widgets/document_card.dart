@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../services/api_service_retrofit.dart';
 import '../../../../services/auth_service.dart';
 import '../../../../services/theme_service.dart';
+import '../../../../theme/app_colors.dart';
 import '../../../../widgets/swipeable_card.dart';
 import '../../domain/entities/document_entity.dart';
 
@@ -134,73 +135,33 @@ class DocumentCard extends StatelessWidget {
         color: themeService.borderColor,
         width: 1,
       ),
-      boxShadow: themeService.isDarkMode ? null : [
-        BoxShadow(
-          color: Colors.grey.withValues(alpha: 0.1),
-          spreadRadius: 1,
-          blurRadius: 4,
-          offset: const Offset(0, 2),
-        ),
-      ],
+      // No box shadow in dark mode
+      boxShadow: null,
     );
   }
 
   TagColors _getTagColors(ThemeService themeService, DocumentType type) {
-    if (themeService.isDarkMode) {
-      return _getDarkThemeTagColors(type);
-    } else {
-      return _getLightThemeTagColors(type);
-    }
-  }
-
-  // MARK: - Tag Colors
-
-  TagColors _getDarkThemeTagColors(DocumentType type) {
+    // Always use dark theme colors
     switch (type) {
       case DocumentType.studyGuide:
         return const TagColors(
-          backgroundColor: Color(0xFFF6F9FB), // Light blue-gray background
-          textColor: Color(0xFF0D1220), // Very dark blue-gray text
+          backgroundColor: AppColors.documentStudyGuideBackground,
+          textColor: AppColors.documentStudyGuideText,
         );
       case DocumentType.assignment:
         return const TagColors(
-          backgroundColor: Color(0xFF1E293B),
-          textColor: Colors.white,
+          backgroundColor: AppColors.documentAssignmentBackgroundDark,
+          textColor: AppColors.documentAssignmentTextDark,
         );
       case DocumentType.notes:
         return const TagColors(
-           backgroundColor: Color(0xFF33CC66),
-          textColor: Colors.white,
+          backgroundColor: AppColors.documentNotesBackgroundDark,
+          textColor: AppColors.documentNotesTextDark,
         );
       default:
         return const TagColors(
           backgroundColor: Color(0xFF3A3A3A),
           textColor: Color(0xFFB0B0B0),
-        );
-    }
-  }
-
-  TagColors _getLightThemeTagColors(DocumentType type) {
-    switch (type) {
-      case DocumentType.studyGuide:
-        return TagColors(
-          backgroundColor: Colors.blue.withValues(alpha: 0.1),
-          textColor: Colors.blue.shade700,
-        );
-      case DocumentType.assignment:
-        return TagColors(
-          backgroundColor: Colors.purple.withValues(alpha: 0.1),
-          textColor: Colors.purple.shade700,
-        );
-      case DocumentType.notes:
-        return TagColors(
-          backgroundColor: Colors.green.withValues(alpha: 0.1),
-          textColor: Colors.green.shade700,
-        );
-      default:
-        return TagColors(
-          backgroundColor: Colors.grey.withValues(alpha: 0.1),
-          textColor: Colors.grey.shade700,
         );
     }
   }

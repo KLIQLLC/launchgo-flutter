@@ -85,27 +85,6 @@ class SettingsScreen extends StatelessWidget {
             onTap: () {},
           ),
           
-          Divider(color: themeService.borderColor),
-          
-          // Theme Toggle
-          ListTile(
-            leading: Icon(
-              themeService.isDarkMode ? Icons.dark_mode : Icons.light_mode,
-              color: themeService.iconColor,
-            ),
-            title: Text(
-              'Dark Theme',
-              style: TextStyle(color: themeService.textColor),
-            ),
-            trailing: Switch(
-              value: themeService.isDarkMode,
-              onChanged: (value) => themeService.setDarkMode(value),
-              activeColor: ThemeService.accent,
-            ),
-          ),
-          
-          Divider(color: themeService.borderColor),
-          
           // Debug Section (only in debug mode)
           if (kDebugMode) ...[
             Container(
