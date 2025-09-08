@@ -30,19 +30,27 @@ class AppColors {
   
   // Grade B - Blue theme  
   static const Color gradeBBackground = Color(0xFFDBE9FE);
-  static const Color gradeBText = Color(0xFF1976D2);
+  static const Color gradeBText = Color(0xFF1E40AF); // Darker blue text
   
   // Grade C - Yellow theme
   static const Color gradeCBackground = Color(0xFFFEF3C7);
-  static const Color gradeCText = Color(0xFFD97706);
+  static const Color gradeCText = Color(0xFF92400E); // Darker brown/amber text
   
   // Grade D - Orange theme
-  static const Color gradeDBackground = Color(0xFFFED7AA);
-  static const Color gradeDText = Color(0xFFEA580C);
+  static const Color gradeDBackground = Color(0xFFFFEDD7); // sRGB(255, 237, 215) - light peach background
+  static const Color gradeDText = Color(0xFF9A3412); // Darker orange/rust text
   
   // Grade F - Red theme
-  static const Color gradeFBackground = Color(0xFFFEE2E2);
-  static const Color gradeFText = Color(0xFFDC2626);
+  static const Color gradeFBackground = Color(0xFFFEE2E2); // Light pink/red background
+  static const Color gradeFText = Color(0xFF991B1B); // Darker red text
+  
+  // Grade W (Withdrawal) - Light grey theme
+  static const Color gradeWBackground = Color(0xFFF3F4F6); // sRGB(243, 244, 246) - light grey background
+  static const Color gradeWText = Color(0xFF1F2937); // Darker grey/almost black text
+  
+  // Grade IP (In Progress) - Light grey theme
+  static const Color gradeIPBackground = Color(0xFFF3F4F6); // Very light grey/almost white background
+  static const Color gradeIPText = Color(0xFF374151); // Dark grey text
   
   // Grade N/A or null
   static const Color gradeNABackground = Color(0xFFF3F4F6);
@@ -103,6 +111,8 @@ class AppColors {
     if (upperGrade.startsWith('C')) return gradeCBackground;
     if (upperGrade.startsWith('D')) return gradeDBackground;
     if (upperGrade == 'F') return gradeFBackground;
+    if (upperGrade == 'W') return gradeWBackground;
+    if (upperGrade == 'IP') return gradeIPBackground;
     
     return gradeNABackground;
   }
@@ -117,6 +127,8 @@ class AppColors {
     if (upperGrade.startsWith('C')) return gradeCText;
     if (upperGrade.startsWith('D')) return gradeDText;
     if (upperGrade == 'F') return gradeFText;
+    if (upperGrade == 'W') return gradeWText;
+    if (upperGrade == 'IP') return gradeIPText;
     
     return gradeNAText;
   }

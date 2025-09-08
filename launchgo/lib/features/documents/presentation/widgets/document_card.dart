@@ -80,7 +80,7 @@ class DocumentCard extends StatelessWidget {
         style: TextStyle(
           color: tagColors.textColor,
           fontSize: 12,
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -159,18 +159,18 @@ class DocumentCard extends StatelessWidget {
     switch (type) {
       case DocumentType.studyGuide:
         return const TagColors(
-          backgroundColor: Color(0xFF2A3F5F),
-          textColor: Color(0xFF8FAFD6),
+          backgroundColor: Color(0xFFF6F9FB), // Light blue-gray background
+          textColor: Color(0xFF0D1220), // Very dark blue-gray text
         );
       case DocumentType.assignment:
         return const TagColors(
-          backgroundColor: Color(0xFF3A2F4F),
-          textColor: Color(0xFFB99FD8),
+          backgroundColor: Color(0xFF1E293B),
+          textColor: Colors.white,
         );
       case DocumentType.notes:
         return const TagColors(
-          backgroundColor: Color(0xFF2F4F3A),
-          textColor: Color(0xFF9FD8B9),
+           backgroundColor: Color(0xFF33CC66),
+          textColor: Colors.white,
         );
       default:
         return const TagColors(

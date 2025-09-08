@@ -161,7 +161,7 @@ class CourseCard extends StatelessWidget {
                       style: TextStyle(
                         color: AppColors.getGradeTextColor(course['grade']), // Dynamic text color based on background
                         fontSize: 13, // Slightly smaller font
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w600, // Semibold
                       ),
                     ),
                   ),

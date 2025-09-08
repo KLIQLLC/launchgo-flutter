@@ -149,7 +149,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
       backgroundColor: themeService.backgroundColor,
       floatingActionButton: authService.permissions.canCreateDocuments 
         ? ExtendedFAB(
-            label: 'New Course',
+            label: 'Add Course',
             onPressed: _navigateToAddCourse,
           )
         : null,

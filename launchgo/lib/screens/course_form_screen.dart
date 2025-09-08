@@ -31,7 +31,9 @@ class _CourseFormScreenState extends State<CourseFormScreen> {
     'B+', 'B', 'B-',
     'C+', 'C', 'C-',
     'D+', 'D', 'D-',
-    'F'
+    'F',
+    'IP',  // In Progress
+    'W'    // Withdrawal
   ];
 
   @override

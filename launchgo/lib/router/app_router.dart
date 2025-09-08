@@ -196,7 +196,7 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
         case '/courses':
           return 'Courses';
         case '/documents':
-          return 'Documents & Study Guides';
+          return 'Documents';
         case '/recaps':
           return 'Recaps';
         case '/chat':
