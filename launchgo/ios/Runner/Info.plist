@@ -64,5 +64,7 @@
 		<false/>
 		<key>ITSAppUsesNonExemptEncryption</key>
 		<false/>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>This app needs access to photo library to allow you to upload documents and images.</string>
 	</dict>
 </plist>
