@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 import 'models/auth_request.dart';
@@ -107,5 +108,30 @@ abstract class ApiService {
     @Path("userId") String userId,
     @Path("courseId") String courseId,
     @Path("assignmentId") String assignmentId,
+  );
+
+  // Attachment endpoints
+  @POST("/users/{userId}/courses/{courseId}/assignments/{assignmentId}/attachments")
+  @MultiPart()
+  Future<HttpResponse<dynamic>> uploadAttachment(
+    @Path("userId") String userId,
+    @Path("courseId") String courseId,
+    @Path("assignmentId") String assignmentId,
+    @Part(name: "file") File file,
+  );
+
+  @GET("/users/{userId}/courses/{courseId}/assignments/{assignmentId}/attachments")
+  Future<HttpResponse<dynamic>> getAttachments(
+    @Path("userId") String userId,
+    @Path("courseId") String courseId,
+    @Path("assignmentId") String assignmentId,
+  );
+
+  @DELETE("/users/{userId}/courses/{courseId}/assignments/{assignmentId}/attachments/{attachmentId}")
+  Future<HttpResponse<void>> deleteAttachment(
+    @Path("userId") String userId,
+    @Path("courseId") String courseId,
+    @Path("assignmentId") String assignmentId,
+    @Path("attachmentId") String attachmentId,
   );
 }

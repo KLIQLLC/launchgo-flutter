@@ -1,6 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/theme_service.dart';
 import '../services/auth_service.dart';
 import '../services/api_service_retrofit.dart';
@@ -32,6 +35,8 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
   final List<TextEditingController> _stepControllers = [];
   final List<Map<String, dynamic>?> _originalStepData = []; // Track original step data with IDs
   final List<PlatformFile> _selectedFiles = [];
+  List<Map<String, dynamic>> _existingAttachments = []; // Store existing attachments from server
+  Set<String> _deletingAttachmentIds = {}; // Track which attachments are being deleted
   
   DateTime? _dueDate;
   String _selectedStatus = 'pending';
@@ -46,6 +51,10 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
   @override
   void initState() {
     super.initState();
+    debugPrint('🔍 ===== ASSIGNMENT FORM INIT DEBUG =====');
+    debugPrint('🔍 widget.assignment: ${widget.assignment}');
+    debugPrint('🔍 widget.course: ${widget.course}');
+    
     if (widget.assignment != null) {
       _titleController.text = widget.assignment!['title'] ?? '';
       _descriptionController.text = widget.assignment!['description'] ?? '';
@@ -111,11 +120,21 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
       debugPrint('🔍 Total step controllers loaded: ${_stepControllers.length}');
       debugPrint('🔍 ===== END ASSIGNMENT LOADING DEBUG =====');
       
-      // Note: File attachments can't be loaded as PlatformFiles in edit mode
-      // They would need to be downloaded from storage, which is beyond current scope
-      // The UI will show "Attach file" button allowing replacement
+      // Load existing attachments from assignment data
+      final attachmentsData = widget.assignment!['attachments'];
+      debugPrint('📎 Loading attachments from assignment data: $attachmentsData');
+      debugPrint('📎 Type of attachmentsData: ${attachmentsData.runtimeType}');
+      
+      if (attachmentsData != null && attachmentsData is List) {
+        _existingAttachments = List<Map<String, dynamic>>.from(attachmentsData);
+        debugPrint('✅ Loaded ${_existingAttachments.length} existing attachment(s) directly in initState');
+        debugPrint('📎 _existingAttachments: $_existingAttachments');
+      } else {
+        debugPrint('📎 No attachments found in assignment data or wrong type');
+      }
     }
   }
+
 
   @override
   void dispose() {
@@ -191,14 +210,8 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
       debugPrint('📝 Number of steps being sent: ${stepsData.length}');
       debugPrint('📝 === END STEPS DEBUG ===');
 
-      // Prepare attachments data (metadata only for now)
-      final attachmentsData = _selectedFiles.map((file) => {
-        'name': file.name,
-        'size': file.size,
-        'mimeType': _getMimeType(file.extension),
-        // TODO: Implement file upload to storage service
-        // For now, we'll send file metadata only
-      }).toList();
+      // Don't send attachments metadata with the assignment data
+      // Files will be uploaded separately after assignment is created/updated
 
       // Use selected date or default to 7 days from now if not set
       final dueDateToUse = _dueDate ?? DateTime.now().add(const Duration(days: 7));
@@ -211,10 +224,13 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
         'status': _selectedStatus,
         'dueDateAt': '${dueDateToUse.year}-${dueDateToUse.month.toString().padLeft(2, '0')}-${dueDateToUse.day.toString().padLeft(2, '0')}',
         'steps': stepsData,
-        'attachments': attachmentsData,
+        // Attachments will be uploaded separately after assignment creation/update
       };
 
       debugPrint('📋 Complete assignment data being sent: $assignmentData');
+      
+      Map<String, dynamic>? assignmentResult;
+      String? assignmentId;
       
       if (widget.assignment != null) {
         // Update existing assignment
@@ -222,18 +238,56 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
         debugPrint('🔄 Course ID: ${widget.course!['id']}');
         debugPrint('🔄 Assignment ID: ${widget.assignment!['id']}');
         
-        final result = await apiService.updateAssignment(
+        assignmentResult = await apiService.updateAssignment(
           widget.course!['id'], 
           widget.assignment!['id'], 
           assignmentData
         );
+        assignmentId = widget.assignment!['id'];
         
-        debugPrint('✅ Update result: $result');
+        debugPrint('✅ Update result: $assignmentResult');
       } else {
         // Create new assignment
         debugPrint('🆕 Creating assignment with data: $assignmentData');
-        final result = await apiService.createAssignment(widget.course!['id'], assignmentData);
-        debugPrint('✅ Create result: $result');
+        assignmentResult = await apiService.createAssignment(widget.course!['id'], assignmentData);
+        assignmentId = assignmentResult['id'];
+        debugPrint('✅ Create result: $assignmentResult');
+      }
+      
+      // Upload attachments if any files are selected
+      if (_selectedFiles.isNotEmpty && assignmentId != null) {
+        debugPrint('📎 Uploading ${_selectedFiles.length} attachment(s)...');
+        
+        for (final platformFile in _selectedFiles) {
+          try {
+            // Convert PlatformFile to File
+            if (platformFile.path != null) {
+              final file = File(platformFile.path!);
+              
+              debugPrint('📤 Uploading file: ${platformFile.name}');
+              await apiService.uploadAttachment(
+                widget.course!['id'],
+                assignmentId,
+                file,
+                platformFile.name, // Pass the original filename
+              );
+              debugPrint('✅ Successfully uploaded: ${platformFile.name}');
+            } else {
+              debugPrint('⚠️ File path is null for: ${platformFile.name}');
+            }
+          } catch (e) {
+            debugPrint('❌ Failed to upload ${platformFile.name}: $e');
+            // Continue with other files even if one fails
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Failed to upload ${platformFile.name}'),
+                  backgroundColor: AppColors.warning,
+                ),
+              );
+            }
+          }
+        }
       }
       
       if (mounted) {
@@ -413,7 +467,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildLabel('Earned Points (optional)', themeService),
+                        _buildLabel('Earned Points', themeService),
                         _buildTextField(
                           controller: _earnedPointsController,
                           hintText: '0',
@@ -615,31 +669,232 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
     }
   }
 
-  String _getMimeType(String? extension) {
-    switch (extension?.toLowerCase()) {
-      case 'pdf':
-        return 'application/pdf';
-      case 'doc':
-        return 'application/msword';
-      case 'docx':
-        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-      case 'jpg':
-      case 'jpeg':
-        return 'image/jpeg';
-      case 'png':
-        return 'image/png';
-      case 'gif':
-        return 'image/gif';
-      case 'txt':
-        return 'text/plain';
-      default:
-        return 'application/octet-stream';
+  IconData _getFileIconForName(String fileName) {
+    final extension = fileName.split('.').lastOrNull;
+    return _getFileIcon(extension);
+  }
+
+  Future<void> _deleteExistingAttachment(Map<String, dynamic> attachment) async {
+    if (widget.assignment == null || widget.course == null) return;
+    
+    final attachmentId = attachment['id'];
+    if (attachmentId == null) return;
+    
+    // Check if already deleting this attachment
+    if (_deletingAttachmentIds.contains(attachmentId)) {
+      debugPrint('⚠️ Already deleting attachment: $attachmentId');
+      return;
+    }
+    
+    // Mark as deleting
+    setState(() {
+      _deletingAttachmentIds.add(attachmentId);
+    });
+    
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final apiService = ApiServiceRetrofit(authService: authService);
+      
+      debugPrint('🗑️ Deleting attachment: ${attachment['name']} (ID: $attachmentId)');
+      
+      await apiService.deleteAttachment(
+        widget.course!['id'],
+        widget.assignment!['id'],
+        attachmentId,
+      );
+      
+      setState(() {
+        _existingAttachments.removeWhere((a) => a['id'] == attachmentId);
+        _deletingAttachmentIds.remove(attachmentId);
+      });
+      
+      debugPrint('✅ Successfully deleted attachment');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Attachment deleted'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Failed to delete attachment: $e');
+      
+      // Remove from deleting set on error
+      setState(() {
+        _deletingAttachmentIds.remove(attachmentId);
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete attachment'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 
+  Future<void> _downloadAttachment(Map<String, dynamic> attachment) async {
+    final link = attachment['link'];
+    if (link == null) {
+      debugPrint('❌ No download link available for attachment');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Download link not available'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      final uri = Uri.parse(link);
+      debugPrint('📥 Opening attachment: $link');
+      
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
+        );
+        debugPrint('✅ Successfully opened attachment');
+      } else {
+        throw Exception('Could not launch $link');
+      }
+    } catch (e) {
+      debugPrint('❌ Failed to open attachment: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to open attachment: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+
   Widget _buildDocumentUploadArea(ThemeService themeService) {
+    debugPrint('🖼️ Building upload area: _existingAttachments.length = ${_existingAttachments.length}');
+    debugPrint('🖼️ _existingAttachments: $_existingAttachments');
+    
     return Column(
       children: [
+        // Show existing attachments if any
+        if (_existingAttachments.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Existing attachments:',
+            style: TextStyle(
+              color: themeService.textSecondaryColor,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          for (final attachment in _existingAttachments)
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _deletingAttachmentIds.contains(attachment['id'])
+                    ? themeService.cardColor.withValues(alpha: 0.3)
+                    : themeService.cardColor.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: _deletingAttachmentIds.contains(attachment['id'])
+                      ? AppColors.error.withValues(alpha: 0.3)
+                      : themeService.borderColor.withValues(alpha: 0.5),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _getFileIconForName(attachment['name'] ?? 'file'),
+                    size: 20,
+                    color: themeService.textSecondaryColor,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _downloadAttachment(attachment),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            attachment['name'] ?? 'Unknown file',
+                            style: TextStyle(
+                              color: themeService.textColor,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              decoration: TextDecoration.underline,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (attachment['size'] != null)
+                            Text(
+                              _formatFileSize(attachment['size'] is int ? attachment['size'] : 0),
+                              style: TextStyle(
+                                color: themeService.textSecondaryColor,
+                                fontSize: 12,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Download button
+                      IconButton(
+                        icon: Icon(
+                          Icons.download,
+                          size: 20,
+                          color: themeService.textSecondaryColor,
+                        ),
+                        onPressed: () => _downloadAttachment(attachment),
+                        tooltip: 'Download',
+                      ),
+                      // Delete button
+                      IconButton(
+                        icon: _deletingAttachmentIds.contains(attachment['id'])
+                            ? SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.error),
+                                ),
+                              )
+                            : SvgPicture.asset(
+                                'assets/icons/ic_delete.svg',
+                                width: 20,
+                                height: 20,
+                                colorFilter: ColorFilter.mode(
+                                  AppColors.error,
+                                  BlendMode.srcIn,
+                                ),
+                              ),
+                        onPressed: _deletingAttachmentIds.contains(attachment['id']) 
+                            ? null 
+                            : () => _deleteExistingAttachment(attachment),
+                        tooltip: 'Delete',
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 16),
+        ],
+        
         // File picker button
         GestureDetector(
           onTap: _pickFiles,
@@ -670,7 +925,9 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _selectedFiles.isEmpty ? 'Attach file' : 'Replace file',
+                        _selectedFiles.isEmpty && _existingAttachments.isEmpty 
+                            ? 'Attach file' 
+                            : 'Add another file',
                         style: TextStyle(
                           color: themeService.textColor,
                           fontSize: 16,
@@ -689,7 +946,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                   ),
                 ),
                 Icon(
-                  _selectedFiles.isEmpty ? Icons.chevron_right : Icons.refresh,
+                  (_selectedFiles.isEmpty && _existingAttachments.isEmpty) ? Icons.chevron_right : Icons.add,
                   color: themeService.textSecondaryColor,
                 ),
               ],

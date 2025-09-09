@@ -342,6 +342,29 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
                     fontSize: 13,
                   ),
                 ),
+                // Show attachment icon if attachments exist
+                if (assignment['attachments'] != null && 
+                    assignment['attachments'] is List && 
+                    (assignment['attachments'] as List).isNotEmpty) ...[
+                  const SizedBox(width: 16),
+                  SvgPicture.asset(
+                    'assets/icons/ic_attachment.svg',
+                    width: 16,
+                    height: 16,
+                    colorFilter: ColorFilter.mode(
+                      themeService.textSecondaryColor,
+                      BlendMode.srcIn,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${(assignment['attachments'] as List).length}',
+                    style: TextStyle(
+                      color: themeService.textSecondaryColor,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
               ],
             ),
           ],

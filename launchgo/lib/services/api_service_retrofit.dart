@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../api/api_service.dart';
@@ -441,6 +442,109 @@ class ApiServiceRetrofit {
       debugPrint('✅ Assignment deleted successfully');
     } catch (e) {
       debugPrint('Failed to delete assignment: $e');
+      rethrow;
+    }
+  }
+
+  /// Upload attachment for an assignment
+  Future<Map<String, dynamic>> uploadAttachment(
+    String courseId, 
+    String assignmentId, 
+    File file,
+    String originalFileName,
+  ) async {
+    try {
+      final userId = _getEffectiveUserId();
+      if (userId == null) {
+        throw Exception('User ID is required');
+      }
+      
+      debugPrint('📎 Uploading attachment: ${file.path} with original name: $originalFileName');
+      
+      // Create a new file with the original filename to preserve the extension
+      final tempDir = await Directory.systemTemp.createTemp();
+      final tempFile = File('${tempDir.path}/$originalFileName');
+      await file.copy(tempFile.path);
+      
+      try {
+        final response = await _retrofit.uploadAttachment(
+          userId, 
+          courseId, 
+          assignmentId, 
+          tempFile,
+        );
+        
+        debugPrint('✅ Attachment uploaded successfully');
+        
+        // Handle both direct object and JSON string responses
+        if (response.data is String) {
+          return json.decode(response.data);
+        }
+        return response.data as Map<String, dynamic>;
+      } finally {
+        // Clean up temp file
+        try {
+          await tempFile.delete();
+          await tempDir.delete();
+        } catch (e) {
+          debugPrint('Failed to clean up temp file: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Failed to upload attachment: $e');
+      rethrow;
+    }
+  }
+
+  /// Get attachments for an assignment
+  Future<List<Map<String, dynamic>>> getAttachments(
+    String courseId, 
+    String assignmentId,
+  ) async {
+    try {
+      final userId = _getEffectiveUserId();
+      if (userId == null) {
+        throw Exception('User ID is required');
+      }
+      
+      final response = await _retrofit.getAttachments(userId, courseId, assignmentId);
+      
+      // Handle both direct object and JSON string responses
+      if (response.data is String) {
+        final decoded = json.decode(response.data);
+        if (decoded is List) {
+          return decoded.cast<Map<String, dynamic>>();
+        }
+        return [];
+      }
+      
+      if (response.data is List) {
+        return (response.data as List).cast<Map<String, dynamic>>();
+      }
+      
+      return [];
+    } catch (e) {
+      debugPrint('Failed to get attachments: $e');
+      rethrow;
+    }
+  }
+
+  /// Delete an attachment
+  Future<void> deleteAttachment(
+    String courseId, 
+    String assignmentId, 
+    String attachmentId,
+  ) async {
+    try {
+      final userId = _getEffectiveUserId();
+      if (userId == null) {
+        throw Exception('User ID is required');
+      }
+      
+      await _retrofit.deleteAttachment(userId, courseId, assignmentId, attachmentId);
+      debugPrint('✅ Attachment deleted successfully');
+    } catch (e) {
+      debugPrint('Failed to delete attachment: $e');
       rethrow;
     }
   }
