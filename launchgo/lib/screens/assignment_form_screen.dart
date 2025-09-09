@@ -895,64 +895,63 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
           const SizedBox(height: 16),
         ],
         
-        // File picker button
-        GestureDetector(
-          onTap: _pickFiles,
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: themeService.cardColor,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: themeService.borderColor),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: themeService.backgroundColor,
-                    borderRadius: BorderRadius.circular(8),
+        // File picker button - only show if no files are selected and no existing attachments
+        if (_selectedFiles.isEmpty && _existingAttachments.isEmpty)
+          GestureDetector(
+            onTap: _pickFiles,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: themeService.cardColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: themeService.borderColor),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: themeService.backgroundColor,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.attach_file,
+                      size: 20,
+                      color: themeService.textSecondaryColor,
+                    ),
                   ),
-                  child: Icon(
-                    Icons.attach_file,
-                    size: 20,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Attach file',
+                          style: TextStyle(
+                            color: themeService.textColor,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'PDF, Word, Images (Max 5MB)',
+                          style: TextStyle(
+                            color: themeService.textSecondaryColor,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right,
                     color: themeService.textSecondaryColor,
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _selectedFiles.isEmpty && _existingAttachments.isEmpty 
-                            ? 'Attach file' 
-                            : 'Add another file',
-                        style: TextStyle(
-                          color: themeService.textColor,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'PDF, Word, Images (Max 5MB)',
-                        style: TextStyle(
-                          color: themeService.textSecondaryColor,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  (_selectedFiles.isEmpty && _existingAttachments.isEmpty) ? Icons.chevron_right : Icons.add,
-                  color: themeService.textSecondaryColor,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
         // Selected files list
         if (_selectedFiles.isNotEmpty) ...[ 
           const SizedBox(height: 12),
