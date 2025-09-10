@@ -132,119 +132,139 @@ class _CourseFormScreenState extends State<CourseFormScreen> {
       ),
       body: Form(
         key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Course Name
-              _buildLabel('Course Name*', themeService),
-              _buildTextField(
-                controller: _nameController,
-                hintText: 'Intro to Computer Science',
-                themeService: themeService,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Course name is required';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Course Code
-              _buildLabel('Course Code*', themeService),
-              _buildTextField(
-                controller: _codeController,
-                hintText: 'CS101',
-                themeService: themeService,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Course code is required';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Course Credits
-              _buildLabel('Course Credits', themeService),
-              _buildTextField(
-                controller: _creditsController,
-                hintText: '3',
-                themeService: themeService,
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 16),
-
-              // Instructor
-              _buildLabel('Instructor*', themeService),
-              _buildTextField(
-                controller: _instructorController,
-                hintText: 'Dr. Smith',
-                themeService: themeService,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Instructor is required';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Semester (Read-only)
-              _buildLabel('Semester*', themeService),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: themeService.cardColor,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: themeService.borderColor),
-                ),
-                child: Row(
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        selectedSemester?.name ?? 'No semester selected',
-                        style: TextStyle(
-                          color: themeService.textColor,
-                          fontSize: 17,
-                        ),
+                    // Course Name
+                    _buildLabel('Course Name*', themeService),
+                    _buildTextField(
+                      controller: _nameController,
+                      hintText: 'Intro to Computer Science',
+                      themeService: themeService,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Course name is required';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Course Code
+                    _buildLabel('Course Code*', themeService),
+                    _buildTextField(
+                      controller: _codeController,
+                      hintText: 'CS101',
+                      themeService: themeService,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Course code is required';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Course Credits
+                    _buildLabel('Course Credits', themeService),
+                    _buildTextField(
+                      controller: _creditsController,
+                      hintText: '3',
+                      themeService: themeService,
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Instructor
+                    _buildLabel('Instructor*', themeService),
+                    _buildTextField(
+                      controller: _instructorController,
+                      hintText: 'Dr. Smith',
+                      themeService: themeService,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Instructor is required';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Semester (Read-only)
+                    _buildLabel('Semester*', themeService),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: themeService.cardColor,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: themeService.borderColor),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              selectedSemester?.name ?? 'No semester selected',
+                              style: TextStyle(
+                                color: themeService.textColor,
+                                fontSize: 17,
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            Icons.lock_outline,
+                            color: themeService.textSecondaryColor,
+                            size: 20,
+                          ),
+                        ],
                       ),
                     ),
-                    Icon(
-                      Icons.lock_outline,
-                      color: themeService.textSecondaryColor,
-                      size: 20,
+                    const SizedBox(height: 16),
+
+                    // Current Grade
+                    _buildLabel('Current Grade*', themeService),
+                    _buildGradeDropdown(themeService),
+                    const SizedBox(height: 16),
+
+                    // Course Description
+                    _buildLabel('Course Description', themeService),
+                    _buildTextField(
+                      controller: _descriptionController,
+                      hintText: 'This course is an introduction to computer science.',
+                      themeService: themeService,
+                      maxLines: 4,
                     ),
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
-
-              // Current Grade
-              _buildLabel('Current Grade*', themeService),
-              _buildGradeDropdown(themeService),
-              const SizedBox(height: 16),
-
-              // Course Description
-              _buildLabel('Course Description', themeService),
-              _buildTextField(
-                controller: _descriptionController,
-                hintText: 'This course is an introduction to computer science.',
-                themeService: themeService,
-                maxLines: 4,
+            ),
+            // Submit Button - Sticky at bottom
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: themeService.backgroundColor,
+                border: Border(
+                  top: BorderSide(
+                    color: themeService.borderColor.withValues(alpha: 0.2),
+                    width: 1,
+                  ),
+                ),
               ),
-              const SizedBox(height: 32),
-
-              // Submit Button
-              FormSubmitButton(
-                text: widget.course != null ? 'Update Course' : 'Create Course',
-                onPressed: _saveCourse,
-                isLoading: _isLoading,
+              child: SafeArea(
+                top: false,
+                child: FormSubmitButton(
+                  text: widget.course != null ? 'Update Course' : 'Add Course',
+                  onPressed: _saveCourse,
+                  isLoading: _isLoading,
+                ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

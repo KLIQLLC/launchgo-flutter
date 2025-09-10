@@ -349,156 +349,176 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
       ),
       body: Form(
         key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Assignment Title
-              _buildLabel('Assignment Title*', themeService),
-              _buildTextField(
-                controller: _titleController,
-                hintText: 'Programming Assignment 1',
-                themeService: themeService,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Assignment title is required';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Assignment Title
+                    _buildLabel('Assignment Title*', themeService),
+                    _buildTextField(
+                      controller: _titleController,
+                      hintText: 'Programming Assignment 1',
+                      themeService: themeService,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Assignment title is required';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
 
-              // Assignment Description
-              _buildLabel('Description', themeService),
-              _buildTextField(
-                controller: _descriptionController,
-                hintText: 'Assignment description...',
-                themeService: themeService,
-                maxLines: 4,
-              ),
-              const SizedBox(height: 16),
+                    // Assignment Description
+                    _buildLabel('Description', themeService),
+                    _buildTextField(
+                      controller: _descriptionController,
+                      hintText: 'Assignment description...',
+                      themeService: themeService,
+                      maxLines: 4,
+                    ),
+                    const SizedBox(height: 16),
 
-              // Due Date and Points in the same row
-              Row(
-                children: [
-                  // Due Date (takes 50% of width)
-                  Expanded(
-                    flex: 1,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    // Due Date and Points in the same row
+                    Row(
                       children: [
-                        _buildLabel('Due Date', themeService),
-                        GestureDetector(
-                          onTap: _selectDueDate,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: themeService.cardColor,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: themeService.borderColor),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    _dueDate != null
-                                        ? '${_dueDate!.month.toString().padLeft(2, '0')}/${_dueDate!.day.toString().padLeft(2, '0')}/${_dueDate!.year}'
-                                        : 'mm/dd/yyyy',
-                                    style: TextStyle(
-                                      color: _dueDate != null 
-                                          ? themeService.textColor 
-                                          : themeService.textSecondaryColor,
-                                      fontSize: 17,
-                                    ),
+                        // Due Date (takes 50% of width)
+                        Expanded(
+                          flex: 1,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildLabel('Due Date', themeService),
+                              GestureDetector(
+                                onTap: _selectDueDate,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: themeService.cardColor,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: themeService.borderColor),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          _dueDate != null
+                                              ? '${_dueDate!.month.toString().padLeft(2, '0')}/${_dueDate!.day.toString().padLeft(2, '0')}/${_dueDate!.year}'
+                                              : 'mm/dd/yyyy',
+                                          style: TextStyle(
+                                            color: _dueDate != null 
+                                                ? themeService.textColor 
+                                                : themeService.textSecondaryColor,
+                                            fontSize: 17,
+                                          ),
+                                        ),
+                                      ),
+                                      Icon(
+                                        Icons.calendar_today,
+                                        color: themeService.textSecondaryColor,
+                                        size: 20,
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                Icon(
-                                  Icons.calendar_today,
-                                  color: themeService.textSecondaryColor,
-                                  size: 20,
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // Points (takes 50% of width)
+                        Expanded(
+                          flex: 1,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildLabel('Points', themeService),
+                              _buildTextField(
+                                controller: _pointsController,
+                                hintText: '100',
+                                themeService: themeService,
+                                keyboardType: TextInputType.number,
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  // Points (takes 50% of width)
-                  Expanded(
-                    flex: 1,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    const SizedBox(height: 16),
+
+                    // Status and Earned Points in the same row
+                    Row(
                       children: [
-                        _buildLabel('Points', themeService),
-                        _buildTextField(
-                          controller: _pointsController,
-                          hintText: '100',
-                          themeService: themeService,
-                          keyboardType: TextInputType.number,
+                        // Status (takes 50% of width)
+                        Expanded(
+                          flex: 1,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildLabel('Status', themeService),
+                              _buildStatusDropdown(themeService),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // Earned Points (takes 50% of width)
+                        Expanded(
+                          flex: 1,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildLabel('Earned Points', themeService),
+                              _buildTextField(
+                                controller: _earnedPointsController,
+                                hintText: '0',
+                                themeService: themeService,
+                                keyboardType: TextInputType.number,
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 24),
+
+                    // Attach Documents Section
+                    _buildLabel('Attach Documents', themeService),
+                    _buildDocumentUploadArea(themeService),
+                    const SizedBox(height: 24),
+
+                    // Assignment Steps Section
+                    _buildLabel('Assignment Steps', themeService),
+                    _buildAssignmentSteps(themeService),
+                    const SizedBox(height: 16),
+                  ],
+                ),
               ),
-              const SizedBox(height: 16),
-
-              // Status and Earned Points in the same row
-              Row(
-                children: [
-                  // Status (takes 50% of width)
-                  Expanded(
-                    flex: 1,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildLabel('Status', themeService),
-                        _buildStatusDropdown(themeService),
-                      ],
-                    ),
+            ),
+            // Submit Button - Sticky at bottom
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: themeService.backgroundColor,
+                border: Border(
+                  top: BorderSide(
+                    color: themeService.borderColor.withValues(alpha: 0.2),
+                    width: 1,
                   ),
-                  const SizedBox(width: 12),
-                  // Earned Points (takes 50% of width)
-                  Expanded(
-                    flex: 1,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildLabel('Earned Points', themeService),
-                        _buildTextField(
-                          controller: _earnedPointsController,
-                          hintText: '0',
-                          themeService: themeService,
-                          keyboardType: TextInputType.number,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                ),
               ),
-              const SizedBox(height: 24),
-
-              // Attach Documents Section
-              _buildLabel('Attach Documents', themeService),
-              _buildDocumentUploadArea(themeService),
-              const SizedBox(height: 24),
-
-              // Assignment Steps Section
-              _buildLabel('Assignment Steps', themeService),
-              _buildAssignmentSteps(themeService),
-              const SizedBox(height: 32),
-
-              // Submit Button
-              FormSubmitButton(
-                text: widget.assignment != null ? 'Update Assignment' : 'Add Assignment',
-                onPressed: _saveAssignment,
-                isLoading: _isLoading,
+              child: SafeArea(
+                top: false,
+                child: FormSubmitButton(
+                  text: widget.assignment != null ? 'Update Assignment' : 'Add Assignment',
+                  onPressed: _saveAssignment,
+                  isLoading: _isLoading,
+                ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
