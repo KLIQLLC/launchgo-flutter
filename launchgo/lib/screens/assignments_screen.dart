@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../api/dio_client_enhanced.dart';
@@ -10,6 +9,7 @@ import '../services/auth_service.dart';
 import '../widgets/extended_fab.dart';
 import '../widgets/swipeable_card.dart';
 import '../theme/app_colors.dart';
+import '../widgets/assignment_card.dart';
 
 class AssignmentsScreen extends StatefulWidget {
   final Map<String, dynamic> course;
@@ -103,16 +103,6 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
 
 
 
-  String _formatDate(String? dateStr) {
-    if (dateStr == null) return 'No due date';
-    
-    try {
-      final date = DateTime.parse(dateStr);
-      return '${date.day}/${date.month}/${date.year}';
-    } catch (e) {
-      return 'Invalid date';
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -215,8 +205,6 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
   }
 
   Widget _buildAssignmentCard(Map<String, dynamic> assignment, ThemeService themeService) {
-    final statusColor = AppColors.getStatusColor(assignment['status']);
-    final statusBgColor = AppColors.getStatusBackgroundColor(assignment['status']);
     final authService = context.watch<AuthService>();
     
     return Container(
@@ -226,150 +214,14 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
         canTap: authService.permissions.canEditDocuments,
         onTap: () => _navigateToEditAssignment(assignment),
         onSwipeToDelete: () => _showDeleteConfirmation(assignment),
-        child: Container(
-          decoration: BoxDecoration(
-            color: themeService.cardColor,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: themeService.borderColor),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Assignment header with inline status
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Title row with status badge
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Text(
-                      assignment['title'] ?? 'Untitled Assignment',
-                      style: TextStyle(
-                        color: themeService.textColor,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(width: 8), // Small gap between title and status
-                    // Status badge with shadow effect
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: statusBgColor.withValues(alpha: 0.2), // 20% opacity background
-                        borderRadius: BorderRadius.circular(12), // Rounded full
-                        border: Border.all(
-                          color: statusBgColor.withValues(alpha: 0.3), // 30% opacity border
-                          width: 1,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: statusBgColor.withValues(alpha: 0.1), // 10% shadow
-                            blurRadius: 8,
-                            spreadRadius: 0,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Text(
-                        (assignment['status'] as String? ?? 'pending').toLowerCase(),
-                        style: TextStyle(
-                          color: statusColor, // Darker text color (blue-700 for pending)
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                // Description below title
-                if (assignment['description'] != null && assignment['description'].toString().isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    assignment['description'],
-                    style: TextStyle(
-                      color: themeService.textSecondaryColor,
-                      fontSize: 14,
-                      height: 1.4,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 12),
-            
-            // Assignment details
-            Row(
-              children: [
-                // Due date with calendar icon
-                SvgPicture.asset(
-                  'assets/icons/ic_calendar.svg',
-                  width: 16,
-                  height: 16,
-                  colorFilter: ColorFilter.mode(
-                    themeService.textSecondaryColor,
-                    BlendMode.srcIn,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  'Due: ${_formatDate(assignment['dueDateAt'])}',
-                  style: TextStyle(
-                    color: themeService.textSecondaryColor,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                // Points with clock icon
-                SvgPicture.asset(
-                  'assets/icons/ic_clock.svg',
-                  width: 16,
-                  height: 16,
-                  colorFilter: ColorFilter.mode(
-                    themeService.textSecondaryColor,
-                    BlendMode.srcIn,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '${assignment['pointsEarned'] ?? 0}/${assignment['pointsGoal'] ?? 0} pts',
-                  style: TextStyle(
-                    color: themeService.textSecondaryColor,
-                    fontSize: 13,
-                  ),
-                ),
-                // Show attachment icon if attachments exist
-                if (assignment['attachments'] != null && 
-                    assignment['attachments'] is List && 
-                    (assignment['attachments'] as List).isNotEmpty) ...[
-                  const SizedBox(width: 16),
-                  SvgPicture.asset(
-                    'assets/icons/ic_attachment.svg',
-                    width: 16,
-                    height: 16,
-                    colorFilter: ColorFilter.mode(
-                      themeService.textSecondaryColor,
-                      BlendMode.srcIn,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${(assignment['attachments'] as List).length}',
-                    style: TextStyle(
-                      color: themeService.textSecondaryColor,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ],
-            ),
-          ),
+        child: AssignmentCard(
+          assignment: assignment,
+          course: widget.course,
+          themeService: themeService,
+          onTap: () => _navigateToEditAssignment(assignment),
+          onDelete: () => _showDeleteConfirmation(assignment),
+          canEdit: authService.permissions.canEditDocuments,
+          canDelete: authService.permissions.canDeleteDocuments,
         ),
       ),
     );

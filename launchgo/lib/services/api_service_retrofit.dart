@@ -446,6 +446,56 @@ class ApiServiceRetrofit {
     }
   }
 
+  /// Update assignment step completion status
+  Future<Map<String, dynamic>> updateAssignmentStep(
+    String courseId,
+    String assignmentId,
+    String stepId,
+    Map<String, dynamic> stepData,
+  ) async {
+    try {
+      final userId = _getEffectiveUserId();
+      if (userId == null) {
+        throw Exception('User ID is required');
+      }
+      
+      debugPrint('🔄 Updating assignment step: $stepId with data: $stepData');
+      
+      // Make PUT request to update step
+      final dio = DioClientEnhanced(authService: _authService).dio;
+      final response = await dio.put(
+        '/users/$userId/courses/$courseId/assignments/$assignmentId/steps/$stepId',
+        data: stepData,
+      );
+      
+      debugPrint('✅ Step updated successfully');
+      
+      // Handle response - it might be a String or Map
+      if (response.data is String) {
+        try {
+          // Try to parse as JSON if it's a string
+          final parsed = json.decode(response.data);
+          if (parsed is Map<String, dynamic>) {
+            return parsed;
+          }
+        } catch (e) {
+          // If parsing fails, return a simple success response
+          debugPrint('Response is a plain string: ${response.data}');
+        }
+        // Return a success response if backend returns just a string
+        return {'success': true, 'message': response.data};
+      } else if (response.data is Map<String, dynamic>) {
+        return response.data;
+      } else {
+        // Return a simple success response for other types
+        return {'success': true};
+      }
+    } catch (e) {
+      debugPrint('Failed to update assignment step: $e');
+      rethrow;
+    }
+  }
+
   /// Upload attachment for an assignment
   Future<Map<String, dynamic>> uploadAttachment(
     String courseId, 
