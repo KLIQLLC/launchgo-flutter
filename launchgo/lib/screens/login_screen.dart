@@ -132,27 +132,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                       ],
-                    ] else ...[
-                      // This case should not happen anymore since we check hasAccessToken above
-                      // Keeping for safety
-                      SizedBox(
-                        width: double.infinity,
-                        height: 54,
-                        child: ElevatedButton(
-                          onPressed: _handleSignOut,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.error,
-                            foregroundColor: AppColors.textPrimary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: const Text(
-                            'Sign Out',
-                            style: TextStyle(fontSize: 16),
-                          ),
-                        ),
-                      ),
                     ],
                   ],
                 ),

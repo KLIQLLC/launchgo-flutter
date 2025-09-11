@@ -192,54 +192,6 @@ class SettingsScreen extends StatelessWidget {
             Divider(color: themeService.borderColor),
           ],
           
-          // Logout Button
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: ElevatedButton(
-              onPressed: () async {
-                // Show confirmation dialog
-                final shouldLogout = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Logout'),
-                    content: const Text('Are you sure you want to logout?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text('Cancel'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        child: const Text(
-                          'Logout',
-                          style: TextStyle(color: AppColors.error),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-                
-                if (shouldLogout == true) {
-                  await authService.signOut();
-                  if (context.mounted) {
-                    context.go('/login');
-                  }
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.error,
-                foregroundColor: AppColors.textPrimary,
-                minimumSize: const Size(double.infinity, 50),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Logout',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ),
         ],
       ),
     );
