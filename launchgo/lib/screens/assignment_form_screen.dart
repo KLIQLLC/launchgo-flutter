@@ -321,6 +321,80 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
     }
   }
 
+  Future<void> _saveAttachmentsOnly() async {
+    if (widget.assignment == null) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final apiService = ApiServiceRetrofit(authService: authService);
+      final assignmentId = widget.assignment!['id'];
+
+      // Upload new attachments if any files are selected
+      if (_selectedFiles.isNotEmpty && assignmentId != null) {
+        debugPrint('📎 Uploading ${_selectedFiles.length} attachment(s)...');
+        
+        for (final platformFile in _selectedFiles) {
+          try {
+            // Convert PlatformFile to File
+            if (platformFile.path != null) {
+              final file = File(platformFile.path!);
+              
+              debugPrint('📤 Uploading file: ${platformFile.name}');
+              await apiService.uploadAttachment(
+                widget.course!['id'],
+                assignmentId,
+                file,
+                platformFile.name, // Pass the original filename
+              );
+              debugPrint('✅ Successfully uploaded: ${platformFile.name}');
+            }
+          } catch (e) {
+            debugPrint('❌ Failed to upload ${platformFile.name}: $e');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Failed to upload ${platformFile.name}'),
+                  backgroundColor: AppColors.error,
+                ),
+              );
+            }
+          }
+        }
+        
+        // Clear selected files after successful upload
+        setState(() {
+          _selectedFiles.clear();
+        });
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Attachments saved successfully'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        Navigator.of(context).pop(true);
+      }
+    } catch (e) {
+      debugPrint('❌ Failed to save attachments: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save attachments: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   Future<void> _selectDueDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -339,6 +413,8 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
   @override
   Widget build(BuildContext context) {
     final themeService = context.watch<ThemeService>();
+    final authService = context.watch<AuthService>();
+    final isStudent = authService.isStudent;
     
     return Scaffold(
       backgroundColor: themeService.backgroundColor,
@@ -377,6 +453,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                         controller: _titleController,
                         hintText: 'Programming Assignment 1',
                         themeService: themeService,
+                        enabled: !isStudent,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Assignment title is required';
@@ -394,6 +471,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                       hintText: 'Assignment description...',
                       themeService: themeService,
                       maxLines: 4,
+                      enabled: !isStudent,
                     ),
                     const SizedBox(height: _FormConstants.spacingMedium),
 
@@ -408,7 +486,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                             children: [
                               _buildLabel('Due Date', themeService),
                               GestureDetector(
-                                onTap: _selectDueDate,
+                                onTap: isStudent ? null : _selectDueDate,
                                 child: Container(
                                   height: _FormConstants.fieldHeight,
                                   padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -460,6 +538,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                                   hintText: '100',
                                   themeService: themeService,
                                   keyboardType: TextInputType.number,
+                                  enabled: !isStudent,
                                 ),
                               ),
                             ],
@@ -479,7 +558,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildLabel('Status', themeService),
-                              _buildStatusDropdown(themeService),
+                              _buildStatusDropdown(themeService, enabled: !isStudent),
                             ],
                           ),
                         ),
@@ -498,6 +577,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                                   hintText: '0',
                                   themeService: themeService,
                                   keyboardType: TextInputType.number,
+                                  enabled: !isStudent,
                                 ),
                               ),
                             ],
@@ -519,6 +599,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                       originalStepData: _originalStepData,
                       newStepController: _newStepController,
                       themeService: themeService,
+                      enabled: !isStudent,
                       onDeleteStep: _deleteStep,
                       onAddStep: _addNewStep,
                       getInputDecoration: ({
@@ -554,8 +635,10 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
               child: SafeArea(
                 top: false,
                 child: FormSubmitButton(
-                  text: widget.assignment != null ? 'Update Assignment' : 'Add Assignment',
-                  onPressed: _saveAssignment,
+                  text: isStudent 
+                      ? 'Save Attachments' 
+                      : widget.assignment != null ? 'Update Assignment' : 'Add Assignment',
+                  onPressed: isStudent ? _saveAttachmentsOnly : _saveAssignment,
                   isLoading: _isLoading,
                 ),
               ),
@@ -588,14 +671,16 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
     TextInputType? keyboardType,
     int maxLines = 1,
     EdgeInsetsGeometry? contentPadding,
+    bool enabled = true,
   }) {
     return TextFormField(
       controller: controller,
       validator: validator,
       keyboardType: keyboardType,
       maxLines: maxLines,
+      enabled: enabled,
       style: TextStyle(
-        color: themeService.inputTextColor,
+        color: enabled ? themeService.inputTextColor : themeService.textSecondaryColor,
         fontSize: 16,
       ),
       decoration: _getInputDecoration(
@@ -676,22 +761,28 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
     }
   }
 
-  Widget _buildStatusDropdown(ThemeService themeService) {
-    return CupertinoDropdown(
-      value: _capitalizeFirst(_selectedStatus),
-      items: _statusOptions.map((status) => _capitalizeFirst(status)).toList(),
-      hintText: 'Select status',
-      onChanged: (value) {
-        if (value != null) {
-          // Find the original status value from the display text
-          final index = _statusOptions.indexWhere((status) => 
-            _capitalizeFirst(status) == value
-          );
-          if (index != -1) {
-            setState(() => _selectedStatus = _statusOptions[index]);
-          }
-        }
-      },
+  Widget _buildStatusDropdown(ThemeService themeService, {bool enabled = true}) {
+    return AbsorbPointer(
+      absorbing: !enabled,
+      child: Opacity(
+        opacity: enabled ? 1.0 : 0.5,
+        child: CupertinoDropdown(
+          value: _capitalizeFirst(_selectedStatus),
+          items: _statusOptions.map((status) => _capitalizeFirst(status)).toList(),
+          hintText: 'Select status',
+          onChanged: enabled ? (value) {
+            if (value != null) {
+              // Find the original status value from the display text
+              final index = _statusOptions.indexWhere((status) => 
+                _capitalizeFirst(status) == value
+              );
+              if (index != -1) {
+                setState(() => _selectedStatus = _statusOptions[index]);
+              }
+            }
+          } : null,
+        ),
+      ),
     );
   }
 

@@ -211,7 +211,7 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
       margin: const EdgeInsets.only(bottom: 16),
       child: SwipeableCard(
         canSwipe: authService.permissions.canDeleteDocuments,
-        canTap: authService.permissions.canEditDocuments,
+        canTap: true, // Allow all users to open assignments
         onTap: () => _navigateToEditAssignment(assignment),
         onSwipeToDelete: () => _showDeleteConfirmation(assignment),
         child: AssignmentCard(
@@ -220,7 +220,7 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
           themeService: themeService,
           onTap: () => _navigateToEditAssignment(assignment),
           onDelete: () => _showDeleteConfirmation(assignment),
-          canEdit: authService.permissions.canEditDocuments,
+          canEdit: true, // Allow all users to open assignments
           canDelete: authService.permissions.canDeleteDocuments,
         ),
       ),

@@ -8,6 +8,7 @@ class AssignmentStepsWidget extends StatefulWidget {
   final ThemeService themeService;
   final Function(int) onDeleteStep;
   final VoidCallback onAddStep;
+  final bool enabled;
   final InputDecoration Function({
     required String hintText,
     String? prefixText,
@@ -32,6 +33,7 @@ class AssignmentStepsWidget extends StatefulWidget {
     required this.onDeleteStep,
     required this.onAddStep,
     required this.getInputDecoration,
+    this.enabled = true,
   });
 
   @override
@@ -57,8 +59,9 @@ class _AssignmentStepsWidgetState extends State<AssignmentStepsWidget> {
                     height: AssignmentStepsWidget.fieldHeight,
                     child: TextFormField(
                       controller: controller,
+                      enabled: widget.enabled,
                       style: TextStyle(
-                        color: widget.themeService.inputTextColor,
+                        color: widget.enabled ? widget.themeService.inputTextColor : widget.themeService.textSecondaryColor,
                         fontSize: 16,
                       ),
                       decoration: widget.getInputDecoration(
@@ -79,10 +82,10 @@ class _AssignmentStepsWidgetState extends State<AssignmentStepsWidget> {
                 ),
                 SizedBox(width: AssignmentStepsWidget.spacingSmall),
                 IconButton(
-                  onPressed: () => widget.onDeleteStep(index),
+                  onPressed: widget.enabled ? () => widget.onDeleteStep(index) : null,
                   icon: Icon(
                     Icons.close,
-                    color: widget.themeService.textSecondaryColor,
+                    color: widget.enabled ? widget.themeService.textSecondaryColor : widget.themeService.textSecondaryColor.withValues(alpha: 0.3),
                   ),
                 ),
               ],
@@ -97,8 +100,9 @@ class _AssignmentStepsWidgetState extends State<AssignmentStepsWidget> {
                 height: AssignmentStepsWidget.fieldHeight,
                 child: TextField(
                   controller: widget.newStepController,
+                  enabled: widget.enabled,
                   style: TextStyle(
-                    color: widget.themeService.inputTextColor,
+                    color: widget.enabled ? widget.themeService.inputTextColor : widget.themeService.textSecondaryColor,
                     fontSize: 16,
                   ),
                   decoration: widget.getInputDecoration(
@@ -115,34 +119,36 @@ class _AssignmentStepsWidgetState extends State<AssignmentStepsWidget> {
             SizedBox(
               height: AssignmentStepsWidget.fieldHeight,
               child: ElevatedButton(
-                onPressed: widget.stepControllers.length < AssignmentStepsWidget.maxSteps
+                onPressed: widget.enabled && widget.stepControllers.length < AssignmentStepsWidget.maxSteps
                     ? widget.onAddStep
                     : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: widget.stepControllers.length < AssignmentStepsWidget.maxSteps
+                  backgroundColor: widget.enabled && widget.stepControllers.length < AssignmentStepsWidget.maxSteps
                       ? widget.themeService.backgroundColor
                       : widget.themeService.backgroundColor.withValues(alpha: 0.5),
-                  foregroundColor: widget.stepControllers.length < AssignmentStepsWidget.maxSteps
+                  foregroundColor: widget.enabled && widget.stepControllers.length < AssignmentStepsWidget.maxSteps
                       ? widget.themeService.textColor
                       : widget.themeService.textColor.withValues(alpha: 0.5),
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(AssignmentStepsWidget.borderRadius),
                     side: BorderSide(
-                      color: widget.stepControllers.length < AssignmentStepsWidget.maxSteps
+                      color: widget.enabled && widget.stepControllers.length < AssignmentStepsWidget.maxSteps
                           ? widget.themeService.borderColor
                           : widget.themeService.borderColor.withValues(alpha: 0.5),
                     ),
                   ),
                 ),
                 child: Text(
-                  widget.stepControllers.length < AssignmentStepsWidget.maxSteps
-                      ? 'Add Step (${widget.stepControllers.length}/${AssignmentStepsWidget.maxSteps})'
-                      : 'Max steps reached',
+                  !widget.enabled
+                      ? 'Read Only'
+                      : widget.stepControllers.length < AssignmentStepsWidget.maxSteps
+                          ? 'Add Step (${widget.stepControllers.length}/${AssignmentStepsWidget.maxSteps})'
+                          : 'Max steps reached',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
-                    color: widget.stepControllers.length < AssignmentStepsWidget.maxSteps
+                    color: widget.enabled && widget.stepControllers.length < AssignmentStepsWidget.maxSteps
                         ? widget.themeService.textColor
                         : widget.themeService.textColor.withValues(alpha: 0.5),
                   ),

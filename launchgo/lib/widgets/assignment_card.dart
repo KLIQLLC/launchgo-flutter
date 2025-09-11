@@ -340,8 +340,12 @@ class _AssignmentCardState extends State<AssignmentCard> {
       final stepId = step['id']?.toString();
       final isUpdating = stepId != null && _updatingSteps.contains(stepId);
       
+      // Check if user is a student to disable step toggling
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final isStudent = authService.isStudent;
+      
       return InkWell(
-        onTap: stepId != null && !isUpdating 
+        onTap: stepId != null && !isUpdating && !isStudent
             ? () => _toggleStepCompletion(step, index)
             : null,
         borderRadius: BorderRadius.circular(4),
