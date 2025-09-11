@@ -396,11 +396,16 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
   }
 
   Future<void> _selectDueDate() async {
+    final now = DateTime.now();
+    final initialDate = _dueDate != null && _dueDate!.isAfter(now) 
+        ? _dueDate! 
+        : now;
+    
     final picked = await showDatePicker(
       context: context,
-      initialDate: _dueDate ?? DateTime.now(),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialDate: initialDate,
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 365)),
     );
     
     if (picked != null) {
