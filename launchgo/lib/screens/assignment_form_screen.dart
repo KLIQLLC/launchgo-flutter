@@ -9,7 +9,19 @@ import '../services/auth_service.dart';
 import '../services/api_service_retrofit.dart';
 import '../widgets/form_submit_button.dart';
 import '../widgets/cupertino_dropdown.dart';
+import '../widgets/assignment_steps_widget.dart';
 import '../theme/app_colors.dart';
+
+// Constants
+class _FormConstants {
+  static const double fieldHeight = 42.0;
+  static const double borderRadius = 12.0;
+  static const double horizontalPadding = 12.0;
+  static const double spacingMedium = 16.0;
+  static const double spacingLarge = 24.0;
+  static const int maxFileSize = 10485760; // 10MB
+  static const Duration defaultDueDateOffset = Duration(days: 7);
+}
 
 class AssignmentFormScreen extends StatefulWidget {
   final Map<String, dynamic>? course;
@@ -214,7 +226,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
       // Files will be uploaded separately after assignment is created/updated
 
       // Use selected date or default to 7 days from now if not set
-      final dueDateToUse = _dueDate ?? DateTime.now().add(const Duration(days: 7));
+      final dueDateToUse = _dueDate ?? DateTime.now().add(_FormConstants.defaultDueDateOffset);
       
       final assignmentData = {
         'title': _titleController.text,
@@ -359,18 +371,21 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                   children: [
                     // Assignment Title
                     _buildLabel('Assignment Title*', themeService),
-                    _buildTextField(
-                      controller: _titleController,
-                      hintText: 'Programming Assignment 1',
-                      themeService: themeService,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Assignment title is required';
-                        }
-                        return null;
-                      },
+                    SizedBox(
+                      height: _FormConstants.fieldHeight,
+                      child: _buildTextField(
+                        controller: _titleController,
+                        hintText: 'Programming Assignment 1',
+                        themeService: themeService,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Assignment title is required';
+                          }
+                          return null;
+                        },
+                      ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: _FormConstants.spacingMedium),
 
                     // Assignment Description
                     _buildLabel('Description', themeService),
@@ -380,7 +395,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                       themeService: themeService,
                       maxLines: 4,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: _FormConstants.spacingMedium),
 
                     // Due Date and Points in the same row
                     Row(
@@ -395,12 +410,14 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                               GestureDetector(
                                 onTap: _selectDueDate,
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  height: _FormConstants.fieldHeight,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
                                   decoration: BoxDecoration(
                                     color: themeService.cardColor,
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(color: themeService.borderColor),
                                   ),
+                                  alignment: Alignment.center,
                                   child: Row(
                                     children: [
                                       Expanded(
@@ -436,18 +453,21 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildLabel('Points', themeService),
-                              _buildTextField(
-                                controller: _pointsController,
-                                hintText: '100',
-                                themeService: themeService,
-                                keyboardType: TextInputType.number,
+                              SizedBox(
+                                height: _FormConstants.fieldHeight,
+                                child: _buildTextField(
+                                  controller: _pointsController,
+                                  hintText: '100',
+                                  themeService: themeService,
+                                  keyboardType: TextInputType.number,
+                                ),
                               ),
                             ],
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: _FormConstants.spacingMedium),
 
                     // Status and Earned Points in the same row
                     Row(
@@ -471,28 +491,50 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildLabel('Earned Points', themeService),
-                              _buildTextField(
-                                controller: _earnedPointsController,
-                                hintText: '0',
-                                themeService: themeService,
-                                keyboardType: TextInputType.number,
+                              SizedBox(
+                                height: _FormConstants.fieldHeight,
+                                child: _buildTextField(
+                                  controller: _earnedPointsController,
+                                  hintText: '0',
+                                  themeService: themeService,
+                                  keyboardType: TextInputType.number,
+                                ),
                               ),
                             ],
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: _FormConstants.spacingLarge),
 
                     // Attach Documents Section
                     _buildLabel('Attach Documents', themeService),
                     _buildDocumentUploadArea(themeService),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: _FormConstants.spacingLarge),
 
                     // Assignment Steps Section
                     _buildLabel('Assignment Steps', themeService),
-                    _buildAssignmentSteps(themeService),
-                    const SizedBox(height: 16),
+                    AssignmentStepsWidget(
+                      stepControllers: _stepControllers,
+                      originalStepData: _originalStepData,
+                      newStepController: _newStepController,
+                      themeService: themeService,
+                      onDeleteStep: _deleteStep,
+                      onAddStep: _addNewStep,
+                      getInputDecoration: ({
+                        required String hintText,
+                        String? prefixText,
+                        TextStyle? prefixStyle,
+                        EdgeInsetsGeometry? contentPadding,
+                      }) => _getInputDecoration(
+                        themeService: themeService,
+                        hintText: hintText,
+                        prefixText: prefixText,
+                        prefixStyle: prefixStyle,
+                        contentPadding: contentPadding,
+                      ),
+                    ),
+                    const SizedBox(height: _FormConstants.spacingMedium),
                   ],
                 ),
               ),
@@ -545,6 +587,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
     String? Function(String?)? validator,
     TextInputType? keyboardType,
     int maxLines = 1,
+    EdgeInsetsGeometry? contentPadding,
   }) {
     return TextFormField(
       controller: controller,
@@ -555,31 +598,10 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
         color: themeService.inputTextColor,
         fontSize: 16,
       ),
-      decoration: InputDecoration(
+      decoration: _getInputDecoration(
+        themeService: themeService,
         hintText: hintText,
-        hintStyle: TextStyle(
-          color: themeService.inputPlaceholderColor,
-          fontSize: 17,
-        ),
-        filled: true,
-        fillColor: themeService.cardColor,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: themeService.borderColor),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: themeService.borderColor),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: ThemeService.accent),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.error),
-        ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        contentPadding: contentPadding,
       ),
     );
   }
@@ -587,6 +609,71 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
   String _capitalizeFirst(String text) {
     if (text.isEmpty) return text;
     return text[0].toUpperCase() + text.substring(1).toLowerCase();
+  }
+
+  // Unified input decoration
+  InputDecoration _getInputDecoration({
+    required ThemeService themeService,
+    required String hintText,
+    String? prefixText,
+    TextStyle? prefixStyle,
+    EdgeInsetsGeometry? contentPadding,
+  }) {
+    return InputDecoration(
+      hintText: hintText,
+      prefixText: prefixText,
+      prefixStyle: prefixStyle,
+      hintStyle: TextStyle(
+        color: themeService.inputPlaceholderColor,
+        fontSize: 17,
+      ),
+      filled: true,
+      fillColor: themeService.cardColor,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(_FormConstants.borderRadius),
+        borderSide: BorderSide(color: themeService.borderColor),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(_FormConstants.borderRadius),
+        borderSide: BorderSide(color: themeService.borderColor),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(_FormConstants.borderRadius),
+        borderSide: BorderSide(color: ThemeService.accent),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(_FormConstants.borderRadius),
+        borderSide: const BorderSide(color: AppColors.error),
+      ),
+      contentPadding: contentPadding ?? EdgeInsets.symmetric(
+        horizontal: _FormConstants.horizontalPadding,
+        vertical: 6,
+      ),
+    );
+  }
+
+  // Step management methods
+  void _deleteStep(int index) {
+    setState(() {
+      _stepControllers[index].dispose();
+      _stepControllers.removeAt(index);
+      // Also remove from original data tracking
+      if (index < _originalStepData.length) {
+        _originalStepData.removeAt(index);
+      }
+    });
+  }
+
+  void _addNewStep() {
+    if (_newStepController.text.trim().isNotEmpty) {
+      setState(() {
+        final newController = TextEditingController(text: _newStepController.text);
+        _stepControllers.add(newController);
+        // Add null for new steps (no original data)
+        _originalStepData.add(null);
+        _newStepController.clear();
+      });
+    }
   }
 
   Widget _buildStatusDropdown(ThemeService themeService) {
@@ -618,9 +705,9 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
       );
 
       if (result != null) {
-        // Check file size limit (5MB)
+        // Check file size limit
         final file = result.files.first;
-        if (file.size > 5 * 1024 * 1024) { // 5MB in bytes
+        if (file.size > _FormConstants.maxFileSize) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -912,7 +999,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                 ],
               ),
             ),
-          const SizedBox(height: 16),
+          const SizedBox(height: _FormConstants.spacingMedium),
         ],
         
         // File picker button - only show if no files are selected and no existing attachments
@@ -1035,151 +1122,4 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
     );
   }
 
-  Widget _buildAssignmentSteps(ThemeService themeService) {
-    debugPrint('🎨 Building assignment steps UI - ${_stepControllers.length} controllers');
-    return Column(
-      children: [
-        // Existing steps
-        ..._stepControllers.asMap().entries.map((entry) {
-          final index = entry.key;
-          final controller = entry.value;
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: controller,
-                    style: TextStyle(
-                      color: themeService.inputTextColor,
-                      fontSize: 16,
-                    ),
-                    decoration: InputDecoration(
-                      prefixText: '${index + 1}. ',
-                      prefixStyle: TextStyle(
-                        color: themeService.textColor,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      filled: true,
-                      fillColor: themeService.cardColor,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: themeService.borderColor),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: themeService.borderColor),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: ThemeService.accent),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  onPressed: () {
-                    setState(() {
-                      _stepControllers[index].dispose();
-                      _stepControllers.removeAt(index);
-                      // Also remove from original data tracking
-                      if (index < _originalStepData.length) {
-                        _originalStepData.removeAt(index);
-                      }
-                    });
-                  },
-                  icon: Icon(
-                    Icons.close,
-                    color: themeService.textSecondaryColor,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }),
-        // Add new step row
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _newStepController,
-                style: TextStyle(
-                  color: themeService.inputTextColor,
-                  fontSize: 16,
-                ),
-                decoration: InputDecoration(
-                  hintText: 'Add a step...',
-                  hintStyle: TextStyle(
-                    color: themeService.inputPlaceholderColor,
-                    fontSize: 16,
-                  ),
-                  filled: true,
-                  fillColor: themeService.cardColor,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: themeService.borderColor),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: themeService.borderColor),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: ThemeService.accent),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            ElevatedButton(
-              onPressed: _stepControllers.length < 10 ? () {
-                if (_newStepController.text.trim().isNotEmpty) {
-                  setState(() {
-                    final newController = TextEditingController(text: _newStepController.text);
-                    _stepControllers.add(newController);
-                    // Add null for new steps (no original data)
-                    _originalStepData.add(null);
-                    _newStepController.clear();
-                  });
-                }
-              } : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _stepControllers.length < 10 
-                    ? themeService.backgroundColor 
-                    : themeService.backgroundColor.withValues(alpha: 0.5),
-                foregroundColor: _stepControllers.length < 10 
-                    ? themeService.textColor 
-                    : themeService.textColor.withValues(alpha: 0.5),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(
-                    color: _stepControllers.length < 10 
-                        ? themeService.borderColor 
-                        : themeService.borderColor.withValues(alpha: 0.5)
-                  ),
-                ),
-              ),
-              child: Text(
-                _stepControllers.length < 10 
-                    ? 'Add Step (${_stepControllers.length}/10)' 
-                    : 'Max steps reached',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: _stepControllers.length < 10 
-                      ? themeService.textColor 
-                      : themeService.textColor.withValues(alpha: 0.5),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
 }
