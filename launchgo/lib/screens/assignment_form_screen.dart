@@ -452,20 +452,17 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                   children: [
                     // Assignment Title
                     _buildLabel('Assignment Title*', themeService),
-                    SizedBox(
-                      height: _FormConstants.fieldHeight,
-                      child: _buildTextField(
-                        controller: _titleController,
-                        hintText: 'Programming Assignment 1',
-                        themeService: themeService,
-                        enabled: !isStudent,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Assignment title is required';
-                          }
-                          return null;
-                        },
-                      ),
+                    _buildTextField(
+                      controller: _titleController,
+                      hintText: 'Programming Assignment 1',
+                      themeService: themeService,
+                      enabled: !isStudent,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Assignment title is required';
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: _FormConstants.spacingMedium),
 
@@ -536,15 +533,12 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildLabel('Points', themeService),
-                              SizedBox(
-                                height: _FormConstants.fieldHeight,
-                                child: _buildTextField(
-                                  controller: _pointsController,
-                                  hintText: '100',
-                                  themeService: themeService,
-                                  keyboardType: TextInputType.number,
-                                  enabled: !isStudent,
-                                ),
+                              _buildTextField(
+                                controller: _pointsController,
+                                hintText: '100',
+                                themeService: themeService,
+                                keyboardType: TextInputType.number,
+                                enabled: !isStudent,
                               ),
                             ],
                           ),
@@ -575,15 +569,12 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildLabel('Earned Points', themeService),
-                              SizedBox(
-                                height: _FormConstants.fieldHeight,
-                                child: _buildTextField(
-                                  controller: _earnedPointsController,
-                                  hintText: '0',
-                                  themeService: themeService,
-                                  keyboardType: TextInputType.number,
-                                  enabled: !isStudent,
-                                ),
+                              _buildTextField(
+                                controller: _earnedPointsController,
+                                hintText: '0',
+                                themeService: themeService,
+                                keyboardType: TextInputType.number,
+                                enabled: !isStudent,
                               ),
                             ],
                           ),
@@ -737,8 +728,9 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
       ),
       contentPadding: contentPadding ?? EdgeInsets.symmetric(
         horizontal: _FormConstants.horizontalPadding,
-        vertical: 6,
+        vertical: 8,
       ),
+      isDense: true,
     );
   }
 
