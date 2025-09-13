@@ -112,7 +112,7 @@ flutter_launcher_icons:
   
   # Optional: Adaptive icon configuration for Android
   adaptive_icon_background: "#FF5757"
-  adaptive_icon_foreground: "assets/app_icon/app_icon_1024.png"
+  adaptive_icon_foreground: "assets/app_icon/icon1024_andr.png"
   
   # Web is not supported in this project
   web:
