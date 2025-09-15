@@ -38,6 +38,10 @@ dependencies:
   ## 3rd Party Login
   google_sign_in: ^7.1.1
   
+  ## Firebase
+  firebase_core: ^3.8.0
+  firebase_crashlytics: ^4.2.0
+  
   ## Navigation
   go_router: ^14.0.0
   

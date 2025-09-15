@@ -1,5 +1,5 @@
 # Uncomment this line to define a global platform for your project
-# platform :ios, '12.0'
+platform :ios, '13.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -45,5 +45,16 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+  end
+  
+  # Add Crashlytics build phase
+  installer.pods_project.targets.each do |target|
+    if target.name == 'Runner'
+      target.build_phases.each do |phase|
+        if phase.display_name == 'Run Script'
+          phase.shell_script = '"${PODS_ROOT}/FirebaseCrashlytics/run"'
+        end
+      end
+    end
   end
 end
