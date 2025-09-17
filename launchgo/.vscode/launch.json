@@ -5,6 +5,7 @@
       "name": "stage",
       "request": "launch",
       "type": "dart",
+      "program": "lib/main.dart",
       "args": [
         "--flavor",
         "stage",
@@ -15,6 +16,7 @@
       "name": "stage (profile mode)",
       "request": "launch",
       "type": "dart",
+      "program": "lib/main.dart",
       "flutterMode": "profile",
       "args": [
         "--flavor",
@@ -26,6 +28,7 @@
       "name": "stage (release mode)",
       "request": "launch",
       "type": "dart",
+      "program": "lib/main.dart",
       "flutterMode": "release",
       "args": [
         "--flavor",
@@ -37,6 +40,7 @@
       "name": "prod",
       "request": "launch",
       "type": "dart",
+      "program": "lib/main.dart",
       "args": [
         "--flavor",
         "prod",
@@ -47,6 +51,7 @@
       "name": "prod (profile mode)",
       "request": "launch",
       "type": "dart",
+      "program": "lib/main.dart",
       "flutterMode": "profile",
       "args": [
         "--flavor",
@@ -58,6 +63,7 @@
       "name": "prod (release mode)",
       "request": "launch",
       "type": "dart",
+      "program": "lib/main.dart",
       "flutterMode": "release",
       "args": [
         "--flavor",

@@ -11,64 +11,67 @@ This Flutter project supports **iOS and Android platforms only**.
 ## Development Setup
 
 ### Prerequisites
-- Flutter SDK (^3.8.1)
-- Dart SDK
+- FVM (Flutter Version Management) - **REQUIRED**
+- Flutter 3.35.4 (managed via FVM)
+- Dart 3.9.2
 - iOS development: Xcode and CocoaPods
 - Android development: Android Studio
 
 ### Getting Started
 ```bash
+# IMPORTANT: Always use FVM for Flutter commands
 # Get dependencies
-flutter pub get
+fvm flutter pub get
 
 # iOS specific
 cd ios && pod install && cd ..
 
 # Run the app
-flutter run
+fvm flutter run
 
 # Run with environment variables
-flutter run --dart-define=ENV=stage  # Stage environment
-flutter run --dart-define=ENV=prod   # Production environment
+fvm flutter run --dart-define=ENV=stage  # Stage environment
+fvm flutter run --dart-define=ENV=prod   # Production environment
 ```
 
 ## Common Commands
 
 ### Development
 ```bash
+# IMPORTANT: All Flutter commands must use FVM
 # Run the app
-flutter run
+fvm flutter run
 
 # Run on specific device
-flutter run -d <device_id>
+fvm flutter run -d <device_id>
 
 # List available devices
-flutter devices
+fvm flutter devices
 
 # Run with specific environment
-./scripts/run_stage.sh   # Run in stage environment
-./scripts/run_prod.sh    # Run in production environment
+fvm flutter run --dart-define=ENV=stage   # Stage environment
+fvm flutter run --dart-define=ENV=prod    # Production environment
 ```
 
 ### Testing
 ```bash
 # Run all tests
-flutter test
+fvm flutter test
 
 # Run tests with coverage
-flutter test --coverage
+fvm flutter test --coverage
 ```
 
 ### Build
 ```bash
 # Build for iOS
-flutter build ios
+fvm flutter build ios
 
 # Build for Android
-flutter build apk
-flutter build appbundle
+fvm flutter build apk
+fvm flutter build appbundle
 
-# Build for TestFlight
+# Build for TestFlight (may need updating for FVM)
 ./scripts/build_testflight.sh
 
 # Clear tokens for testing
@@ -78,27 +81,37 @@ flutter build appbundle
 ### Code Quality
 ```bash
 # Analyze code
-flutter analyze
+fvm flutter analyze
 
 # Format code
-dart format .
+fvm dart format .
+```
+
+### Code Generation
+```bash
+# Generate code for Retrofit, JSON serialization, etc.
+fvm flutter pub run build_runner build --delete-conflicting-outputs
+
+# Watch mode for auto-generation
+fvm flutter pub run build_runner watch --delete-conflicting-outputs
 ```
 
 ### Dependencies
 ```bash
 # Get packages
-flutter pub get
+fvm flutter pub get
 
 # Upgrade packages
-flutter pub upgrade
+fvm flutter pub upgrade
 
 # Update dependencies
-flutter pub outdated
+fvm flutter pub outdated
 ```
 
 ## Project Structure
 - `lib/` - Main application code
   - `screens/` - Application screens (Login, Schedule, Courses, Chat, Recaps)
+    - `schedule_screen.dart` - **Recently refactored** with improved widget organization
   - `features/` - Feature modules (Documents with BLoC pattern)
     - `documents/` - Document management feature
       - `presentation/` - UI layer (pages, widgets, BLoC)
@@ -248,11 +261,32 @@ flutter pub outdated
 - [ ] Silent sign-in restoration
 - [ ] Error states and retry logic
 
+## Recent Changes
+
+### Schedule Screen Refactoring (2025-09-17)
+The `schedule_screen.dart` has been completely refactored with:
+- **Widget Extraction**: Split into 15+ smaller, focused widgets
+- **Better Organization**: Each widget has single responsibility
+- **Improved Error Handling**: Dedicated error state with retry functionality
+- **Constants**: Extracted magic numbers into named constants
+- **Factory Pattern**: Status badges using factory constructors
+- **Cleaner State Management**: Separated loading, error, and data states
+
+Key extracted widgets:
+- `_StudentHeader` - Student information display
+- `_WeekNavigator` - Week navigation controls  
+- `_AssignmentCard` - Individual assignment cards
+- `_StatusBadge` - Completed/Overdue status indicators
+- `_ErrorState` - Error display with retry
+
 ## Important Notes
-- Always run `flutter pub get` after modifying pubspec.yaml
+- **ALWAYS use FVM**: Run all Flutter commands with `fvm flutter` prefix
+- **Flutter Version**: Project uses Flutter 3.35.4 via FVM
+- Always run `fvm flutter pub get` after modifying pubspec.yaml
 - For iOS, run `cd ios && pod install` after adding new dependencies
-- Check `flutter doctor` if you encounter build issues
+- Check `fvm flutter doctor` if you encounter build issues
 - Firebase configuration files contain sensitive information - never commit to public repositories
 - Test authentication flows thoroughly before deployment
 - Routes are defined in `lib/router/app_router.dart` for centralized navigation management
 - App name is displayed as "launchgo" (lowercase) throughout the UI
+- Code generation files (`.g.dart`) should not be edited manually
