@@ -5,7 +5,7 @@
 echo "Building Android app..."
 
 # Build prod flavor with prod environment for demo
-flutter build apk --flavor prod --dart-define=ENV=prod
+fvm flutter build apk --flavor prod --dart-define=ENV=prod
 
 echo "Distributing to Firebase App Distribution..."
 

@@ -23,12 +23,12 @@ echo -e "${GREEN}✅ Updated version to: ${new_version}${NC}"
 
 # Clean and get dependencies
 echo -e "${YELLOW}📦 Cleaning and updating dependencies...${NC}"
-flutter clean
-flutter pub get
+fvm flutter clean
+fvm flutter pub get
 
 # Build iOS with Flutter using stage flavor but production environment
 echo -e "${YELLOW}🏗️ Building iOS for TestFlight (stage bundle ID + prod env)...${NC}"
-flutter build ios --flavor stage --dart-define=ENV=prod
+fvm flutter build ios --flavor stage --dart-define=ENV=prod
 
 # iOS specific setup
 echo -e "${YELLOW}🍎 Setting up iOS dependencies...${NC}"
