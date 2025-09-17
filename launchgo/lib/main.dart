@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:launchgo/config/environment.dart';
 import 'package:launchgo/router/app_router.dart';
+import 'package:launchgo/services/api_service_retrofit.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/widgets/splash_screen.dart';
@@ -41,6 +42,11 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthService()..initialize()),
         ChangeNotifierProvider(create: (_) => ThemeService()),
+        Provider(
+          create: (context) => ApiServiceRetrofit(
+            authService: context.read<AuthService>(),
+          ),
+        ),
       ],
       child: const MyApp(),
     ),

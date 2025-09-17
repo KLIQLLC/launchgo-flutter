@@ -22,6 +22,14 @@ abstract class ApiService {
   @GET("/semesters")
   Future<HttpResponse<dynamic>> getSemesters();
 
+  // Deadlines endpoints
+  @GET("/users/{userId}/deadlines")
+  Future<HttpResponse<dynamic>> getDeadlines(
+    @Path("userId") String userId,
+    @Query("startAt") int startAt,
+    @Query("endAt") int endAt,
+  );
+
   // Document endpoints
   @GET("/users/{userId}/documents")
   Future<HttpResponse<dynamic>> getDocuments(

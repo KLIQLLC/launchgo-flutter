@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../api/api_service.dart';
 import '../api/dio_client_enhanced.dart';
@@ -94,6 +93,47 @@ class ApiServiceRetrofit {
     } catch (e) {
       debugPrint('❌ Failed to get semesters: $e');
       return [];
+    }
+  }
+  
+  // Deadlines endpoints
+  
+  Future<Map<String, dynamic>?> getDeadlines({
+    required int startAt,
+    required int endAt,
+  }) async {
+    try {
+      // Ensure user info is loaded
+      if (_authService.userInfo == null) {
+        debugPrint('⚠️ User info not loaded yet, loading now...');
+        await _authService.loadUserInfo();
+      }
+      
+      final userId = _getEffectiveUserId();
+      if (userId == null) {
+        debugPrint('❌ Cannot get deadlines: User ID is null');
+        return null;
+      }
+      
+      debugPrint('🔄 Getting deadlines for user $userId from $startAt to $endAt');
+      final response = await _retrofit.getDeadlines(userId, startAt, endAt);
+      final data = response.data;
+      
+      // Parse JSON string response for deadlines
+      if (data is String) {
+        final parsedData = json.decode(data);
+        debugPrint('✅ Successfully fetched deadlines');
+        return parsedData;
+      } else if (data is Map<String, dynamic>) {
+        debugPrint('✅ Successfully fetched deadlines');
+        return data;
+      }
+      
+      debugPrint('❌ No valid deadline data found');
+      return null;
+    } catch (e) {
+      debugPrint('❌ Failed to get deadlines: $e');
+      return null;
     }
   }
   
