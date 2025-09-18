@@ -27,16 +27,16 @@ class ApiServiceRetrofit {
   }
   
   /// Parse response data that might be a JSON string
-  Map<String, dynamic> _parseResponse(Map<String, dynamic> response) {
-    // Handle cases where the response might be a string
-    if (response.containsKey('data') && response['data'] is String) {
+  dynamic _parseJsonResponse(dynamic data) {
+    if (data is String) {
       try {
-        response['data'] = json.decode(response['data']);
+        return json.decode(data);
       } catch (e) {
-        debugPrint('❌ Failed to parse response data as JSON: $e');
+        debugPrint('❌ Failed to parse response as JSON: $e');
+        return null;
       }
     }
-    return response;
+    return data;
   }
   
   // User endpoints
@@ -46,22 +46,8 @@ class ApiServiceRetrofit {
       final response = await _retrofit.getUserInfo();
       final data = response.data;
       
-      // Parse JSON string response for getUserInfo
-      if (data is String) {
-        final parsedData = json.decode(data);
-        if (parsedData['data'] != null) {
-          return parsedData['data'];
-        }
-        return parsedData;
-      } else if (data is Map<String, dynamic>) {
-        final parsed = _parseResponse(data);
-        if (parsed['data'] != null) {
-          return parsed['data'];
-        }
-        return parsed;
-      }
-      
-      return null;
+      final parsedData = _parseJsonResponse(data);
+      return parsedData is Map<String, dynamic> ? parsedData : null;
     } catch (e) {
       debugPrint('Failed to get user info: $e');
       rethrow;
@@ -78,17 +64,14 @@ class ApiServiceRetrofit {
       debugPrint('📊 Response status: ${response.response.statusCode}');
       debugPrint('📊 Raw response data type: ${data.runtimeType}');
       
-      // Parse JSON string response for semesters
-      if (data is String) {
-        final parsedData = json.decode(data);
-        if (parsedData['data'] is List) {
-          final semesterList = List<Map<String, dynamic>>.from(parsedData['data']);
-          debugPrint('✅ Successfully parsed ${semesterList.length} semesters');
-          return semesterList;
-        }
+      final parsedData = _parseJsonResponse(data);
+      if (parsedData is List) {
+        final semesterList = List<Map<String, dynamic>>.from(parsedData);
+        debugPrint('✅ Successfully parsed ${semesterList.length} semesters');
+        return semesterList;
       }
       
-      debugPrint('❌ No valid semester data found');
+      debugPrint('❌ No valid semester data found - data: $data');
       return [];
     } catch (e) {
       debugPrint('❌ Failed to get semesters: $e');
@@ -119,18 +102,15 @@ class ApiServiceRetrofit {
       final response = await _retrofit.getDeadlines(userId, startAt, endAt);
       final data = response.data;
       
-      // Parse JSON string response for deadlines
-      if (data is String) {
-        final parsedData = json.decode(data);
-        debugPrint('✅ Successfully fetched deadlines');
-        return parsedData;
-      } else if (data is Map<String, dynamic>) {
-        debugPrint('✅ Successfully fetched deadlines');
-        return data;
+      final parsedData = _parseJsonResponse(data);
+      if (parsedData == null) {
+        debugPrint('❌ No valid deadline data found');
+        return null;
       }
       
-      debugPrint('❌ No valid deadline data found');
-      return null;
+      debugPrint('✅ Successfully fetched deadlines');
+      // Wrap array responses in 'data' key for backward compatibility
+      return parsedData is List ? {'data': parsedData} : parsedData;
     } catch (e) {
       debugPrint('❌ Failed to get deadlines: $e');
       return null;
@@ -169,21 +149,9 @@ class ApiServiceRetrofit {
       final response = await _retrofit.getDocuments(userId, semesterId);
       final data = response.data;
       
-      // Parse JSON string response for getDocuments
-      if (data is String) {
-        final parsedData = json.decode(data);
-        if (parsedData['data'] is List) {
-          return List<Map<String, dynamic>>.from(parsedData['data']);
-        }
-      } else if (data is Map<String, dynamic>) {
-        final parsed = _parseResponse(data);
-        // Handle different response formats
-        if (parsed['data'] != null && parsed['data'] is List) {
-          return List<Map<String, dynamic>>.from(parsed['data']);
-        }
-        if (parsed['documents'] != null && parsed['documents'] is List) {
-          return List<Map<String, dynamic>>.from(parsed['documents']);
-        }
+      final parsedData = _parseJsonResponse(data);
+      if (parsedData is List) {
+        return List<Map<String, dynamic>>.from(parsedData);
       }
       
       return [];
@@ -213,17 +181,9 @@ class ApiServiceRetrofit {
       final response = await _retrofit.getCourses(userId, semesterId);
       final data = response.data;
       
-      // Parse JSON string response for getCourses
-      if (data is String) {
-        final parsedData = json.decode(data);
-        if (parsedData['data'] is List) {
-          return List<Map<String, dynamic>>.from(parsedData['data']);
-        }
-      } else if (data is Map<String, dynamic>) {
-        final parsed = _parseResponse(data);
-        if (parsed['data'] != null && parsed['data'] is List) {
-          return List<Map<String, dynamic>>.from(parsed['data']);
-        }
+      final parsedData = _parseJsonResponse(data);
+      if (parsedData is List) {
+        return List<Map<String, dynamic>>.from(parsedData);
       }
       
       return [];
@@ -244,22 +204,8 @@ class ApiServiceRetrofit {
       final response = await _retrofit.getCourse(userId, courseId);
       final data = response.data;
       
-      // Parse JSON string response if needed
-      if (data is String) {
-        final parsedData = json.decode(data);
-        if (parsedData['data'] != null) {
-          return parsedData['data'] as Map<String, dynamic>;
-        }
-        return parsedData as Map<String, dynamic>;
-      } else if (data is Map<String, dynamic>) {
-        final parsed = _parseResponse(data);
-        if (parsed['data'] != null) {
-          return parsed['data'] as Map<String, dynamic>;
-        }
-        return parsed;
-      }
-      
-      return null;
+      final parsedData = _parseJsonResponse(data);
+      return parsedData is Map<String, dynamic> ? parsedData : null;
     } catch (e) {
       debugPrint('Failed to get course: $e');
       return null;
@@ -284,22 +230,8 @@ class ApiServiceRetrofit {
       final response = await _retrofit.createCourse(userId, dataWithSemester);
       final data = response.data;
       
-      // Parse JSON string response
-      if (data is String) {
-        final parsedData = json.decode(data);
-        if (parsedData['data'] != null) {
-          return parsedData['data'];
-        }
-        return parsedData;
-      } else if (data is Map<String, dynamic>) {
-        final parsed = _parseResponse(data);
-        if (parsed['data'] != null) {
-          return parsed['data'];
-        }
-        return parsed;
-      }
-      
-      return {};
+      final parsedData = _parseJsonResponse(data);
+      return parsedData is Map<String, dynamic> ? parsedData : {};
     } catch (e) {
       debugPrint('Failed to create course: $e');
       rethrow;
@@ -324,22 +256,8 @@ class ApiServiceRetrofit {
       final response = await _retrofit.updateCourse(userId, courseId, dataWithSemester);
       final data = response.data;
       
-      // Parse JSON string response
-      if (data is String) {
-        final parsedData = json.decode(data);
-        if (parsedData['data'] != null) {
-          return parsedData['data'];
-        }
-        return parsedData;
-      } else if (data is Map<String, dynamic>) {
-        final parsed = _parseResponse(data);
-        if (parsed['data'] != null) {
-          return parsed['data'];
-        }
-        return parsed;
-      }
-      
-      return {};
+      final parsedData = _parseJsonResponse(data);
+      return parsedData is Map<String, dynamic> ? parsedData : {};
     } catch (e) {
       debugPrint('Failed to update course: $e');
       rethrow;
@@ -380,10 +298,8 @@ class ApiServiceRetrofit {
       final response = await _retrofit.createDocument(userId, dataWithSemester);
       final data = response.data;
       
-      if (data is Map<String, dynamic>) {
-        return _parseResponse(data);
-      }
-      return {};
+      final parsedData = _parseJsonResponse(data);
+      return parsedData is Map<String, dynamic> ? parsedData : {};
     } catch (e) {
       debugPrint('Failed to create document: $e');
       rethrow;
@@ -407,10 +323,8 @@ class ApiServiceRetrofit {
       final response = await _retrofit.updateDocument(userId, documentId, dataWithSemester);
       final data = response.data;
       
-      if (data is Map<String, dynamic>) {
-        return _parseResponse(data);
-      }
-      return {};
+      final parsedData = _parseJsonResponse(data);
+      return parsedData is Map<String, dynamic> ? parsedData : {};
     } catch (e) {
       debugPrint('Failed to update document: $e');
       rethrow;
@@ -440,11 +354,8 @@ class ApiServiceRetrofit {
       
       final response = await _retrofit.createAssignment(userId, courseId, assignmentData);
       
-      // Handle both direct object and JSON string responses
-      if (response.data is String) {
-        return json.decode(response.data);
-      }
-      return response.data as Map<String, dynamic>;
+      final parsedData = _parseJsonResponse(response.data);
+      return parsedData is Map<String, dynamic> ? parsedData : {};
     } catch (e) {
       debugPrint('Failed to create assignment: $e');
       rethrow;
@@ -460,11 +371,8 @@ class ApiServiceRetrofit {
       
       final response = await _retrofit.updateAssignment(userId, courseId, assignmentId, assignmentData);
       
-      // Handle both direct object and JSON string responses
-      if (response.data is String) {
-        return json.decode(response.data);
-      }
-      return response.data as Map<String, dynamic>;
+      final parsedData = _parseJsonResponse(response.data);
+      return parsedData is Map<String, dynamic> ? parsedData : {};
     } catch (e) {
       debugPrint('Failed to update assignment: $e');
       rethrow;
@@ -510,26 +418,12 @@ class ApiServiceRetrofit {
       
       debugPrint('✅ Step updated successfully');
       
-      // Handle response - it might be a String or Map
-      if (response.data is String) {
-        try {
-          // Try to parse as JSON if it's a string
-          final parsed = json.decode(response.data);
-          if (parsed is Map<String, dynamic>) {
-            return parsed;
-          }
-        } catch (e) {
-          // If parsing fails, return a simple success response
-          debugPrint('Response is a plain string: ${response.data}');
-        }
-        // Return a success response if backend returns just a string
-        return {'success': true, 'message': response.data};
-      } else if (response.data is Map<String, dynamic>) {
-        return response.data;
-      } else {
-        // Return a simple success response for other types
-        return {'success': true};
+      final parsedData = _parseJsonResponse(response.data);
+      if (parsedData is Map<String, dynamic>) {
+        return parsedData;
       }
+      // Return a simple success response for non-object responses
+      return {'success': true, 'message': parsedData?.toString() ?? 'Success'};
     } catch (e) {
       debugPrint('Failed to update assignment step: $e');
       rethrow;
@@ -599,19 +493,10 @@ class ApiServiceRetrofit {
       
       final response = await _retrofit.getAttachments(userId, courseId, assignmentId);
       
-      // Handle both direct object and JSON string responses
-      if (response.data is String) {
-        final decoded = json.decode(response.data);
-        if (decoded is List) {
-          return decoded.cast<Map<String, dynamic>>();
-        }
-        return [];
+      final parsedData = _parseJsonResponse(response.data);
+      if (parsedData is List) {
+        return parsedData.cast<Map<String, dynamic>>();
       }
-      
-      if (response.data is List) {
-        return (response.data as List).cast<Map<String, dynamic>>();
-      }
-      
       return [];
     } catch (e) {
       debugPrint('Failed to get attachments: $e');

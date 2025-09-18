@@ -17,7 +17,7 @@ class EnvironmentConfig {
       case 'stage':
       default:
         _environment = Environment.stage;
-        _baseUrl = 'https://paqlhj8bef.execute-api.us-west-1.amazonaws.com/api';
+        _baseUrl = 'https://dev-api.launchgo.com/api/v1';
         break;
     }
   }
