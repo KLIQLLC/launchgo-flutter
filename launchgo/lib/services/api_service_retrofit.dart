@@ -54,6 +54,19 @@ class ApiServiceRetrofit {
     }
   }
   
+  Future<Map<String, dynamic>?> updateStudentInfo(String studentId, Map<String, dynamic> studentData) async {
+    try {
+      debugPrint('📝 Updating student info for: $studentId');
+      final response = await _retrofit.updateStudentInfo(studentId, studentData);
+      final parsedData = _parseJsonResponse(response.data);
+      debugPrint('✅ Student info updated successfully');
+      return parsedData is Map<String, dynamic> ? parsedData : null;
+    } catch (e) {
+      debugPrint('❌ Failed to update student info: $e');
+      rethrow;
+    }
+  }
+  
   // Semester endpoints
   
   Future<List<Map<String, dynamic>>> getSemesters() async {

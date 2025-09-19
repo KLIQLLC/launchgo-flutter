@@ -61,7 +61,7 @@ class DeadlineAssignment extends Equatable {
   }
 
   bool get isCompleted => status.toLowerCase() == 'completed';
-  bool get isOverdue => !isCompleted && dueDate.isBefore(DateTime.now());
+  bool get isOverdue => !isCompleted && dueDate.toUtc().isBefore(DateTime.now().toUtc());
 
   @override
   List<Object?> get props => [id, title, dueDate, status, attachments];

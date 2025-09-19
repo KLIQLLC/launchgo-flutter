@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:launchgo/models/deadline_model.dart';
 import 'package:launchgo/models/user_model.dart';
+import 'package:launchgo/screens/edit_student_info_modal.dart';
 import 'package:launchgo/services/api_service_retrofit.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/theme_service.dart';
+import 'package:launchgo/widgets/deadline_card.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
@@ -196,47 +198,88 @@ class _StudentInfo extends StatelessWidget {
   const _StudentInfo({required this.student});
 
   String get academicYear {
+    String? year;
     if (student is Student) {
-      return student.academicYear ?? 'Sophomore';
+      year = student.academicYear;
+    } else if (student is UserModel && student.students.isNotEmpty) {
+      year = student.students.first.academicYear;
     }
-    if (student?.students != null && student.students.isNotEmpty) {
-      return student.students.first.academicYear ?? 'Sophomore';
+    
+    // Normalize the academic year (capitalize first letter)
+    if (year != null && year.isNotEmpty) {
+      final lower = year.toLowerCase();
+      return lower[0].toUpperCase() + lower.substring(1);
     }
     return 'Sophomore';
   }
 
   String get gpa {
+    double? gpaValue;
     if (student is Student) {
-      final gpa = student.gpa;
-      return gpa != null ? gpa.toStringAsFixed(1) : '2.4';
+      gpaValue = student.gpa;
+    } else if (student is UserModel && student.students.isNotEmpty) {
+      gpaValue = student.students.first.gpa;
     }
-    if (student?.students != null && student.students.isNotEmpty) {
-      final gpa = student.students.first.gpa;
-      return gpa != null ? gpa.toStringAsFixed(1) : '2.4';
-    }
-    return '2.4';
+    return gpaValue != null ? gpaValue.toStringAsFixed(1) : '2.4';
   }
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Text(
-          'Year: $academicYear',
-          style: TextStyle(
-            color: Colors.grey[400],
-            fontSize: 16,
-          ),
+    return InkWell(
+      onTap: () async {
+        final result = await EditStudentInfoModal.show(context);
+        
+        // If the edit was successful, the screen will rebuild automatically
+        // since AuthService will notify listeners
+        if (result == true) {
+          debugPrint('Student info updated successfully');
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
         ),
-        const SizedBox(width: 16),
-        Text(
-          '• GPA: $gpa',
-          style: TextStyle(
-            color: Colors.grey[400],
-            fontSize: 16,
-          ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Row(
+                children: [
+                  Text(
+                    'Year: $academicYear',
+                    style: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Text(
+                    '•',
+                    style: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Text(
+                    'GPA: $gpa',
+                    style: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.edit,
+                    size: 16,
+                    color: Colors.grey[600],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -308,11 +351,46 @@ class _DeadlinesList extends StatelessWidget {
       );
     }
 
+    // Group assignments by course code
+    Map<String, List<MapEntry<DeadlineCourse, DeadlineAssignment>>> groupedAssignments = {};
+    for (final entry in assignments) {
+      final courseCode = entry.key.code;
+      if (!groupedAssignments.containsKey(courseCode)) {
+        groupedAssignments[courseCode] = [];
+      }
+      groupedAssignments[courseCode]!.add(entry);
+    }
+
     return Column(
-      children: assignments.map((entry) {
-        return _AssignmentItem(
-          course: entry.key,
-          assignment: entry.value,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: groupedAssignments.entries.map((courseGroup) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Course header
+            Padding(
+              padding: const EdgeInsets.only(left: 0, bottom: 16),
+              child: Text(
+                courseGroup.key,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            // Assignments for this course
+            ...courseGroup.value.map((entry) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: DeadlineCard(
+                  assignment: entry.value,
+                  course: entry.key,
+                ),
+              );
+            }),
+            const SizedBox(height: 16), // Space between course groups
+          ],
         );
       }).toList(),
     );
@@ -369,238 +447,6 @@ class _NavigationButton extends StatelessWidget {
   }
 }
 
-class _AssignmentItem extends StatelessWidget {
-  final DeadlineCourse course;
-  final DeadlineAssignment assignment;
-
-  const _AssignmentItem({
-    required this.course,
-    required this.assignment,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          course.code,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 16),
-        _AssignmentCard(assignment: assignment),
-        const SizedBox(height: 24),
-      ],
-    );
-  }
-}
-
-class _AssignmentCard extends StatelessWidget {
-  final DeadlineAssignment assignment;
-
-  const _AssignmentCard({required this.assignment});
-
-  Color get _borderColor {
-    if (assignment.isCompleted) return Colors.green;
-    if (assignment.isOverdue) return Colors.red;
-    return Colors.orange;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        border: Border(
-          left: BorderSide(
-            color: _borderColor,
-            width: 3,
-          ),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeader(),
-          const SizedBox(height: 12),
-          _buildFooter(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Row(
-      children: [
-        _StatusIcon(isCompleted: assignment.isCompleted),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Text(
-            assignment.title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-        if (assignment.isCompleted) _StatusBadge.completed(),
-        if (assignment.isOverdue) _StatusBadge.overdue(),
-        if (assignment.attachments.isNotEmpty)
-          _AttachmentIndicator(count: assignment.attachments.length),
-      ],
-    );
-  }
-
-  Widget _buildFooter() {
-    return Row(
-      children: [
-        Text(
-          'Due ${DateFormat('M/d').format(assignment.dueDate)}',
-          style: TextStyle(
-            color: Colors.grey[400],
-            fontSize: 14,
-          ),
-        ),
-        if (!assignment.isCompleted && !assignment.isOverdue)
-          _SubmitButton(
-            onPressed: () {
-              // TODO: Implement submit functionality
-            },
-          ),
-      ],
-    );
-  }
-}
-
-class _StatusIcon extends StatelessWidget {
-  final bool isCompleted;
-
-  const _StatusIcon({required this.isCompleted});
-
-  @override
-  Widget build(BuildContext context) {
-    return Icon(
-      isCompleted ? Icons.check_circle : Icons.circle_outlined,
-      color: isCompleted ? Colors.green : Colors.white54,
-      size: 24,
-    );
-  }
-}
-
-class _StatusBadge extends StatelessWidget {
-  final String text;
-  final Color color;
-  
-  const _StatusBadge._({
-    required this.text,
-    required this.color,
-  });
-  
-  factory _StatusBadge.completed() => const _StatusBadge._(
-    text: 'Completed',
-    color: Colors.green,
-  );
-  
-  factory _StatusBadge.overdue() => const _StatusBadge._(
-    text: 'Overdue',
-    color: Colors.red,
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 6,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: color,
-          width: 1,
-        ),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: color,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
-
-class _AttachmentIndicator extends StatelessWidget {
-  final int count;
-
-  const _AttachmentIndicator({required this.count});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(left: 12),
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 6,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.grey[800],
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.attach_file,
-            color: Colors.white54,
-            size: 16,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            '$count file${count > 1 ? 's' : ''}',
-            style: const TextStyle(
-              color: Colors.white54,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SubmitButton extends StatelessWidget {
-  final VoidCallback onPressed;
-
-  const _SubmitButton({required this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(left: 16),
-      child: ElevatedButton.icon(
-        onPressed: onPressed,
-        icon: const Icon(Icons.upload, size: 16),
-        label: const Text('Submit'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.grey[800],
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 8,
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _EmptyState extends StatelessWidget {
   final String message;

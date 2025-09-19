@@ -17,6 +17,12 @@ abstract class ApiService {
   // User endpoints
   @GET("/users/me")
   Future<HttpResponse<dynamic>> getUserInfo();
+  
+  @PATCH("/students/{studentId}")
+  Future<HttpResponse<dynamic>> updateStudentInfo(
+    @Path("studentId") String studentId,
+    @Body() Map<String, dynamic> studentData,
+  );
 
   // Semester endpoints
   @GET("/semesters")
