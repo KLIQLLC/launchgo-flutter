@@ -4,20 +4,21 @@ import 'package:intl/intl.dart';
 
 import '../services/api_service_retrofit.dart';
 import '../models/event_model.dart';
+import '../widgets/cupertino_dropdown.dart';
 
-class EditEventScreen extends StatefulWidget {
-  final Event event;
+class EventFormScreen extends StatefulWidget {
+  final Event? event;
 
-  const EditEventScreen({
+  const EventFormScreen({
     super.key,
-    required this.event,
+    this.event,
   });
 
   @override
-  State<EditEventScreen> createState() => _EditEventScreenState();
+  State<EventFormScreen> createState() => _EventFormScreenState();
 }
 
-class _EditEventScreenState extends State<EditEventScreen> {
+class _EventFormScreenState extends State<EventFormScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _descriptionController;
@@ -33,28 +34,43 @@ class _EditEventScreenState extends State<EditEventScreen> {
 
   final List<String> _eventTypes = [
     'lecture',
-    'study',
-    'personal',
+    'lab',
     'advising',
-    'assignment',
+    'tutoring',
+    'study',
+    'club',
+    'research',
   ];
 
   @override
   void initState() {
     super.initState();
     
-    // Initialize controllers with existing event data
-    _nameController = TextEditingController(text: widget.event.name);
-    _descriptionController = TextEditingController();
-    _locationController = TextEditingController();
-    
-    // Initialize dates and times
-    _startDate = widget.event.startAt;
-    _startTime = TimeOfDay.fromDateTime(widget.event.startAt);
-    _endDate = widget.event.endAt;
-    _endTime = TimeOfDay.fromDateTime(widget.event.endAt);
-    
-    _selectedType = widget.event.type;
+    if (widget.event != null) {
+      // Edit mode - initialize with existing event data
+      _nameController = TextEditingController(text: widget.event!.name);
+      _descriptionController = TextEditingController();
+      _locationController = TextEditingController();
+      
+      _startDate = widget.event!.startAt;
+      _startTime = TimeOfDay.fromDateTime(widget.event!.startAt);
+      _endDate = widget.event!.endAt;
+      _endTime = TimeOfDay.fromDateTime(widget.event!.endAt);
+      
+      _selectedType = widget.event!.type;
+    } else {
+      // Add mode - initialize with defaults
+      _nameController = TextEditingController();
+      _descriptionController = TextEditingController();
+      _locationController = TextEditingController();
+      
+      _startDate = DateTime.now();
+      _startTime = TimeOfDay.now();
+      _endDate = DateTime.now();
+      _endTime = TimeOfDay(hour: TimeOfDay.now().hour + 1, minute: TimeOfDay.now().minute);
+      
+      _selectedType = 'lecture';
+    }
   }
 
   @override
@@ -64,6 +80,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
     _locationController.dispose();
     super.dispose();
   }
+
+  bool get isEditMode => widget.event != null;
 
   DateTime get _startDateTime {
     return DateTime(
@@ -108,7 +126,6 @@ class _EditEventScreenState extends State<EditEventScreen> {
     if (picked != null) {
       setState(() {
         _startDate = picked;
-        // If end date is before start date, update it
         if (_endDate.isBefore(_startDate)) {
           _endDate = _startDate;
         }
@@ -137,7 +154,6 @@ class _EditEventScreenState extends State<EditEventScreen> {
     if (picked != null) {
       setState(() {
         _startTime = picked;
-        // If end time is before start time on the same day, update it
         if (_endDate.isAtSameMomentAs(_startDate) && 
             (_endTime.hour < _startTime.hour || 
              (_endTime.hour == _startTime.hour && _endTime.minute <= _startTime.minute))) {
@@ -202,10 +218,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
     }
   }
 
-  Future<void> _updateEvent() async {
+  Future<void> _saveEvent() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // Validate that end time is after start time
     if (_endDateTime.isBefore(_startDateTime) || _endDateTime.isAtSameMomentAs(_startDateTime)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -223,55 +238,78 @@ class _EditEventScreenState extends State<EditEventScreen> {
     try {
       final apiService = context.read<ApiServiceRetrofit>();
       
-      final eventData = <String, dynamic>{};
-      
-      // Only include fields that have changed
-      if (_nameController.text.trim() != widget.event.name) {
-        eventData['name'] = _nameController.text.trim();
-      }
-      
-      if (_descriptionController.text.trim().isNotEmpty) {
-        eventData['description'] = _descriptionController.text.trim();
-      }
-      
-      if (_locationController.text.trim().isNotEmpty) {
-        eventData['location'] = _locationController.text.trim();
-      }
-      
-      if (_selectedType != widget.event.type) {
-        eventData['type'] = _selectedType;
-      }
-      
-      if (!_startDateTime.isAtSameMomentAs(widget.event.startAt)) {
-        eventData['startAt'] = _startDateTime.toUtc().toIso8601String();
-      }
-      
-      if (!_endDateTime.isAtSameMomentAs(widget.event.endAt)) {
-        eventData['endAt'] = _endDateTime.toUtc().toIso8601String();
-      }
+      if (isEditMode) {
+        // Update existing event
+        final eventData = <String, dynamic>{};
+        
+        if (_nameController.text.trim() != widget.event!.name) {
+          eventData['name'] = _nameController.text.trim();
+        }
+        
+        if (_descriptionController.text.trim().isNotEmpty) {
+          eventData['description'] = _descriptionController.text.trim();
+        }
+        
+        if (_locationController.text.trim().isNotEmpty) {
+          eventData['location'] = _locationController.text.trim();
+        }
+        
+        if (_selectedType != widget.event!.type) {
+          eventData['type'] = _selectedType;
+        }
+        
+        if (!_startDateTime.isAtSameMomentAs(widget.event!.startAt)) {
+          eventData['startAt'] = _startDateTime.toUtc().toIso8601String();
+        }
+        
+        if (!_endDateTime.isAtSameMomentAs(widget.event!.endAt)) {
+          eventData['endAt'] = _endDateTime.toUtc().toIso8601String();
+        }
 
-      if (eventData.isEmpty) {
-        // No changes made
-        Navigator.of(context).pop(false);
-        return;
-      }
+        if (eventData.isEmpty) {
+          Navigator.of(context).pop(false);
+          return;
+        }
 
-      final result = await apiService.updateEvent(widget.event.id, eventData);
-      
-      if (result != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Event updated successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.of(context).pop(true); // Return true to indicate success
+        final result = await apiService.updateEvent(widget.event!.id, eventData);
+        
+        if (result != null && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Event updated successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.of(context).pop(true);
+        }
+      } else {
+        // Create new event
+        final eventData = {
+          'name': _nameController.text.trim(),
+          'description': _descriptionController.text.trim(),
+          'location': _locationController.text.trim(),
+          'type': _selectedType,
+          'startAt': _startDateTime.toUtc().toIso8601String(),
+          'endAt': _endDateTime.toUtc().toIso8601String(),
+        };
+
+        final result = await apiService.createEvent(eventData);
+        
+        if (result != null && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Event created successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.of(context).pop(true);
+        }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to update event: $e'),
+            content: Text('Failed to ${isEditMode ? 'update' : 'create'} event: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -291,9 +329,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
       backgroundColor: const Color(0xFF0F1419),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1A2332),
-        title: const Text(
-          'Edit Event',
-          style: TextStyle(color: Colors.white),
+        title: Text(
+          isEditMode ? 'Edit Event' : 'Add Event',
+          style: const TextStyle(color: Colors.white),
         ),
         leading: IconButton(
           icon: const Icon(Icons.close, color: Colors.white),
@@ -301,7 +339,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: _isLoading ? null : _updateEvent,
+            onPressed: _isLoading ? null : _saveEvent,
             child: _isLoading
                 ? const SizedBox(
                     width: 16,
@@ -426,40 +464,20 @@ class _EditEventScreenState extends State<EditEventScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          initialValue: _selectedType,
-          style: const TextStyle(color: Colors.white),
-          dropdownColor: const Color(0xFF1A2332),
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: const Color(0xFF1A2332),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[600]!),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[600]!),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.blue),
-            ),
-          ),
-          items: _eventTypes.map((type) {
-            return DropdownMenuItem(
-              value: type,
-              child: Text(
-                type[0].toUpperCase() + type.substring(1),
-                style: const TextStyle(color: Colors.white),
-              ),
-            );
-          }).toList(),
+        CupertinoDropdown(
+          value: _selectedType[0].toUpperCase() + _selectedType.substring(1),
+          items: _eventTypes.map((type) => type[0].toUpperCase() + type.substring(1)).toList(),
+          hintText: 'Select event type',
           onChanged: (value) {
             if (value != null) {
-              setState(() {
-                _selectedType = value;
-              });
+              final index = _eventTypes.indexWhere((type) => 
+                (type[0].toUpperCase() + type.substring(1)) == value
+              );
+              if (index != -1) {
+                setState(() {
+                  _selectedType = _eventTypes[index];
+                });
+              }
             }
           },
         ),

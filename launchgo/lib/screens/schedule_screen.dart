@@ -9,8 +9,7 @@ import 'package:launchgo/widgets/deadline_card.dart';
 import 'package:launchgo/widgets/extended_fab.dart';
 import 'package:launchgo/widgets/event_card.dart';
 import 'package:launchgo/models/event_model.dart';
-import 'package:launchgo/screens/add_event_screen.dart';
-import 'package:launchgo/screens/edit_event_screen.dart';
+import 'package:launchgo/screens/event_form_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
@@ -119,7 +118,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         onPressed: () async {
           final result = await Navigator.of(context).push<bool>(
             MaterialPageRoute(
-              builder: (context) => const AddEventScreen(),
+              builder: (context) => const EventFormScreen(),
             ),
           );
           
@@ -621,7 +620,7 @@ class _DeadlinesListState extends State<_DeadlinesList> {
   Future<void> _editEvent(Event event) async {
     final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (context) => EditEventScreen(event: event),
+        builder: (context) => EventFormScreen(event: event),
       ),
     );
     

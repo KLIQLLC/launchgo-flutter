@@ -52,14 +52,18 @@ class Event extends Equatable {
     switch (type.toLowerCase()) {
       case 'lecture':
         return const Color(0xFF6A5ACD); // Purple
-      case 'study':
-        return const Color(0xFF8B4513); // Brown
-      case 'personal':
-        return const Color(0xFF228B22); // Green
+      case 'lab':
+        return const Color(0xFF32CD32); // Lime green
       case 'advising':
         return const Color(0xFF8B4513); // Brown
-      case 'assignment':
-        return const Color(0xFFFF6347); // Tomato
+      case 'tutoring':
+        return const Color(0xFF20B2AA); // Light sea green
+      case 'study':
+        return const Color(0xFFFFD700); // Gold
+      case 'club':
+        return const Color(0xFFFF69B4); // Hot pink
+      case 'research':
+        return const Color(0xFF9370DB); // Medium purple
       default:
         return const Color(0xFF4682B4); // Steel blue
     }
