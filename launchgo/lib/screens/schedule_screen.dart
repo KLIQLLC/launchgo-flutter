@@ -6,6 +6,11 @@ import 'package:launchgo/services/api_service_retrofit.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/widgets/deadline_card.dart';
+import 'package:launchgo/widgets/extended_fab.dart';
+import 'package:launchgo/widgets/event_card.dart';
+import 'package:launchgo/models/event_model.dart';
+import 'package:launchgo/screens/add_event_screen.dart';
+import 'package:launchgo/screens/edit_event_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
@@ -24,6 +29,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   DateTime _currentWeekStart = DateTime.now();
+  final GlobalKey<_DeadlinesListState> _deadlinesListKey = GlobalKey<_DeadlinesListState>();
 
   @override
   void initState() {
@@ -106,16 +112,34 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final themeService = context.watch<ThemeService>();
     final authService = context.watch<AuthService>();
 
-    return Column(
-      children: [
-        _StudentHeader(authService: authService, themeService: themeService),
-        Expanded(
-          child: Container(
-            color: const Color(0xFF0F1419),
-            child: _buildContent(themeService),
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      floatingActionButton: ExtendedFAB(
+        label: 'Add Event',
+        onPressed: () async {
+          final result = await Navigator.of(context).push<bool>(
+            MaterialPageRoute(
+              builder: (context) => const AddEventScreen(),
+            ),
+          );
+          
+          // If event was created successfully, reload events
+          if (result == true) {
+            _deadlinesListKey.currentState?.reloadEvents();
+          }
+        },
+      ),
+      body: Column(
+        children: [
+          _StudentHeader(authService: authService, themeService: themeService),
+          Expanded(
+            child: Container(
+              color: const Color(0xFF0F1419),
+              child: _buildContent(themeService),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -133,6 +157,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     }
 
     return _DeadlinesList(
+      key: _deadlinesListKey,
       assignments: _getSortedAssignments(),
       weekRangeText: _getWeekRangeText(),
       onPreviousWeek: () => _navigateWeek(-1),
@@ -161,7 +186,7 @@ class _StudentHeader extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFF1A2332),
         border: Border(
@@ -284,7 +309,7 @@ class _StudentInfo extends StatelessWidget {
   }
 }
 
-class _DeadlinesList extends StatelessWidget {
+class _DeadlinesList extends StatefulWidget {
   final List<MapEntry<DeadlineCourse, DeadlineAssignment>> assignments;
   final String weekRangeText;
   final VoidCallback onPreviousWeek;
@@ -292,6 +317,7 @@ class _DeadlinesList extends StatelessWidget {
   final ThemeService themeService;
 
   const _DeadlinesList({
+    super.key,
     required this.assignments,
     required this.weekRangeText,
     required this.onPreviousWeek,
@@ -300,20 +326,80 @@ class _DeadlinesList extends StatelessWidget {
   });
 
   @override
+  State<_DeadlinesList> createState() => _DeadlinesListState();
+}
+
+class _DeadlinesListState extends State<_DeadlinesList> {
+  List<Event> _events = [];
+  bool _isLoadingEvents = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEvents();
+  }
+
+  @override
+  void didUpdateWidget(_DeadlinesList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reload events when widget is rebuilt (e.g., after creating a new event)
+    if (oldWidget.weekRangeText != widget.weekRangeText) {
+      _loadEvents();
+    }
+  }
+
+  void reloadEvents() {
+    _loadEvents();
+  }
+
+  Future<void> _loadEvents() async {
+    setState(() {
+      _isLoadingEvents = true;
+    });
+
+    try {
+      final apiService = context.read<ApiServiceRetrofit>();
+      final now = DateTime.now();
+      final weekStart = now.subtract(Duration(days: now.weekday % 7));
+      final weekEnd = weekStart.add(const Duration(days: 6));
+
+      final response = await apiService.getEvents(
+        startAt: weekStart,
+        endAt: weekEnd,
+      );
+
+      final events = response.map((eventData) => Event.fromJson(eventData)).toList();
+      
+      setState(() {
+        _events = events;
+      });
+    } catch (e) {
+      debugPrint('Failed to load events: $e');
+    } finally {
+      setState(() {
+        _isLoadingEvents = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20.0),
+      padding: const EdgeInsets.symmetric(vertical: 20.0, horizontal: 12.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(),
           const SizedBox(height: 16),
           _WeekNavigator(
-            onPreviousWeek: onPreviousWeek,
-            onNextWeek: onNextWeek,
+            onPreviousWeek: widget.onPreviousWeek,
+            onNextWeek: widget.onNextWeek,
           ),
           const SizedBox(height: 32),
           _buildAssignmentsList(),
+          const SizedBox(height: 24),
+          _buildWeeklySchedule(),
+          const SizedBox(height: 100),
         ],
       ),
     );
@@ -333,7 +419,7 @@ class _DeadlinesList extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          weekRangeText,
+          widget.weekRangeText,
           style: TextStyle(
             color: Colors.grey[400],
             fontSize: 14,
@@ -344,16 +430,16 @@ class _DeadlinesList extends StatelessWidget {
   }
 
   Widget _buildAssignmentsList() {
-    if (assignments.isEmpty) {
+    if (widget.assignments.isEmpty) {
       return _EmptyState(
         message: 'No deadlines for this week',
-        themeService: themeService,
+        themeService: widget.themeService,
       );
     }
 
     // Group assignments by course code
     Map<String, List<MapEntry<DeadlineCourse, DeadlineAssignment>>> groupedAssignments = {};
-    for (final entry in assignments) {
+    for (final entry in widget.assignments) {
       final courseCode = entry.key.code;
       if (!groupedAssignments.containsKey(courseCode)) {
         groupedAssignments[courseCode] = [];
@@ -395,6 +481,156 @@ class _DeadlinesList extends StatelessWidget {
       }).toList(),
     );
   }
+
+  Widget _buildWeeklySchedule() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Weekly Schedule',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 24),
+        _buildScheduleDays(),
+      ],
+    );
+  }
+
+  Widget _buildScheduleDays() {
+    if (_isLoadingEvents) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32.0),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_events.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            children: [
+              Icon(
+                Icons.calendar_month_outlined,
+                size: 48,
+                color: Colors.grey[600],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No events for this week',
+                style: TextStyle(
+                  color: Colors.grey[400],
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Group events by day
+    final eventsByDay = _groupEventsByDay(_events);
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: eventsByDay.entries.map((dayEntry) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Center(
+                child: Text(
+                  dayEntry.key,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            ...dayEntry.value.map((event) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: EventCard(
+                  event: event,
+                  onEdit: () => _editEvent(event),
+                  onDelete: () => _onEventDeleted(event),
+                ),
+              );
+            }),
+            const SizedBox(height: 24),
+          ],
+        );
+      }).toList(),
+    );
+  }
+
+  Map<String, List<Event>> _groupEventsByDay(List<Event> events) {
+    final grouped = <String, List<Event>>{};
+    final dayDates = <String, DateTime>{};
+    
+    for (final event in events) {
+      final dayKey = _formatDayKey(event.startAt);
+      if (!grouped.containsKey(dayKey)) {
+        grouped[dayKey] = [];
+        dayDates[dayKey] = DateTime(event.startAt.year, event.startAt.month, event.startAt.day);
+      }
+      grouped[dayKey]!.add(event);
+    }
+    
+    // Sort events within each day by start time
+    for (final dayEvents in grouped.values) {
+      dayEvents.sort((a, b) => a.startAt.compareTo(b.startAt));
+    }
+    
+    // Return days sorted by date (chronological order)
+    final sortedEntries = grouped.entries.toList();
+    sortedEntries.sort((a, b) => dayDates[a.key]!.compareTo(dayDates[b.key]!));
+    
+    return Map.fromEntries(sortedEntries);
+  }
+
+  String _formatDayKey(DateTime date) {
+    final dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    final monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    final dayName = dayNames[date.weekday % 7];
+    final month = monthNames[date.month - 1];
+    final day = date.day;
+    
+    return '$dayName $month/$day';
+  }
+
+
+  void _onEventDeleted(Event event) {
+    // Remove the event from the local list and rebuild
+    setState(() {
+      _events.removeWhere((e) => e.id == event.id);
+    });
+  }
+
+  Future<void> _editEvent(Event event) async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (context) => EditEventScreen(event: event),
+      ),
+    );
+    
+    // If event was updated successfully, reload events
+    if (result == true) {
+      _loadEvents();
+    }
+  }
+
 }
 
 class _WeekNavigator extends StatelessWidget {
@@ -541,3 +777,4 @@ class _ErrorState extends StatelessWidget {
     );
   }
 }
+

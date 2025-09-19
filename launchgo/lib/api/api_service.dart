@@ -148,4 +148,31 @@ abstract class ApiService {
     @Path("assignmentId") String assignmentId,
     @Path("attachmentId") String attachmentId,
   );
+
+  // Events endpoints
+  @GET("/users/{userId}/events")
+  Future<HttpResponse<dynamic>> getEvents(
+    @Path("userId") String userId,
+    @Query("startAt") String startAt,
+    @Query("endAt") String endAt,
+  );
+
+  @POST("/users/{userId}/events/single")
+  Future<HttpResponse<dynamic>> createEvent(
+    @Path("userId") String userId,
+    @Body() Map<String, dynamic> eventData,
+  );
+
+  @DELETE("/users/{userId}/events/{eventId}")
+  Future<HttpResponse<void>> deleteEvent(
+    @Path("userId") String userId,
+    @Path("eventId") String eventId,
+  );
+
+  @PATCH("/users/{userId}/events/{eventId}")
+  Future<HttpResponse<dynamic>> updateEvent(
+    @Path("userId") String userId,
+    @Path("eventId") String eventId,
+    @Body() Map<String, dynamic> eventData,
+  );
 }

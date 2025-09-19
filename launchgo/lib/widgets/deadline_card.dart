@@ -8,6 +8,7 @@ import '../models/deadline_model.dart';
 import '../services/api_service_retrofit.dart';
 import '../theme/app_colors.dart';
 import 'status_badge.dart';
+import 'document_upload_widget.dart';
 
 class DeadlineCard extends StatefulWidget {
   final DeadlineAssignment assignment;
@@ -28,6 +29,8 @@ class _DeadlineCardState extends State<DeadlineCard> {
   String? _status;
   bool _isUpdating = false;
   File? _selectedFile;
+  final List<PlatformFile> _selectedFiles = [];
+  final Set<String> _deletingAttachmentIds = {};
 
   @override
   void initState() {
@@ -359,88 +362,117 @@ class _DeadlineCardState extends State<DeadlineCard> {
     }
   }
 
+  Future<void> _pickFiles() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        allowMultiple: false,
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'gif', 'txt'],
+        withData: true,
+      );
+
+      if (result != null) {
+        final file = result.files.first;
+        if (file.size > 10485760) { // 10MB limit
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('File "${file.name}" exceeds 10MB limit'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+
+        setState(() {
+          _selectedFiles.clear();
+          _selectedFiles.add(file);
+          if (file.path != null) {
+            _selectedFile = File(file.path!);
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error picking files: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _removeFile(int index) {
+    setState(() {
+      _selectedFiles.removeAt(index);
+      _selectedFile = null;
+    });
+  }
+
+  void _deleteExistingAttachment(Map<String, dynamic> attachment) {
+    // This would be implemented if needed for existing attachments
+  }
+
+  void _downloadAttachment(Map<String, dynamic> attachment) {
+    // This would be implemented if needed for existing attachments
+  }
+
   void _showSubmitDialog() {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return StatefulBuilder(
-          builder: (context, setState) {
+          builder: (context, dialogSetState) {
             return AlertDialog(
               backgroundColor: const Color(0xFF1A2332),
               title: const Text(
                 'Submit Assignment',
                 style: TextStyle(color: Colors.white),
               ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Submit "${widget.assignment.title}"',
-                    style: const TextStyle(color: Colors.white70),
-                  ),
-                  const SizedBox(height: 16),
-                  // File selection button
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      final result = await FilePicker.platform.pickFiles(
-                        type: FileType.any,
-                        allowMultiple: false,
-                      );
-                      
-                      if (result != null && result.files.isNotEmpty) {
-                        setState(() {
-                          _selectedFile = File(result.files.first.path!);
-                        });
-                      }
-                    },
-                    icon: const Icon(Icons.attach_file, color: Colors.white),
-                    label: Text(
-                      _selectedFile != null 
-                          ? 'File: ${_selectedFile!.path.split('/').last}'
-                          : 'Select File (Optional)',
-                      style: const TextStyle(color: Colors.white),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Submit "${widget.assignment.title}"',
+                      style: const TextStyle(color: Colors.white70),
                     ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.white54),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    const SizedBox(height: 16),
+                    DocumentUploadWidget(
+                      selectedFiles: _selectedFiles,
+                      existingAttachments: const [],
+                      deletingAttachmentIds: _deletingAttachmentIds,
+                      onPickFiles: () async {
+                        await _pickFiles();
+                        dialogSetState(() {});
+                      },
+                      onRemoveFile: (index) {
+                        _removeFile(index);
+                        dialogSetState(() {});
+                      },
+                      onDeleteExistingAttachment: _deleteExistingAttachment,
+                      onDownloadAttachment: _downloadAttachment,
+                      backgroundColor: const Color(0xFF0F1419),
+                      cardColor: const Color(0xFF1A2332),
+                      borderColor: Colors.grey[600]!,
+                      textColor: Colors.white,
+                      textSecondaryColor: Colors.grey[400]!,
+                      showTitle: false,
                     ),
-                  ),
-                  if (_selectedFile != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.check_circle, color: Colors.green, size: 16),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Selected: ${_selectedFile!.path.split('/').last}',
-                              style: const TextStyle(color: Colors.green, fontSize: 12),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              setState(() {
-                                _selectedFile = null;
-                              });
-                            },
-                            child: const Text(
-                              'Remove',
-                              style: TextStyle(color: Colors.red, fontSize: 12),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
+                  ],
+                ),
               ),
               actions: [
                 TextButton(
                   onPressed: () {
                     setState(() {
                       _selectedFile = null;
+                      _selectedFiles.clear();
                     });
                     Navigator.of(context).pop();
                   },
@@ -449,16 +481,25 @@ class _DeadlineCardState extends State<DeadlineCard> {
                     style: TextStyle(color: Colors.grey),
                   ),
                 ),
-                ElevatedButton(
+                OutlinedButton.icon(
                   onPressed: () {
                     Navigator.of(context).pop();
                     _submitAssignment();
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
+                  icon: const Icon(Icons.upload, size: 16),
+                  label: const Text('Submit', style: TextStyle(fontSize: 14)),
+                  style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.white,
+                    side: const BorderSide(color: Colors.white54, width: 1),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    minimumSize: const Size(0, 32),
                   ),
-                  child: const Text('Submit'),
                 ),
               ],
             );
@@ -567,13 +608,13 @@ class _DeadlineCardState extends State<DeadlineCard> {
           ),
           padding: const EdgeInsets.symmetric(
             horizontal: 16,
-            vertical: 18, // Taller cards with more padding
+            vertical: 8,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildHeader(),
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               _buildFooter(),
             ],
           ),
@@ -598,7 +639,7 @@ class _DeadlineCardState extends State<DeadlineCard> {
             ),
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 8),
         Expanded(
           child: Text(
             widget.assignment.title,
@@ -744,17 +785,21 @@ class _SubmitButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(left: 16),
-      child: ElevatedButton.icon(
+      child: OutlinedButton.icon(
         onPressed: onPressed,
         icon: const Icon(Icons.upload, size: 16),
-        label: const Text('Submit'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.grey[800],
+        label: const Text('Submit', style: TextStyle(fontSize: 14)),
+        style: OutlinedButton.styleFrom(
           foregroundColor: Colors.white,
+          side: const BorderSide(color: Colors.white54, width: 1),
           padding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 8,
+            horizontal: 12,
+            vertical: 6,
           ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          minimumSize: const Size(0, 32),
         ),
       ),
     );

@@ -10,6 +10,7 @@ import '../services/api_service_retrofit.dart';
 import '../widgets/form_submit_button.dart';
 import '../widgets/cupertino_dropdown.dart';
 import '../widgets/assignment_steps_widget.dart';
+import '../widgets/document_upload_widget.dart';
 import '../theme/app_colors.dart';
 
 // Constants
@@ -584,8 +585,21 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                     const SizedBox(height: _FormConstants.spacingLarge),
 
                     // Attach Documents Section
-                    _buildLabel('Attach Documents', themeService),
-                    _buildDocumentUploadArea(themeService),
+                    DocumentUploadWidget(
+                      selectedFiles: _selectedFiles,
+                      existingAttachments: _existingAttachments,
+                      deletingAttachmentIds: _deletingAttachmentIds,
+                      onPickFiles: _pickFiles,
+                      onRemoveFile: _removeFile,
+                      onDeleteExistingAttachment: _deleteExistingAttachment,
+                      onDownloadAttachment: _downloadAttachment,
+                      backgroundColor: themeService.backgroundColor,
+                      cardColor: themeService.cardColor,
+                      borderColor: themeService.borderColor,
+                      textColor: themeService.textColor,
+                      textSecondaryColor: themeService.textSecondaryColor,
+                      title: 'Attach Documents',
+                    ),
                     const SizedBox(height: _FormConstants.spacingLarge),
 
                     // Assignment Steps Section
@@ -839,35 +853,6 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
     });
   }
 
-  String _formatFileSize(int bytes) {
-    if (bytes < 1024) return '${bytes}B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)}KB';
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)}MB';
-  }
-
-  IconData _getFileIcon(String? extension) {
-    switch (extension?.toLowerCase()) {
-      case 'pdf':
-        return Icons.picture_as_pdf;
-      case 'doc':
-      case 'docx':
-        return Icons.description;
-      case 'jpg':
-      case 'jpeg':
-      case 'png':
-      case 'gif':
-        return Icons.image;
-      case 'txt':
-        return Icons.text_snippet;
-      default:
-        return Icons.insert_drive_file;
-    }
-  }
-
-  IconData _getFileIconForName(String fileName) {
-    final extension = fileName.split('.').lastOrNull;
-    return _getFileIcon(extension);
-  }
 
   Future<void> _deleteExistingAttachment(Map<String, dynamic> attachment) async {
     if (widget.assignment == null || widget.course == null) return;
@@ -974,240 +959,5 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
   }
 
 
-  Widget _buildDocumentUploadArea(ThemeService themeService) {
-    debugPrint('🖼️ Building upload area: _existingAttachments.length = ${_existingAttachments.length}');
-    debugPrint('🖼️ _existingAttachments: $_existingAttachments');
-    
-    return Column(
-      children: [
-        // Show existing attachments if any
-        if (_existingAttachments.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text(
-            'Existing attachments:',
-            style: TextStyle(
-              color: themeService.textSecondaryColor,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 8),
-          for (final attachment in _existingAttachments)
-            Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: _deletingAttachmentIds.contains(attachment['id'])
-                    ? themeService.cardColor.withValues(alpha: 0.3)
-                    : themeService.cardColor.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: _deletingAttachmentIds.contains(attachment['id'])
-                      ? AppColors.error.withValues(alpha: 0.3)
-                      : themeService.borderColor.withValues(alpha: 0.5),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    _getFileIconForName(attachment['name'] ?? 'file'),
-                    size: 20,
-                    color: themeService.textSecondaryColor,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => _downloadAttachment(attachment),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            attachment['name'] ?? 'Unknown file',
-                            style: TextStyle(
-                              color: themeService.textColor,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              decoration: TextDecoration.underline,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          if (attachment['size'] != null)
-                            Text(
-                              _formatFileSize(attachment['size'] is int ? attachment['size'] : 0),
-                              style: TextStyle(
-                                color: themeService.textSecondaryColor,
-                                fontSize: 12,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Download button
-                      IconButton(
-                        icon: Icon(
-                          Icons.download,
-                          size: 20,
-                          color: themeService.textSecondaryColor,
-                        ),
-                        onPressed: () => _downloadAttachment(attachment),
-                        tooltip: 'Download',
-                      ),
-                      // Delete button
-                      IconButton(
-                        icon: _deletingAttachmentIds.contains(attachment['id'])
-                            ? SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.error),
-                                ),
-                              )
-                            : SvgPicture.asset(
-                                'assets/icons/ic_delete.svg',
-                                width: 20,
-                                height: 20,
-                                colorFilter: ColorFilter.mode(
-                                  AppColors.error,
-                                  BlendMode.srcIn,
-                                ),
-                              ),
-                        onPressed: _deletingAttachmentIds.contains(attachment['id']) 
-                            ? null 
-                            : () => _deleteExistingAttachment(attachment),
-                        tooltip: 'Delete',
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          const SizedBox(height: _FormConstants.spacingMedium),
-        ],
-        
-        // File picker button - only show if no files are selected and no existing attachments
-        if (_selectedFiles.isEmpty && _existingAttachments.isEmpty)
-          GestureDetector(
-            onTap: _pickFiles,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: themeService.cardColor,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: themeService.borderColor),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: themeService.backgroundColor,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      Icons.attach_file,
-                      size: 20,
-                      color: themeService.textSecondaryColor,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Attach file',
-                          style: TextStyle(
-                            color: themeService.textColor,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'PDF, Word, Images (Max 5MB)',
-                          style: TextStyle(
-                            color: themeService.textSecondaryColor,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(
-                    Icons.chevron_right,
-                    color: themeService.textSecondaryColor,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        // Selected files list
-        if (_selectedFiles.isNotEmpty) ...[ 
-          const SizedBox(height: 12),
-          for (int i = 0; i < _selectedFiles.length; i++)
-            Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: themeService.backgroundColor,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: themeService.borderColor),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    _getFileIcon(_selectedFiles[i].extension),
-                    size: 20,
-                    color: themeService.textSecondaryColor,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _selectedFiles[i].name,
-                          style: TextStyle(
-                            color: themeService.textColor,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          _formatFileSize(_selectedFiles[i].size),
-                          style: TextStyle(
-                            color: themeService.textSecondaryColor,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => _removeFile(i),
-                    icon: Icon(
-                      Icons.close,
-                      size: 18,
-                      color: themeService.textSecondaryColor,
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 32,
-                      minHeight: 32,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ],
-    );
-  }
 
 }

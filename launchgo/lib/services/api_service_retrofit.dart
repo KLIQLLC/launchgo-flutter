@@ -536,4 +536,137 @@ class ApiServiceRetrofit {
       rethrow;
     }
   }
+
+  // Events endpoints
+  
+  Future<List<Map<String, dynamic>>> getEvents({
+    required DateTime startAt,
+    required DateTime endAt,
+  }) async {
+    try {
+      // Ensure user info is loaded
+      if (_authService.userInfo == null) {
+        debugPrint('⚠️ User info not loaded yet, loading now...');
+        await _authService.loadUserInfo();
+      }
+      
+      final userId = _getEffectiveUserId();
+      if (userId == null) {
+        debugPrint('❌ Cannot get events: User ID is null');
+        return [];
+      }
+      
+      // Format dates as required by API (YYYY-MM-DD HH:MM:SS.sss)
+      final startAtStr = _formatDateForApi(startAt);
+      final endAtStr = _formatDateForApi(endAt);
+      
+      debugPrint('🔄 Getting events for user $userId from $startAtStr to $endAtStr');
+      final response = await _retrofit.getEvents(userId, startAtStr, endAtStr);
+      final data = response.data;
+      
+      final parsedData = _parseJsonResponse(data);
+      if (parsedData is List) {
+        final eventsList = List<Map<String, dynamic>>.from(parsedData);
+        debugPrint('✅ Successfully fetched ${eventsList.length} events');
+        return eventsList;
+      }
+      
+      debugPrint('❌ No valid event data found');
+      return [];
+    } catch (e) {
+      debugPrint('❌ Failed to get events: $e');
+      return [];
+    }
+  }
+
+  String _formatDateForApi(DateTime dateTime) {
+    return dateTime.toIso8601String().replaceAll('T', ' ').replaceAll('Z', '');
+  }
+
+  Future<Map<String, dynamic>?> createEvent(Map<String, dynamic> eventData) async {
+    try {
+      // Ensure user info is loaded
+      if (_authService.userInfo == null) {
+        debugPrint('⚠️ User info not loaded yet, loading now...');
+        await _authService.loadUserInfo();
+      }
+      
+      final userId = _getEffectiveUserId();
+      if (userId == null) {
+        debugPrint('❌ Cannot create event: User ID is null');
+        return null;
+      }
+      
+      debugPrint('🔄 Creating event for user $userId with data: $eventData');
+      final response = await _retrofit.createEvent(userId, eventData);
+      final data = response.data;
+      
+      final parsedData = _parseJsonResponse(data);
+      if (parsedData is Map<String, dynamic>) {
+        debugPrint('✅ Successfully created event');
+        return parsedData;
+      }
+      
+      debugPrint('❌ No valid event data returned');
+      return null;
+    } catch (e) {
+      debugPrint('❌ Failed to create event: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteEvent(String eventId) async {
+    try {
+      // Ensure user info is loaded
+      if (_authService.userInfo == null) {
+        debugPrint('⚠️ User info not loaded yet, loading now...');
+        await _authService.loadUserInfo();
+      }
+      
+      final userId = _getEffectiveUserId();
+      if (userId == null) {
+        debugPrint('❌ Cannot delete event: User ID is null');
+        throw Exception('User ID is required');
+      }
+      
+      debugPrint('🗑️ Deleting event $eventId for user $userId');
+      await _retrofit.deleteEvent(userId, eventId);
+      debugPrint('✅ Successfully deleted event');
+    } catch (e) {
+      debugPrint('❌ Failed to delete event: $e');
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>?> updateEvent(String eventId, Map<String, dynamic> eventData) async {
+    try {
+      // Ensure user info is loaded
+      if (_authService.userInfo == null) {
+        debugPrint('⚠️ User info not loaded yet, loading now...');
+        await _authService.loadUserInfo();
+      }
+      
+      final userId = _getEffectiveUserId();
+      if (userId == null) {
+        debugPrint('❌ Cannot update event: User ID is null');
+        return null;
+      }
+      
+      debugPrint('🔄 Updating event $eventId for user $userId with data: $eventData');
+      final response = await _retrofit.updateEvent(userId, eventId, eventData);
+      final data = response.data;
+      
+      final parsedData = _parseJsonResponse(data);
+      if (parsedData is Map<String, dynamic>) {
+        debugPrint('✅ Successfully updated event');
+        return parsedData;
+      }
+      
+      debugPrint('❌ No valid event data returned');
+      return null;
+    } catch (e) {
+      debugPrint('❌ Failed to update event: $e');
+      rethrow;
+    }
+  }
 }
