@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
-import '../services/api_service_retrofit.dart';
-import '../models/event_model.dart';
-import '../widgets/cupertino_dropdown.dart';
+import '../../services/api_service_retrofit.dart';
+import '../../models/event_model.dart';
+import '../../widgets/cupertino_dropdown.dart';
 
 class EventFormScreen extends StatefulWidget {
   final Event? event;

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../models/event_model.dart';
-import '../services/api_service_retrofit.dart';
+import '../../models/event_model.dart';
+import '../../services/api_service_retrofit.dart';
 
 class EventCard extends StatelessWidget {
   final Event event;

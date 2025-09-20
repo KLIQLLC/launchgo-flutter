@@ -4,14 +4,14 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../services/theme_service.dart';
-import '../services/auth_service.dart';
-import '../services/api_service_retrofit.dart';
-import '../widgets/form_submit_button.dart';
-import '../widgets/cupertino_dropdown.dart';
-import '../widgets/assignment_steps_widget.dart';
-import '../widgets/document_upload_widget.dart';
-import '../theme/app_colors.dart';
+import '../../services/theme_service.dart';
+import '../../services/auth_service.dart';
+import '../../services/api_service_retrofit.dart';
+import '../../widgets/form_submit_button.dart';
+import '../../widgets/cupertino_dropdown.dart';
+import '../../widgets/documents/assignment_steps_widget.dart';
+import '../../widgets/documents/document_upload_widget.dart';
+import '../../theme/app_colors.dart';
 
 // Constants
 class _FormConstants {

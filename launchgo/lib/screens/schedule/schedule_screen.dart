@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:launchgo/models/deadline_model.dart';
 import 'package:launchgo/models/user_model.dart';
-import 'package:launchgo/screens/edit_student_info_modal.dart';
+import 'package:launchgo/screens/schedule/edit_student_info_modal.dart';
 import 'package:launchgo/services/api_service_retrofit.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/theme_service.dart';
-import 'package:launchgo/widgets/deadline_card.dart';
+import 'package:launchgo/widgets/schedule/deadline_card.dart';
 import 'package:launchgo/widgets/extended_fab.dart';
-import 'package:launchgo/widgets/event_card.dart';
+import 'package:launchgo/widgets/schedule/event_card.dart';
 import 'package:launchgo/models/event_model.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -138,6 +138,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
   }
 
+  Future<void> _handleRefresh() async {
+    await _loadDeadlines();
+    // Also refresh events if the list is available
+    _deadlinesListKey.currentState?.reloadEvents();
+  }
+
   Widget _buildContent(ThemeService themeService) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -151,13 +157,18 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       );
     }
 
-    return _DeadlinesList(
-      key: _deadlinesListKey,
-      assignments: _getSortedAssignments(),
-      weekRangeText: _getWeekRangeText(),
-      onPreviousWeek: () => _navigateWeek(-1),
-      onNextWeek: () => _navigateWeek(1),
-      themeService: themeService,
+    return RefreshIndicator(
+      onRefresh: _handleRefresh,
+      color: ThemeService.accent,
+      backgroundColor: themeService.cardColor,
+      child: _DeadlinesList(
+        key: _deadlinesListKey,
+        assignments: _getSortedAssignments(),
+        weekRangeText: _getWeekRangeText(),
+        onPreviousWeek: () => _navigateWeek(-1),
+        onNextWeek: () => _navigateWeek(1),
+        themeService: themeService,
+      ),
     );
   }
 }
@@ -380,6 +391,7 @@ class _DeadlinesListState extends State<_DeadlinesList> {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: 20.0, horizontal: 12.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

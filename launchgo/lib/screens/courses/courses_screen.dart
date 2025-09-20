@@ -5,10 +5,10 @@ import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/api_service_retrofit.dart';
 import 'package:provider/provider.dart';
-import '../widgets/course_card.dart';
-import '../widgets/extended_fab.dart';
-import '../widgets/swipeable_card.dart';
-import '../theme/app_colors.dart';
+import '../../widgets/courses/course_card.dart';
+import '../../widgets/extended_fab.dart';
+import '../../widgets/swipeable_card.dart';
+import '../../theme/app_colors.dart';
 
 class CoursesScreen extends StatefulWidget {
   const CoursesScreen({super.key});
@@ -220,6 +220,8 @@ class _CoursesScreenState extends State<CoursesScreen> {
     
     return RefreshIndicator(
       onRefresh: _loadCourses,
+      color: ThemeService.accent,
+      backgroundColor: themeService.cardColor,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: _courses.length,

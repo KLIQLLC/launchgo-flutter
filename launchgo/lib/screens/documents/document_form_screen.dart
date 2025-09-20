@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import '../features/documents/domain/entities/document_entity.dart';
-import '../services/api_service_retrofit.dart';
-import '../services/auth_service.dart';
-import '../services/theme_service.dart';
-import '../widgets/cupertino_dropdown.dart';
-import '../widgets/form_submit_button.dart';
-import '../theme/app_colors.dart';
+import '../../features/documents/domain/entities/document_entity.dart';
+import '../../services/api_service_retrofit.dart';
+import '../../services/auth_service.dart';
+import '../../services/theme_service.dart';
+import '../../widgets/cupertino_dropdown.dart';
+import '../../widgets/form_submit_button.dart';
+import '../../theme/app_colors.dart';
 
 enum DocumentScreenMode {
   create,

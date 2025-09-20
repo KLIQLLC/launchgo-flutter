@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
-import '../theme/app_colors.dart';
-import '../services/theme_service.dart';
-import '../services/auth_service.dart';
-import '../services/api_service_retrofit.dart';
+import '../../theme/app_colors.dart';
+import '../../services/theme_service.dart';
+import '../../services/auth_service.dart';
+import '../../services/api_service_retrofit.dart';
 
 class AssignmentCard extends StatefulWidget {
   final Map<String, dynamic> assignment;

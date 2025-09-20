@@ -2,14 +2,14 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import '../api/dio_client_enhanced.dart';
-import '../services/api_service_retrofit.dart';
-import '../services/theme_service.dart';
-import '../services/auth_service.dart';
-import '../widgets/extended_fab.dart';
-import '../widgets/swipeable_card.dart';
-import '../theme/app_colors.dart';
-import '../widgets/assignment_card.dart';
+import '../../api/dio_client_enhanced.dart';
+import '../../services/api_service_retrofit.dart';
+import '../../services/theme_service.dart';
+import '../../services/auth_service.dart';
+import '../../widgets/extended_fab.dart';
+import '../../widgets/swipeable_card.dart';
+import '../../theme/app_colors.dart';
+import '../../widgets/documents/assignment_card.dart';
 
 class AssignmentsScreen extends StatefulWidget {
   final Map<String, dynamic> course;
@@ -193,6 +193,8 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
   Widget _buildAssignmentsList(ThemeService themeService) {
     return RefreshIndicator(
       onRefresh: () async => _loadAssignments(),
+      color: ThemeService.accent,
+      backgroundColor: themeService.cardColor,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: _assignments.length,

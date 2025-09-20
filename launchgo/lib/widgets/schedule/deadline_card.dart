@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:io';
 
-import '../models/deadline_model.dart';
-import '../services/api_service_retrofit.dart';
-import '../theme/app_colors.dart';
-import 'status_badge.dart';
-import 'document_upload_widget.dart';
+import '../../models/deadline_model.dart';
+import '../../services/api_service_retrofit.dart';
+import '../../theme/app_colors.dart';
+import '../status_badge.dart';
+import '../documents/document_upload_widget.dart';
 
 class DeadlineCard extends StatefulWidget {
   final DeadlineAssignment assignment;
@@ -194,11 +195,22 @@ class _DeadlineCardState extends State<DeadlineCard> {
   }
 
   void _showAttachments() {
+    // Convert DeadlineAttachment list to Map format for DocumentUploadWidget
+    final List<Map<String, dynamic>> existingAttachments = widget.assignment.attachments
+        .map((attachment) => {
+              'id': attachment.id,
+              'name': attachment.name,
+              'size': attachment.size,
+              'link': attachment.link,
+              'mimeType': attachment.mimeType,
+            })
+        .toList();
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return StatefulBuilder(
-          builder: (context, setState) {
+          builder: (context, dialogSetState) {
             return AlertDialog(
               backgroundColor: const Color(0xFF1A2332),
               title: const Text(
@@ -207,115 +219,44 @@ class _DeadlineCardState extends State<DeadlineCard> {
               ),
               content: SizedBox(
                 width: double.maxFinite,
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: widget.assignment.attachments.length,
-                  itemBuilder: (context, index) {
-                    final attachment = widget.assignment.attachments[index];
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[800],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            _getFileIcon(attachment.name),
-                            color: Colors.blue,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  attachment.name,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                Text(
-                                  '${(attachment.size / 1024).toStringAsFixed(1)} KB',
-                                  style: const TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: () {
-                              // TODO: Implement file download/view
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Opening ${attachment.name}...'),
-                                  backgroundColor: Colors.blue,
-                                ),
-                              );
-                            },
-                            icon: const Icon(
-                              Icons.download,
-                              color: Colors.blue,
-                              size: 20,
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: () async {
-                              final confirmed = await showDialog<bool>(
-                                context: context,
-                                builder: (BuildContext context) {
-                                  return AlertDialog(
-                                    backgroundColor: const Color(0xFF1A2332),
-                                    title: const Text(
-                                      'Delete Attachment',
-                                      style: TextStyle(color: Colors.white),
-                                    ),
-                                    content: Text(
-                                      'Are you sure you want to delete "${attachment.name}"?',
-                                      style: const TextStyle(color: Colors.white70),
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.of(context).pop(false),
-                                        child: const Text(
-                                          'Cancel',
-                                          style: TextStyle(color: Colors.grey),
-                                        ),
-                                      ),
-                                      TextButton(
-                                        onPressed: () => Navigator.of(context).pop(true),
-                                        child: const Text(
-                                          'Delete',
-                                          style: TextStyle(color: Colors.red),
-                                        ),
-                                      ),
-                                    ],
-                                  );
-                                },
-                              );
-                              
-                              if (confirmed == true && mounted) {
-                                Navigator.of(context).pop(); // Close the attachments dialog first
-                                await _deleteAttachment(attachment.id, setState);
-                              }
-                            },
-                            icon: const Icon(
-                              Icons.delete,
-                              color: Colors.red,
-                              size: 20,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+                child: SingleChildScrollView(
+                  child: DocumentUploadWidget(
+                    selectedFiles: const [],
+                    existingAttachments: existingAttachments,
+                    deletingAttachmentIds: _deletingAttachmentIds,
+                    onPickFiles: () {}, // No file picking in view mode
+                    onRemoveFile: (index) {}, // No file removal in view mode
+                    onDeleteExistingAttachment: (attachment) async {
+                      dialogSetState(() {
+                        _deletingAttachmentIds.add(attachment['id']);
+                      });
+                      
+                      await _deleteAttachment(attachment['id'], dialogSetState);
+                      
+                      dialogSetState(() {
+                        _deletingAttachmentIds.remove(attachment['id']);
+                        existingAttachments.removeWhere((a) => a['id'] == attachment['id']);
+                      });
+                      
+                      // Update the main card state
+                      setState(() {});
+                    },
+                    onDownloadAttachment: (attachment) {
+                      // TODO: Implement file download/view
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Opening ${attachment['name']}...'),
+                          backgroundColor: Colors.blue,
+                        ),
+                      );
+                    },
+                    backgroundColor: const Color(0xFF0F1419),
+                    cardColor: const Color(0xFF1A2332),
+                    borderColor: Colors.grey[600]!,
+                    textColor: Colors.white,
+                    textSecondaryColor: Colors.grey[400]!,
+                    showTitle: false,
+                  ),
                 ),
               ),
               actions: [
@@ -334,33 +275,6 @@ class _DeadlineCardState extends State<DeadlineCard> {
     );
   }
 
-  IconData _getFileIcon(String fileName) {
-    final extension = fileName.split('.').last.toLowerCase();
-    switch (extension) {
-      case 'pdf':
-        return Icons.picture_as_pdf;
-      case 'doc':
-      case 'docx':
-        return Icons.description;
-      case 'jpg':
-      case 'jpeg':
-      case 'png':
-      case 'gif':
-        return Icons.image;
-      case 'mp4':
-      case 'mov':
-      case 'avi':
-        return Icons.video_file;
-      case 'mp3':
-      case 'wav':
-        return Icons.audio_file;
-      case 'zip':
-      case 'rar':
-        return Icons.archive;
-      default:
-        return Icons.insert_drive_file;
-    }
-  }
 
   Future<void> _pickFiles() async {
     try {
@@ -731,10 +645,14 @@ class _AttachmentIndicator extends StatelessWidget {
         child: Container(
           margin: const EdgeInsets.only(left: 12),
           padding: const EdgeInsets.all(8),
-          child: Icon(
-            Icons.attach_file,
-            color: Colors.white54,
-            size: 20,
+          child: SvgPicture.asset(
+            'assets/icons/ic_attachment.svg',
+            width: 20,
+            height: 20,
+            colorFilter: const ColorFilter.mode(
+              Colors.white54,
+              BlendMode.srcIn,
+            ),
           ),
         ),
       );

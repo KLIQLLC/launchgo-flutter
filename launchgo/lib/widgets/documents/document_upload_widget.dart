@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../theme/app_colors.dart';
+import '../../theme/app_colors.dart';
 
 class DocumentUploadWidget extends StatelessWidget {
   final List<PlatformFile> selectedFiles;
@@ -67,7 +67,7 @@ class DocumentUploadWidget extends StatelessWidget {
         if (existingAttachments.isNotEmpty) ...[
           const SizedBox(height: 8),
           Text(
-            'Existing attachments:',
+            'Existing attachment:',
             style: TextStyle(
               color: textSecondaryColor,
               fontSize: 14,
