@@ -58,38 +58,45 @@ class EventCard extends StatelessWidget {
         onTap: onEdit,
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: event.color.withValues(alpha: 0.8),
-            borderRadius: BorderRadius.circular(12),
+            color: event.color.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: event.color.withValues(alpha: 0.4),
+              width: 1.5,
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 event.name,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
+                style: TextStyle(
+                  color: event.color,
+                  fontSize: 18,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 8),
               Text(
                 event.timeRange,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
+                style: TextStyle(
+                  color: event.color.withValues(alpha: 0.8),
+                  fontSize: 16,
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                event.type,
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
+              if (event.location != null && event.location!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  event.location!,
+                  style: TextStyle(
+                    color: event.color.withValues(alpha: 0.8),
+                    fontSize: 16,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
+              ],
             ],
           ),
         ),

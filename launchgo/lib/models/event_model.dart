@@ -7,6 +7,8 @@ class Event extends Equatable {
   final DateTime startAt;
   final DateTime endAt;
   final String type;
+  final String? location;
+  final String? description;
 
   const Event({
     required this.id,
@@ -14,6 +16,8 @@ class Event extends Equatable {
     required this.startAt,
     required this.endAt,
     required this.type,
+    this.location,
+    this.description,
   });
 
   factory Event.fromJson(Map<String, dynamic> json) {
@@ -27,6 +31,8 @@ class Event extends Equatable {
           ? DateTime.parse(json['endAt'])
           : DateTime.now(),
       type: json['type'] ?? '',
+      location: json['location'],
+      description: json['description'],
     );
   }
 
@@ -37,6 +43,8 @@ class Event extends Equatable {
       'startAt': startAt.toIso8601String(),
       'endAt': endAt.toIso8601String(),
       'type': type,
+      if (location != null) 'location': location,
+      if (description != null) 'description': description,
     };
   }
 
@@ -51,21 +59,21 @@ class Event extends Equatable {
   Color get color {
     switch (type.toLowerCase()) {
       case 'lecture':
-        return const Color(0xFF6A5ACD); // Purple
+        return const Color(0xFF9C88FF); // Soft purple
       case 'lab':
-        return const Color(0xFF32CD32); // Lime green
+        return const Color(0xFF00D2D3); // Turquoise
       case 'advising':
-        return const Color(0xFF8B4513); // Brown
+        return const Color(0xFFFF9F43); // Orange
       case 'tutoring':
-        return const Color(0xFF20B2AA); // Light sea green
+        return const Color(0xFF54A0FF); // Sky blue
       case 'study':
-        return const Color(0xFFFFD700); // Gold
+        return const Color(0xFFFECA57); // Yellow/Gold
       case 'club':
-        return const Color(0xFFFF69B4); // Hot pink
+        return const Color(0xFFFF6B9D); // Pink
       case 'research':
-        return const Color(0xFF9370DB); // Medium purple
+        return const Color(0xFF48DBFB); // Light blue
       default:
-        return const Color(0xFF4682B4); // Steel blue
+        return const Color(0xFF5F27CD); // Deep purple
     }
   }
 
@@ -78,5 +86,5 @@ class Event extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, name, startAt, endAt, type];
+  List<Object?> get props => [id, name, startAt, endAt, type, location, description];
 }

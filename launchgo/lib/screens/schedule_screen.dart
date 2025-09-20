@@ -596,10 +596,9 @@ class _DeadlinesListState extends State<_DeadlinesList> {
 
   String _formatDayKey(DateTime date) {
     final dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    final monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     
     final dayName = dayNames[date.weekday % 7];
-    final month = monthNames[date.month - 1];
+    final month = date.month;
     final day = date.day;
     
     return '$dayName $month/$day';

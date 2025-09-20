@@ -49,8 +49,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
     if (widget.event != null) {
       // Edit mode - initialize with existing event data
       _nameController = TextEditingController(text: widget.event!.name);
-      _descriptionController = TextEditingController();
-      _locationController = TextEditingController();
+      _descriptionController = TextEditingController(text: widget.event!.description ?? '');
+      _locationController = TextEditingController(text: widget.event!.location ?? '');
       
       _startDate = widget.event!.startAt;
       _startTime = TimeOfDay.fromDateTime(widget.event!.startAt);
@@ -246,11 +246,11 @@ class _EventFormScreenState extends State<EventFormScreen> {
           eventData['name'] = _nameController.text.trim();
         }
         
-        if (_descriptionController.text.trim().isNotEmpty) {
+        if (_descriptionController.text.trim() != (widget.event!.description ?? '')) {
           eventData['description'] = _descriptionController.text.trim();
         }
         
-        if (_locationController.text.trim().isNotEmpty) {
+        if (_locationController.text.trim() != (widget.event!.location ?? '')) {
           eventData['location'] = _locationController.text.trim();
         }
         
