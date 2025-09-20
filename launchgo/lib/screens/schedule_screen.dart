@@ -9,9 +9,9 @@ import 'package:launchgo/widgets/deadline_card.dart';
 import 'package:launchgo/widgets/extended_fab.dart';
 import 'package:launchgo/widgets/event_card.dart';
 import 'package:launchgo/models/event_model.dart';
-import 'package:launchgo/screens/event_form_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 
 class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({super.key});
@@ -116,11 +116,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       floatingActionButton: ExtendedFAB(
         label: 'Add Event',
         onPressed: () async {
-          final result = await Navigator.of(context).push<bool>(
-            MaterialPageRoute(
-              builder: (context) => const EventFormScreen(),
-            ),
-          );
+          final result = await context.push('/new-event');
           
           // If event was created successfully, reload events
           if (result == true) {
@@ -618,10 +614,9 @@ class _DeadlinesListState extends State<_DeadlinesList> {
   }
 
   Future<void> _editEvent(Event event) async {
-    final result = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (context) => EventFormScreen(event: event),
-      ),
+    final result = await context.push(
+      '/edit-event/${event.id}',
+      extra: event,
     );
     
     // If event was updated successfully, reload events

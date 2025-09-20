@@ -14,6 +14,8 @@ import 'package:launchgo/screens/document_form_screen.dart';
 import 'package:launchgo/screens/recaps_screen.dart';
 import 'package:launchgo/screens/schedule_screen.dart';
 import 'package:launchgo/screens/settings_screen.dart';
+import 'package:launchgo/screens/event_form_screen.dart';
+import 'package:launchgo/models/event_model.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/widgets/app_drawer.dart';
@@ -127,6 +129,19 @@ class AppRouter {
               course: course,
               assignment: assignment,
             );
+          },
+        ),
+        GoRoute(
+          path: '/new-event',
+          name: 'newEvent',
+          builder: (context, state) => const EventFormScreen(),
+        ),
+        GoRoute(
+          path: '/edit-event/:eventId',
+          name: 'editEvent',
+          builder: (context, state) {
+            final event = state.extra as Event;
+            return EventFormScreen(event: event);
           },
         ),
         ShellRoute(
