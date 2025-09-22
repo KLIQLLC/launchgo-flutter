@@ -71,7 +71,7 @@ class Event extends Equatable {
       case 'homework':
         return const Color(0xFFFF6B9D); // Pink
       case 'study':
-        return const Color(0xFF48DBFB); // Light blue
+        return const Color(0xFFE18748); // Yellow
       case 'extracurricular':
         return const Color(0xFF5F27CD); // Deep purple
       default:

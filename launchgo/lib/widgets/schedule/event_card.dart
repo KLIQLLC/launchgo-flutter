@@ -58,10 +58,10 @@ class EventCard extends StatelessWidget {
         onTap: onEdit,
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: event.color.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: event.color.withValues(alpha: 0.4),
               width: 1.5,
@@ -74,25 +74,25 @@ class EventCard extends StatelessWidget {
                 event.name,
                 style: TextStyle(
                   color: event.color,
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               Text(
                 event.timeRange,
                 style: TextStyle(
                   color: event.color.withValues(alpha: 0.8),
-                  fontSize: 16,
+                  fontSize: 14,
                 ),
               ),
               if (event.location != null && event.location!.isNotEmpty) ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 Text(
                   event.location!,
                   style: TextStyle(
                     color: event.color.withValues(alpha: 0.8),
-                    fontSize: 16,
+                    fontSize: 14,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
