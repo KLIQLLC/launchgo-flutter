@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/event_model.dart';
 import '../../services/api_service_retrofit.dart';
+import '../swipeable_card.dart';
 
 class EventCard extends StatelessWidget {
   final Event event;
@@ -18,98 +19,23 @@ class EventCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cardContent = GestureDetector(
+    return SwipeableCard(
+      canSwipe: onDelete != null,
+      canTap: onEdit != null,
       onTap: onEdit,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: event.color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: event.color.withValues(alpha: 0.4),
-            width: 1.5,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              event.name,
-              style: TextStyle(
-                color: event.color,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              event.timeRange,
-              style: TextStyle(
-                color: event.color.withValues(alpha: 0.8),
-                fontSize: 14,
-              ),
-            ),
-            if (event.location != null && event.location!.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                event.location!,
-                style: TextStyle(
-                  color: event.color.withValues(alpha: 0.8),
-                  fontSize: 14,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ],
-        ),
-      ),
+      onSwipeToDelete: onDelete != null ? () => _handleSwipeToDelete(context) : null,
+      deleteIcon: Icons.delete,
+      child: _EventCardContent(event: event),
     );
+  }
 
-    // If deletion is disabled (onDelete is null), return the card without Dismissible
-    if (onDelete == null) {
-      return cardContent;
+  Future<bool> _handleSwipeToDelete(BuildContext context) async {
+    final confirmed = await _showDeleteConfirmation(context);
+    if (confirmed == true && context.mounted) {
+      await _deleteEvent(context);
+      return true;
     }
-
-    // Otherwise wrap with Dismissible for swipe-to-delete
-    return Dismissible(
-      key: Key(event.id),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 16),
-        decoration: BoxDecoration(
-          color: Colors.red,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            Icon(
-              Icons.delete,
-              color: Colors.white,
-              size: 24,
-            ),
-            SizedBox(width: 8),
-            Text(
-              'Delete',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-      confirmDismiss: (direction) async {
-        return await _showDeleteConfirmation(context);
-      },
-      onDismissed: (direction) async {
-        await _deleteEvent(context);
-      },
-      child: cardContent,
-    );
+    return false;
   }
 
   Future<bool?> _showDeleteConfirmation(BuildContext context) async {
@@ -177,5 +103,99 @@ class EventCard extends StatelessWidget {
         );
       }
     }
+  }
+}
+
+class _EventCardContent extends StatelessWidget {
+  final Event event;
+
+  const _EventCardContent({required this.event});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: _buildCardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _EventTitle(event: event),
+          const SizedBox(height: 4),
+          _EventTime(event: event),
+          if (event.location != null && event.location!.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            _EventLocation(event: event),
+          ],
+        ],
+      ),
+    );
+  }
+
+  BoxDecoration _buildCardDecoration() {
+    return BoxDecoration(
+      color: Color.alphaBlend(
+        event.color.withValues(alpha: 0.15),
+        const Color(0xFF1A2332),
+      ),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: event.color.withValues(alpha: 0.4),
+        width: 1.5,
+      ),
+    );
+  }
+}
+
+class _EventTitle extends StatelessWidget {
+  final Event event;
+
+  const _EventTitle({required this.event});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      event.name,
+      style: TextStyle(
+        color: event.color,
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+}
+
+class _EventTime extends StatelessWidget {
+  final Event event;
+
+  const _EventTime({required this.event});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      event.timeRange,
+      style: TextStyle(
+        color: event.color.withValues(alpha: 0.8),
+        fontSize: 14,
+      ),
+    );
+  }
+}
+
+class _EventLocation extends StatelessWidget {
+  final Event event;
+
+  const _EventLocation({required this.event});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      event.location!,
+      style: TextStyle(
+        color: event.color.withValues(alpha: 0.8),
+        fontSize: 14,
+      ),
+      overflow: TextOverflow.ellipsis,
+    );
   }
 }
