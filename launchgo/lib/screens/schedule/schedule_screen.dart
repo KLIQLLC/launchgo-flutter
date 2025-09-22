@@ -400,11 +400,6 @@ class _DeadlinesListState extends State<_DeadlinesList> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(),
-          const SizedBox(height: 16),
-          _WeekNavigator(
-            onPreviousWeek: widget.onPreviousWeek,
-            onNextWeek: widget.onNextWeek,
-          ),
           const SizedBox(height: 32),
           _buildAssignmentsList(),
           const SizedBox(height: 24),
@@ -427,13 +422,29 @@ class _DeadlinesListState extends State<_DeadlinesList> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          widget.weekRangeText,
-          style: TextStyle(
-            color: Colors.grey[400],
-            fontSize: 14,
-          ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            _NavigationButton(
+              label: 'Previous',
+              onPressed: widget.onPreviousWeek,
+            ),
+            Expanded(
+              child: Center(
+                child: Text(
+                  widget.weekRangeText,
+                  style: TextStyle(
+                    color: Colors.grey[400],
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+            _NavigationButton(
+              label: 'Next',
+              onPressed: widget.onNextWeek,
+            ),
+          ],
         ),
       ],
     );
@@ -641,32 +652,6 @@ class _DeadlinesListState extends State<_DeadlinesList> {
 
 }
 
-class _WeekNavigator extends StatelessWidget {
-  final VoidCallback onPreviousWeek;
-  final VoidCallback onNextWeek;
-
-  const _WeekNavigator({
-    required this.onPreviousWeek,
-    required this.onNextWeek,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        _NavigationButton(
-          label: 'Previous',
-          onPressed: onPreviousWeek,
-        ),
-        const SizedBox(width: 12),
-        _NavigationButton(
-          label: 'Next',
-          onPressed: onNextWeek,
-        ),
-      ],
-    );
-  }
-}
 
 class _NavigationButton extends StatelessWidget {
   final String label;
@@ -679,14 +664,20 @@ class _NavigationButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton(
-      onPressed: onPressed,
-      style: OutlinedButton.styleFrom(
-        foregroundColor: Colors.white,
-        side: const BorderSide(color: Colors.white54),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+    return SizedBox(
+      width: 90, // Fixed width for both buttons
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Colors.white,
+          side: const BorderSide(color: Colors.white54),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(fontSize: 14),
+        ),
       ),
-      child: Text(label),
     );
   }
 }
