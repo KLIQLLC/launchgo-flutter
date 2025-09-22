@@ -345,28 +345,6 @@ class _EventFormScreenState extends State<EventFormScreen> {
           icon: const Icon(Icons.close, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        actions: [
-          TextButton(
-            onPressed: _isLoading ? null : _saveEvent,
-            child: _isLoading
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : const Text(
-                    'Save',
-                    style: TextStyle(
-                      color: Colors.blue,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-          ),
-        ],
       ),
       body: Form(
         key: _formKey,
@@ -398,6 +376,36 @@ class _EventFormScreenState extends State<EventFormScreen> {
                 hint: 'Enter event description',
                 maxLines: 3,
               ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                height: 54,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _saveEvent,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: const Color(0xFF1A1F2B),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: _isLoading
+                      ? const CircularProgressIndicator(
+                          color: Color(0xFF1A1F2B),
+                          strokeWidth: 2,
+                        )
+                      : Text(
+                          isEditMode ? 'Update Event' : 'Add Event',
+                          style: const TextStyle(
+                            color: Color(0xFF1A1F2B),
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 16), // Bottom padding
             ],
           ),
         ),
