@@ -404,14 +404,14 @@ class _DeadlinesListState extends State<_DeadlinesList> {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(vertical: 20.0, horizontal: 12.0),
+      padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 12.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(),
-          const SizedBox(height: 32),
+          const SizedBox(height: 16),
           _buildAssignmentsList(),
-          const SizedBox(height: 24),
+          const SizedBox(height: 10),
           _buildWeeklySchedule(),
           const SizedBox(height: 100),
         ],
