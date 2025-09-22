@@ -521,7 +521,7 @@ class _DeadlineCardState extends State<DeadlineCard> {
             ),
           ),
           padding: const EdgeInsets.symmetric(
-            horizontal: 16,
+            horizontal: 0,
             vertical: 8,
           ),
           child: Column(
@@ -553,18 +553,18 @@ class _DeadlineCardState extends State<DeadlineCard> {
             ),
           ),
         ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            widget.assignment.title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-            ),
+        const SizedBox(width: 0),
+        Text(
+          widget.assignment.title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w500,
           ),
         ),
+        const SizedBox(width: 8),
         StatusBadge.fromStatus(_status ?? widget.assignment.status),
+        const Spacer(), // Push everything else to the right
       ],
     );
   }
@@ -572,11 +572,14 @@ class _DeadlineCardState extends State<DeadlineCard> {
   Widget _buildFooter() {
     return Row(
       children: [
-        Text(
-          'Due ${DateFormat('M/d').format(widget.assignment.dueDate)}',
-          style: TextStyle(
-            color: Colors.grey[400],
-            fontSize: 14,
+        Padding(
+          padding: const EdgeInsets.only(left: 12),
+          child: Text(
+            'Due ${DateFormat('M/d').format(widget.assignment.dueDate)}',
+            style: TextStyle(
+              color: Colors.grey[400],
+              fontSize: 14,
+            ),
           ),
         ),
         // Show attachment indicator only if there are attachments
