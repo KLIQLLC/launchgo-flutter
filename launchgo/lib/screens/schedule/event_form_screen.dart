@@ -33,7 +33,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
   bool _isLoading = false;
 
   final List<String> _eventTypes = [
-    'session',
+    'lg_session',
     'goal',
     'work',
     'social',
@@ -70,7 +70,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
       _endDate = DateTime.now();
       _endTime = TimeOfDay(hour: TimeOfDay.now().hour + 1, minute: TimeOfDay.now().minute);
       
-      _selectedType = 'session';
+      _selectedType = 'lg_session';
     }
   }
 
@@ -102,6 +102,13 @@ class _EventFormScreenState extends State<EventFormScreen> {
       _endTime.hour,
       _endTime.minute,
     );
+  }
+
+  String _formatEventType(String type) {
+    if (type == 'lg_session') {
+      return 'LG Session';
+    }
+    return type[0].toUpperCase() + type.substring(1);
   }
 
   Future<void> _selectStartDate() async {
@@ -466,13 +473,13 @@ class _EventFormScreenState extends State<EventFormScreen> {
         ),
         const SizedBox(height: 8),
         CupertinoDropdown(
-          value: _selectedType[0].toUpperCase() + _selectedType.substring(1),
-          items: _eventTypes.map((type) => type[0].toUpperCase() + type.substring(1)).toList(),
+          value: _formatEventType(_selectedType),
+          items: _eventTypes.map((type) => _formatEventType(type)).toList(),
           hintText: 'Select event type',
           onChanged: (value) {
             if (value != null) {
               final index = _eventTypes.indexWhere((type) => 
-                (type[0].toUpperCase() + type.substring(1)) == value
+                _formatEventType(type) == value
               );
               if (index != -1) {
                 setState(() {
