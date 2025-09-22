@@ -5,7 +5,6 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:dio/dio.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import '../api/dio_client.dart';
-import '../api/models/auth_request.dart';
 import 'api_service_retrofit.dart';
 import '../config/environment.dart';
 import '../models/user_model.dart';
@@ -272,17 +271,17 @@ class AuthService extends ChangeNotifier {
 
   /// Send auth code to backend for JWT token
   Future<void> _sendServerAuthCodeToBackend(String serverAuthCode) async {
-    final request = GoogleAuthRequest(code: serverAuthCode);
-    
     try {
       debugPrint('🔐 Sending auth code to backend...');
+      debugPrint('🔐 GET ${EnvironmentConfig.baseUrl}/users/auth/google/mobile?code=$serverAuthCode');
+      
+      // Use direct Dio call to get raw JSON response
       final dio = DioClient.createDio();
       dio.options.baseUrl = EnvironmentConfig.baseUrl;
       
-      debugPrint('🔐 POST ${dio.options.baseUrl}/users/auth/google/mobile');
-      final rawResponse = await dio.post(
+      final rawResponse = await dio.get(
         '/users/auth/google/mobile',
-        data: request.toJson(),
+        queryParameters: {'code': serverAuthCode},
       );
       debugPrint('🔐 Auth response received: ${rawResponse.statusCode}');
       
@@ -293,19 +292,9 @@ class AuthService extends ChangeNotifier {
         responseData = rawResponse.data;
       }
       
-      // Handle different response formats between environments
-      String? accessToken;
-      int? expiresIn;
-      
-      if (responseData['user'] != null && responseData['user']['accessToken'] != null) {
-        // Prod format: { user: { accessToken: "...", expiresIn: 123 } }
-        accessToken = responseData['user']['accessToken'];
-        expiresIn = responseData['user']['expiresIn'] as int?;
-      } else if (responseData['data'] != null && responseData['data']['accessToken'] != null) {
-        // Stage format: { data: { accessToken: "..." } }
-        accessToken = responseData['data']['accessToken'];
-        expiresIn = responseData['data']['expiresIn'] as int?;
-      }
+      // Direct response format: { accessToken: "...", expiresIn: 123 }
+      final accessToken = responseData['accessToken'] as String?;
+      final expiresIn = responseData['expiresIn'] as int?;
       
       if (accessToken != null) {
         debugPrint('🔐 Access token received successfully');

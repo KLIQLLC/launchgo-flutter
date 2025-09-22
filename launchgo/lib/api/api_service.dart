@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
-import 'models/auth_request.dart';
 import 'models/auth_response.dart';
 
 part 'api_service.g.dart';
@@ -11,8 +10,8 @@ abstract class ApiService {
   factory ApiService(Dio dio, {String baseUrl}) = _ApiService;
 
   // Authentication endpoints
-  @POST("/users/auth/google/mobile")
-  Future<GoogleAuthResponse> authenticateWithGoogle(@Body() GoogleAuthRequest request);
+  @GET("/users/auth/google/mobile")
+  Future<GoogleAuthResponse> authenticateWithGoogle(@Query("code") String code);
 
   // User endpoints
   @GET("/users/me")
