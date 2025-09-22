@@ -33,13 +33,14 @@ class _EventFormScreenState extends State<EventFormScreen> {
   bool _isLoading = false;
 
   final List<String> _eventTypes = [
-    'lecture',
-    'lab',
-    'advising',
-    'tutoring',
+    'session',
+    'goal',
+    'work',
+    'social',
+    'class',
+    'homework',
     'study',
-    'club',
-    'research',
+    'extracurricular',
   ];
 
   @override
@@ -69,7 +70,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
       _endDate = DateTime.now();
       _endTime = TimeOfDay(hour: TimeOfDay.now().hour + 1, minute: TimeOfDay.now().minute);
       
-      _selectedType = 'lecture';
+      _selectedType = 'session';
     }
   }
 
