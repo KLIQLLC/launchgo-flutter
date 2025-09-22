@@ -147,8 +147,8 @@ class _ApiService implements ApiService {
   @override
   Future<HttpResponse<dynamic>> getDeadlines(
     String userId,
-    int startAt,
-    int endAt,
+    String startAt,
+    String endAt,
   ) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{

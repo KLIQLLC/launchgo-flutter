@@ -53,16 +53,18 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       final endOfWeek = _currentWeekStart.add(_endOfWeekOffset);
 
       final response = await apiService.getDeadlines(
-        startAt: _currentWeekStart.millisecondsSinceEpoch,
-        endAt: endOfWeek.millisecondsSinceEpoch,
+        startAt: _currentWeekStart,
+        endAt: endOfWeek,
       );
-
+      
       if (response != null && response['data'] != null) {
         final List<dynamic> coursesData = response['data'];
+        final courses = coursesData
+            .map((c) => DeadlineCourse.fromJson(c))
+            .toList();
+            
         setState(() {
-          _courses = coursesData
-              .map((c) => DeadlineCourse.fromJson(c))
-              .toList();
+          _courses = courses;
         });
       }
     } catch (e) {
@@ -165,6 +167,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         key: _deadlinesListKey,
         assignments: _getSortedAssignments(),
         weekRangeText: _getWeekRangeText(),
+        weekStart: _currentWeekStart,
+        weekEnd: _currentWeekStart.add(_endOfWeekOffset),
         onPreviousWeek: () => _navigateWeek(-1),
         onNextWeek: () => _navigateWeek(1),
         themeService: themeService,
@@ -318,6 +322,8 @@ class _StudentInfo extends StatelessWidget {
 class _DeadlinesList extends StatefulWidget {
   final List<MapEntry<DeadlineCourse, DeadlineAssignment>> assignments;
   final String weekRangeText;
+  final DateTime weekStart;
+  final DateTime weekEnd;
   final VoidCallback onPreviousWeek;
   final VoidCallback onNextWeek;
   final ThemeService themeService;
@@ -326,6 +332,8 @@ class _DeadlinesList extends StatefulWidget {
     super.key,
     required this.assignments,
     required this.weekRangeText,
+    required this.weekStart,
+    required this.weekEnd,
     required this.onPreviousWeek,
     required this.onNextWeek,
     required this.themeService,
@@ -348,8 +356,8 @@ class _DeadlinesListState extends State<_DeadlinesList> {
   @override
   void didUpdateWidget(_DeadlinesList oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Reload events when widget is rebuilt (e.g., after creating a new event)
-    if (oldWidget.weekRangeText != widget.weekRangeText) {
+    // Reload events when week dates change
+    if (oldWidget.weekStart != widget.weekStart || oldWidget.weekEnd != widget.weekEnd) {
       _loadEvents();
     }
   }
@@ -365,13 +373,10 @@ class _DeadlinesListState extends State<_DeadlinesList> {
 
     try {
       final apiService = context.read<ApiServiceRetrofit>();
-      final now = DateTime.now();
-      final weekStart = now.subtract(Duration(days: now.weekday % 7));
-      final weekEnd = weekStart.add(const Duration(days: 6));
 
       final response = await apiService.getEvents(
-        startAt: weekStart,
-        endAt: weekEnd,
+        startAt: widget.weekStart,
+        endAt: widget.weekEnd,
       );
 
       final events = response.map((eventData) => Event.fromJson(eventData)).toList();

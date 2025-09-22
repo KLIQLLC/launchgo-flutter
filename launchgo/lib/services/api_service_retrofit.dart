@@ -95,8 +95,8 @@ class ApiServiceRetrofit {
   // Deadlines endpoints
   
   Future<Map<String, dynamic>?> getDeadlines({
-    required int startAt,
-    required int endAt,
+    required DateTime startAt,
+    required DateTime endAt,
   }) async {
     try {
       // Ensure user info is loaded
@@ -111,8 +111,12 @@ class ApiServiceRetrofit {
         return null;
       }
       
-      debugPrint('🔄 Getting deadlines for user $userId from $startAt to $endAt');
-      final response = await _retrofit.getDeadlines(userId, startAt, endAt);
+      // Format dates as required by API (YYYY-MM-DD HH:MM:SS)
+      final startAtStr = _formatDateForDeadlines(startAt);
+      final endAtStr = _formatDateForDeadlines(endAt);
+      
+      debugPrint('🔄 Getting deadlines for user $userId from $startAtStr to $endAtStr');
+      final response = await _retrofit.getDeadlines(userId, startAtStr, endAtStr);
       final data = response.data;
       
       final parsedData = _parseJsonResponse(data);
@@ -581,6 +585,17 @@ class ApiServiceRetrofit {
 
   String _formatDateForApi(DateTime dateTime) {
     return dateTime.toIso8601String().replaceAll('T', ' ').replaceAll('Z', '');
+  }
+
+  String _formatDateForDeadlines(DateTime dateTime) {
+    // Format as YYYY-MM-DD HH:MM:SS for deadlines API
+    final year = dateTime.year.toString().padLeft(4, '0');
+    final month = dateTime.month.toString().padLeft(2, '0');
+    final day = dateTime.day.toString().padLeft(2, '0');
+    final hour = dateTime.hour.toString().padLeft(2, '0');
+    final minute = dateTime.minute.toString().padLeft(2, '0');
+    final second = dateTime.second.toString().padLeft(2, '0');
+    return '$year-$month-$day $hour:$minute:$second';
   }
 
   Future<Map<String, dynamic>?> createEvent(Map<String, dynamic> eventData) async {
