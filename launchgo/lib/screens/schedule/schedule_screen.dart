@@ -4,6 +4,7 @@ import 'package:launchgo/models/user_model.dart';
 import 'package:launchgo/screens/schedule/edit_student_info_modal.dart';
 import 'package:launchgo/services/api_service_retrofit.dart';
 import 'package:launchgo/services/auth_service.dart';
+import 'package:launchgo/services/permissions_service.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/widgets/schedule/deadline_card.dart';
 import 'package:launchgo/widgets/extended_fab.dart';
@@ -110,27 +111,30 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   Widget build(BuildContext context) {
     final themeService = context.watch<ThemeService>();
     final authService = context.watch<AuthService>();
+    final permissions = PermissionsService(authService.userInfo);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      floatingActionButton: ExtendedFAB(
-        label: 'Add Event',
-        onPressed: () async {
-          final result = await context.push('/new-event');
-          
-          // If event was created successfully, reload events
-          if (result == true) {
-            _deadlinesListKey.currentState?.reloadEvents();
-          }
-        },
-      ),
+      floatingActionButton: permissions.canCreateEvents 
+        ? ExtendedFAB(
+            label: 'Add Event',
+            onPressed: () async {
+              final result = await context.push('/new-event');
+              
+              // If event was created successfully, reload events
+              if (result == true) {
+                _deadlinesListKey.currentState?.reloadEvents();
+              }
+            },
+          )
+        : null,
       body: Column(
         children: [
           _StudentHeader(authService: authService, themeService: themeService),
           Expanded(
             child: Container(
               color: const Color(0xFF0F1419),
-              child: _buildContent(themeService),
+              child: _buildContent(themeService, authService),
             ),
           ),
         ],
@@ -144,7 +148,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     _deadlinesListKey.currentState?.reloadEvents();
   }
 
-  Widget _buildContent(ThemeService themeService) {
+  Widget _buildContent(ThemeService themeService, AuthService authService) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -157,6 +161,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       );
     }
 
+    final permissions = PermissionsService(authService.userInfo);
+    
     return RefreshIndicator(
       onRefresh: _handleRefresh,
       color: ThemeService.accent,
@@ -170,6 +176,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         onPreviousWeek: () => _navigateWeek(-1),
         onNextWeek: () => _navigateWeek(1),
         themeService: themeService,
+        permissions: permissions,
       ),
     );
   }
@@ -325,6 +332,7 @@ class _DeadlinesList extends StatefulWidget {
   final VoidCallback onPreviousWeek;
   final VoidCallback onNextWeek;
   final ThemeService themeService;
+  final PermissionsService permissions;
 
   const _DeadlinesList({
     super.key,
@@ -335,6 +343,7 @@ class _DeadlinesList extends StatefulWidget {
     required this.onPreviousWeek,
     required this.onNextWeek,
     required this.themeService,
+    required this.permissions,
   });
 
   @override
@@ -583,8 +592,8 @@ class _DeadlinesListState extends State<_DeadlinesList> {
                 padding: const EdgeInsets.only(bottom: 12),
                 child: EventCard(
                   event: event,
-                  onEdit: () => _editEvent(event),
-                  onDelete: () => _onEventDeleted(event),
+                  onEdit: widget.permissions.canEditEvents ? () => _editEvent(event) : null,
+                  onDelete: widget.permissions.canDeleteEvents ? () => _onEventDeleted(event) : null,
                 ),
               );
             }),

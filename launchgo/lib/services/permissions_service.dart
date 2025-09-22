@@ -46,6 +46,17 @@ class PermissionsService {
   /// Can access admin features
   bool get canAccessAdmin => isCaseManager;
 
+  // Event Management Permissions
+  
+  /// Can create events - disabled for students
+  bool get canCreateEvents => !isStudent;
+  
+  /// Can edit events - disabled for students
+  bool get canEditEvents => !isStudent;
+  
+  /// Can delete events - disabled for students
+  bool get canDeleteEvents => !isStudent;
+
   // Navigation Permissions
   
   /// Get list of available navigation routes for this role

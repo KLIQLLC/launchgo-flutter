@@ -18,6 +18,60 @@ class EventCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cardContent = GestureDetector(
+      onTap: onEdit,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: event.color.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: event.color.withValues(alpha: 0.4),
+            width: 1.5,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              event.name,
+              style: TextStyle(
+                color: event.color,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              event.timeRange,
+              style: TextStyle(
+                color: event.color.withValues(alpha: 0.8),
+                fontSize: 14,
+              ),
+            ),
+            if (event.location != null && event.location!.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                event.location!,
+                style: TextStyle(
+                  color: event.color.withValues(alpha: 0.8),
+                  fontSize: 14,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+
+    // If deletion is disabled (onDelete is null), return the card without Dismissible
+    if (onDelete == null) {
+      return cardContent;
+    }
+
+    // Otherwise wrap with Dismissible for swipe-to-delete
     return Dismissible(
       key: Key(event.id),
       direction: DismissDirection.endToStart,
@@ -54,53 +108,7 @@ class EventCard extends StatelessWidget {
       onDismissed: (direction) async {
         await _deleteEvent(context);
       },
-      child: GestureDetector(
-        onTap: onEdit,
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: event.color.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: event.color.withValues(alpha: 0.4),
-              width: 1.5,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                event.name,
-                style: TextStyle(
-                  color: event.color,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                event.timeRange,
-                style: TextStyle(
-                  color: event.color.withValues(alpha: 0.8),
-                  fontSize: 14,
-                ),
-              ),
-              if (event.location != null && event.location!.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  event.location!,
-                  style: TextStyle(
-                    color: event.color.withValues(alpha: 0.8),
-                    fontSize: 14,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
+      child: cardContent,
     );
   }
 
