@@ -10,6 +10,7 @@ import 'package:launchgo/widgets/schedule/deadline_card.dart';
 import 'package:launchgo/widgets/extended_fab.dart';
 import 'package:launchgo/widgets/schedule/event_card.dart';
 import 'package:launchgo/models/event_model.dart';
+import 'package:launchgo/theme/app_colors.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
@@ -107,6 +108,26 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     return '${startFormat.format(_currentWeekStart)} - ${endFormat.format(endOfWeek)}';
   }
 
+  Future<void> _navigateToSingleEvent() async {
+    final eventResult = await context.push('/new-event');
+    
+    // If event was created successfully, reload events
+    if (eventResult == true) {
+      _deadlinesListKey.currentState?.reloadEvents();
+    }
+  }
+
+  void _showRecurrentEventMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Recurrent events coming soon!'),
+        backgroundColor: Colors.blue,
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.all(16),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final themeService = context.watch<ThemeService>();
@@ -116,16 +137,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       floatingActionButton: permissions.canCreateEvents 
-        ? ExtendedFAB(
-            label: 'Add Event',
-            onPressed: () async {
-              final result = await context.push('/new-event');
-              
-              // If event was created successfully, reload events
-              if (result == true) {
-                _deadlinesListKey.currentState?.reloadEvents();
-              }
-            },
+        ? _ExpandableFAB(
+            onSingleEvent: _navigateToSingleEvent,
+            onRecurrentEvent: _showRecurrentEventMessage,
           )
         : null,
       body: Column(
@@ -780,6 +794,167 @@ class _ErrorState extends StatelessWidget {
               child: const Text('Retry'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ExpandableFAB extends StatefulWidget {
+  final VoidCallback onSingleEvent;
+  final VoidCallback onRecurrentEvent;
+
+  const _ExpandableFAB({
+    required this.onSingleEvent,
+    required this.onRecurrentEvent,
+  });
+
+  @override
+  State<_ExpandableFAB> createState() => _ExpandableFABState();
+}
+
+class _ExpandableFABState extends State<_ExpandableFAB>
+    with TickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _scaleAnimation;
+  bool _isExpanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    
+    _scaleAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOutBack,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  void _toggleExpanded() {
+    setState(() {
+      _isExpanded = !_isExpanded;
+    });
+    
+    if (_isExpanded) {
+      _animationController.forward();
+    } else {
+      _animationController.reverse();
+    }
+  }
+
+  void _onOptionSelected(VoidCallback callback) {
+    _toggleExpanded();
+    // Add slight delay to allow animation to start before callback
+    Future.delayed(const Duration(milliseconds: 100), callback);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Recurrent Event FAB
+        AnimatedBuilder(
+          animation: _scaleAnimation,
+          builder: (context, child) {
+            return Transform.scale(
+              scale: _scaleAnimation.value,
+              child: _isExpanded
+                  ? _SubFAB(
+                      icon: Icons.repeat,
+                      label: 'Recurring Event',
+                      onPressed: () => _onOptionSelected(widget.onRecurrentEvent),
+                      backgroundColor: const Color(0xFF1A2332),
+                      foregroundColor: Colors.white70,
+                    )
+                  : const SizedBox.shrink(),
+            );
+          },
+        ),
+        
+        if (_isExpanded) const SizedBox(height: 16),
+        
+        // Single Event FAB
+        AnimatedBuilder(
+          animation: _scaleAnimation,
+          builder: (context, child) {
+            return Transform.scale(
+              scale: _scaleAnimation.value,
+              child: _isExpanded
+                  ? _SubFAB(
+                      icon: Icons.event,
+                      label: 'Single Event',
+                      onPressed: () => _onOptionSelected(widget.onSingleEvent),
+                      backgroundColor: const Color(0xFF1A2332),
+                      foregroundColor: Colors.white,
+                    )
+                  : const SizedBox.shrink(),
+            );
+          },
+        ),
+        
+        if (_isExpanded) const SizedBox(height: 16),
+        
+        // Main FAB
+        FloatingActionButton.extended(
+          onPressed: _toggleExpanded,
+          backgroundColor: AppColors.buttonPrimary,
+          foregroundColor: const Color(0xFF1A1F2B),
+          icon: Icon(_isExpanded ? Icons.close : Icons.add),
+          label: Text(
+            _isExpanded ? 'Close' : 'Add Event',
+            style: const TextStyle(
+              color: Color(0xFF1A1F2B),
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SubFAB extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+  final Color backgroundColor;
+  final Color foregroundColor;
+
+  const _SubFAB({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    required this.backgroundColor,
+    required this.foregroundColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FloatingActionButton.extended(
+      onPressed: onPressed,
+      backgroundColor: backgroundColor,
+      foregroundColor: foregroundColor,
+      heroTag: label, // Unique hero tag to avoid conflicts
+      icon: Icon(icon, size: 20),
+      label: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
         ),
       ),
     );
