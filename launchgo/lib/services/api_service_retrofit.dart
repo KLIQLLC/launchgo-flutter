@@ -94,7 +94,7 @@ class ApiServiceRetrofit {
   
   // Deadlines endpoints
   
-  Future<Map<String, dynamic>?> getDeadlines({
+  Future<List<Map<String, dynamic>>> getDeadlines({
     required DateTime startAt,
     required DateTime endAt,
   }) async {
@@ -108,7 +108,7 @@ class ApiServiceRetrofit {
       final userId = _getEffectiveUserId();
       if (userId == null) {
         debugPrint('❌ Cannot get deadlines: User ID is null');
-        return null;
+        return [];
       }
       
       // Format dates as required by API (YYYY-MM-DD HH:MM:SS)
@@ -122,15 +122,17 @@ class ApiServiceRetrofit {
       final parsedData = _parseJsonResponse(data);
       if (parsedData == null) {
         debugPrint('❌ No valid deadline data found');
-        return null;
+        return [];
       }
       
       debugPrint('✅ Successfully fetched deadlines');
-      // Wrap array responses in 'data' key for backward compatibility
-      return parsedData is List ? {'data': parsedData} : parsedData;
+      if (parsedData is List) {
+        return List<Map<String, dynamic>>.from(parsedData);
+      }
+      return [];
     } catch (e) {
       debugPrint('❌ Failed to get deadlines: $e');
-      return null;
+      return [];
     }
   }
   

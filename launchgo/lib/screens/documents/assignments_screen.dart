@@ -56,9 +56,10 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
           final response = await dio.get('/users/$userId/courses?semesterId=$semesterId');
           
           if (response.data != null) {
+            // API returns direct array of courses
             final coursesData = response.data is String 
-                ? json.decode(response.data)['data'] 
-                : response.data['data'];
+                ? json.decode(response.data)
+                : response.data;
             
             // Find our specific course in the updated data
             final updatedCourse = (coursesData as List).firstWhere(
@@ -74,17 +75,24 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
       
       // Get assignments from the updated course data
       final assignments = _currentCourse['assignments'] as List? ?? [];
-      _assignments = List<Map<String, dynamic>>.from(assignments);
+      final newAssignments = List<Map<String, dynamic>>.from(assignments);
       
-      debugPrint('Loaded ${_assignments.length} assignments');
+      
+      setState(() {
+        _assignments = newAssignments;
+        _isLoading = false;
+      });
     } catch (e) {
       debugPrint('Error loading assignments: $e');
       // Fall back to using existing course data
       final assignments = _currentCourse['assignments'] as List? ?? widget.course['assignments'] as List? ?? [];
-      _assignments = List<Map<String, dynamic>>.from(assignments);
+      final fallbackAssignments = List<Map<String, dynamic>>.from(assignments);
+      
+      setState(() {
+        _assignments = fallbackAssignments;
+        _isLoading = false;
+      });
     }
-    
-    setState(() => _isLoading = false);
   }
 
   Future<void> _navigateToAddAssignment() async {

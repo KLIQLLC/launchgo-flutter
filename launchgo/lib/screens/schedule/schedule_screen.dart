@@ -57,16 +57,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         endAt: endOfWeek,
       );
       
-      if (response != null && response['data'] != null) {
-        final List<dynamic> coursesData = response['data'];
-        final courses = coursesData
-            .map((c) => DeadlineCourse.fromJson(c))
-            .toList();
-            
-        setState(() {
-          _courses = courses;
-        });
-      }
+      // API returns direct array of courses with assignments
+      final courses = response
+          .map((c) => DeadlineCourse.fromJson(c))
+          .toList();
+          
+      setState(() {
+        _courses = courses;
+      });
     } catch (e) {
       setState(() {
         _errorMessage = 'Failed to load deadlines. Please try again.';
