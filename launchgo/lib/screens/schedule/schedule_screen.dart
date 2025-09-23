@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:launchgo/models/deadline_model.dart';
 import 'package:launchgo/models/user_model.dart';
 import 'package:launchgo/screens/schedule/edit_student_info_modal.dart';
@@ -7,7 +8,6 @@ import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/permissions_service.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/widgets/schedule/deadline_card.dart';
-import 'package:launchgo/widgets/extended_fab.dart';
 import 'package:launchgo/widgets/schedule/event_card.dart';
 import 'package:launchgo/models/event_model.dart';
 import 'package:launchgo/theme/app_colors.dart';
@@ -873,8 +873,16 @@ class _ExpandableFABState extends State<_ExpandableFAB>
               scale: _scaleAnimation.value,
               child: _isExpanded
                   ? _SubFAB(
-                      icon: Icons.repeat,
-                      label: 'Recurring Event',
+                      icon: SvgPicture.asset(
+                        'assets/icons/recurring.svg',
+                        width: 20,
+                        height: 20,
+                        colorFilter: const ColorFilter.mode(
+                          Colors.white70,
+                          BlendMode.srcIn,
+                        ),
+                      ),
+                      label: 'Recurring',
                       onPressed: () => _onOptionSelected(widget.onRecurrentEvent),
                       backgroundColor: const Color(0xFF1A2332),
                       foregroundColor: Colors.white70,
@@ -894,8 +902,16 @@ class _ExpandableFABState extends State<_ExpandableFAB>
               scale: _scaleAnimation.value,
               child: _isExpanded
                   ? _SubFAB(
-                      icon: Icons.event,
-                      label: 'Single Event',
+                      icon: SvgPicture.asset(
+                        'assets/icons/ic_calendar.svg',
+                        width: 20,
+                        height: 20,
+                        colorFilter: const ColorFilter.mode(
+                          Colors.white,
+                          BlendMode.srcIn,
+                        ),
+                      ),
+                      label: 'Single',
                       onPressed: () => _onOptionSelected(widget.onSingleEvent),
                       backgroundColor: const Color(0xFF1A2332),
                       foregroundColor: Colors.white,
@@ -928,7 +944,7 @@ class _ExpandableFABState extends State<_ExpandableFAB>
 }
 
 class _SubFAB extends StatelessWidget {
-  final IconData icon;
+  final Widget icon;
   final String label;
   final VoidCallback onPressed;
   final Color backgroundColor;
@@ -949,7 +965,7 @@ class _SubFAB extends StatelessWidget {
       backgroundColor: backgroundColor,
       foregroundColor: foregroundColor,
       heroTag: label, // Unique hero tag to avoid conflicts
-      icon: Icon(icon, size: 20),
+      icon: icon,
       label: Text(
         label,
         style: const TextStyle(
