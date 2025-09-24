@@ -15,6 +15,7 @@ import 'package:launchgo/screens/recaps_screen.dart';
 import 'package:launchgo/screens/schedule/schedule_screen.dart';
 import 'package:launchgo/screens/settings_screen.dart';
 import 'package:launchgo/screens/schedule/event_form_screen.dart';
+import 'package:launchgo/screens/schedule/recurring_event_form_screen.dart';
 import 'package:launchgo/models/event_model.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/theme_service.dart';
@@ -135,6 +136,11 @@ class AppRouter {
           path: '/new-event',
           name: 'newEvent',
           builder: (context, state) => const EventFormScreen(),
+        ),
+        GoRoute(
+          path: '/new-recurring-event',
+          name: 'newRecurringEvent',
+          builder: (context, state) => const RecurringEventFormScreen(),
         ),
         GoRoute(
           path: '/edit-event/:eventId',

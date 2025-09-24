@@ -162,6 +162,12 @@ abstract class ApiService {
     @Body() Map<String, dynamic> eventData,
   );
 
+  @POST("/users/{userId}/events/recursion")
+  Future<HttpResponse<dynamic>> createRecurringEvent(
+    @Path("userId") String userId,
+    @Body() Map<String, dynamic> eventData,
+  );
+
   @DELETE("/users/{userId}/events/{eventId}")
   Future<HttpResponse<void>> deleteEvent(
     @Path("userId") String userId,

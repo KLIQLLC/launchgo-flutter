@@ -117,15 +117,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     }
   }
 
-  void _showRecurrentEventMessage() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Recurrent events coming soon!'),
-        backgroundColor: Colors.blue,
-        behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.all(16),
-      ),
-    );
+  Future<void> _navigateToRecurringEvent() async {
+    final eventResult = await context.push('/new-recurring-event');
+    
+    // If events were created successfully, reload events
+    if (eventResult == true) {
+      _deadlinesListKey.currentState?.reloadEvents();
+    }
   }
 
   @override
@@ -139,7 +137,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       floatingActionButton: permissions.canCreateEvents 
         ? _ExpandableFAB(
             onSingleEvent: _navigateToSingleEvent,
-            onRecurrentEvent: _showRecurrentEventMessage,
+            onRecurrentEvent: _navigateToRecurringEvent,
           )
         : null,
       body: Column(
@@ -603,8 +601,10 @@ class _DeadlinesListState extends State<_DeadlinesList> {
             ),
             ...dayEntry.value.map((event) {
               return Padding(
+                key: ValueKey(event.id), // Add unique key based on event ID
                 padding: const EdgeInsets.only(bottom: 12),
                 child: EventCard(
+                  key: ValueKey('event_card_${event.id}'), // Add unique key to EventCard
                   event: event,
                   onEdit: widget.permissions.canEditEvents ? () => _editEvent(event) : null,
                   onDelete: widget.permissions.canDeleteEvents ? () => _onEventDeleted(event) : null,

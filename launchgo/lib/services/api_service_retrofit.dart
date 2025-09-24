@@ -632,6 +632,59 @@ class ApiServiceRetrofit {
     }
   }
 
+  Future<Map<String, dynamic>?> createRecurringEvent(Map<String, dynamic> eventData) async {
+    try {
+      // Ensure user info is loaded
+      if (_authService.userInfo == null) {
+        debugPrint('⚠️ User info not loaded yet, loading now...');
+        await _authService.loadUserInfo();
+      }
+      
+      final userId = _getEffectiveUserId();
+      if (userId == null) {
+        debugPrint('❌ Cannot create recurring event: User ID is null');
+        throw Exception('User ID is required');
+      }
+      
+      debugPrint('🔄 Creating recurring event for user $userId with data: $eventData');
+      final response = await _retrofit.createRecurringEvent(userId, eventData);
+      final data = response.data;
+      
+      debugPrint('📊 Response status: ${response.response.statusCode}');
+      debugPrint('📊 Raw response data type: ${data.runtimeType}');
+      debugPrint('📊 Raw response data: $data');
+      
+      final parsedData = _parseJsonResponse(data);
+      
+      // The API might return a list of created events or a success message
+      // If it returns a list, we consider it successful
+      if (parsedData is List && parsedData.isNotEmpty) {
+        debugPrint('✅ Successfully created ${parsedData.length} recurring events');
+        return {'success': true, 'events': parsedData};
+      }
+      
+      // If it returns a map with any data, consider it successful
+      if (parsedData is Map<String, dynamic>) {
+        debugPrint('✅ Successfully created recurring events');
+        return parsedData;
+      }
+      
+      // If status is 200-299 but no data, still consider it successful
+      if (response.response.statusCode != null && 
+          response.response.statusCode! >= 200 && 
+          response.response.statusCode! < 300) {
+        debugPrint('✅ Recurring events created successfully (no response body)');
+        return {'success': true};
+      }
+      
+      debugPrint('❌ No valid recurring event data returned - data: $data');
+      return null;
+    } catch (e) {
+      debugPrint('❌ Failed to create recurring event: $e');
+      rethrow;
+    }
+  }
+
   Future<void> deleteEvent(String eventId) async {
     try {
       // Ensure user info is loaded

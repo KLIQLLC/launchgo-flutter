@@ -53,10 +53,14 @@ class _EventFormScreenState extends State<EventFormScreen> {
       _descriptionController = TextEditingController(text: widget.event!.description ?? '');
       _locationController = TextEditingController(text: widget.event!.location ?? '');
       
-      _startDate = widget.event!.startAt;
-      _startTime = TimeOfDay.fromDateTime(widget.event!.startAt);
-      _endDate = widget.event!.endAt;
-      _endTime = TimeOfDay.fromDateTime(widget.event!.endAt);
+      // Extract date and time components from the local DateTime
+      final localStartAt = widget.event!.startAt; // Already converted to local in Event.fromJson
+      final localEndAt = widget.event!.endAt;     // Already converted to local in Event.fromJson
+      
+      _startDate = DateTime(localStartAt.year, localStartAt.month, localStartAt.day);
+      _startTime = TimeOfDay.fromDateTime(localStartAt);
+      _endDate = DateTime(localEndAt.year, localEndAt.month, localEndAt.day);
+      _endTime = TimeOfDay.fromDateTime(localEndAt);
       
       _selectedType = widget.event!.type;
     } else {
@@ -66,9 +70,9 @@ class _EventFormScreenState extends State<EventFormScreen> {
       _locationController = TextEditingController();
       
       _startDate = DateTime.now();
-      _startTime = TimeOfDay.now();
+      _startTime = const TimeOfDay(hour: 12, minute: 0); // 12:00 PM
       _endDate = DateTime.now();
-      _endTime = TimeOfDay(hour: TimeOfDay.now().hour + 1, minute: TimeOfDay.now().minute);
+      _endTime = const TimeOfDay(hour: 12, minute: 0); // 12:00 PM
       
       _selectedType = 'lg_session';
     }
@@ -111,11 +115,54 @@ class _EventFormScreenState extends State<EventFormScreen> {
     return type[0].toUpperCase() + type.substring(1);
   }
 
+  String _formatTimeForDropdown(TimeOfDay time) {
+    final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
+    final period = time.period == DayPeriod.am ? 'AM' : 'PM';
+    return '${hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')} $period';
+  }
+
+  List<String> _generateTimeSlots() {
+    final List<String> slots = [];
+    for (int hour = 0; hour < 24; hour++) {
+      for (int minute = 0; minute < 60; minute += 15) {
+        final time = TimeOfDay(hour: hour, minute: minute);
+        final displayHour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
+        final period = time.period == DayPeriod.am ? 'AM' : 'PM';
+        slots.add('${displayHour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')} $period');
+      }
+    }
+    return slots;
+  }
+
+  TimeOfDay? _parseTimeString(String timeStr) {
+    try {
+      final parts = timeStr.split(' ');
+      final timeParts = parts[0].split(':');
+      var hour = int.parse(timeParts[0]);
+      final minute = int.parse(timeParts[1]);
+      final isPM = parts[1] == 'PM';
+      
+      if (hour == 12 && !isPM) {
+        hour = 0; // 12:00 AM is 0:00
+      } else if (hour != 12 && isPM) {
+        hour += 12; // Convert PM hours
+      }
+      
+      return TimeOfDay(hour: hour, minute: minute);
+    } catch (e) {
+      return null;
+    }
+  }
+
   Future<void> _selectStartDate() async {
     final picked = await showDatePicker(
       context: context,
       initialDate: _startDate,
-      firstDate: DateTime.now(),
+      firstDate: isEditMode 
+          ? _startDate.isBefore(DateTime.now()) 
+              ? _startDate 
+              : DateTime.now()
+          : DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
       builder: (context, child) {
         return Theme(
@@ -141,90 +188,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
     }
   }
 
-  Future<void> _selectStartTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _startTime,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: Colors.blue,
-              onPrimary: Colors.white,
-              surface: Color(0xFF1A2332),
-              onSurface: Colors.white,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null) {
-      setState(() {
-        _startTime = picked;
-        if (_endDate.isAtSameMomentAs(_startDate) && 
-            (_endTime.hour < _startTime.hour || 
-             (_endTime.hour == _startTime.hour && _endTime.minute <= _startTime.minute))) {
-          _endTime = TimeOfDay(
-            hour: _startTime.hour + 1 > 23 ? 23 : _startTime.hour + 1,
-            minute: _startTime.minute,
-          );
-        }
-      });
-    }
-  }
 
-  Future<void> _selectEndDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _endDate,
-      firstDate: _startDate.isBefore(DateTime.now()) ? DateTime.now() : _startDate,
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: Colors.blue,
-              onPrimary: Colors.white,
-              surface: Color(0xFF1A2332),
-              onSurface: Colors.white,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null) {
-      setState(() {
-        _endDate = picked;
-      });
-    }
-  }
-
-  Future<void> _selectEndTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _endTime,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: Colors.blue,
-              onPrimary: Colors.white,
-              surface: Color(0xFF1A2332),
-              onSurface: Colors.white,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null) {
-      setState(() {
-        _endTime = picked;
-      });
-    }
-  }
 
   Future<void> _saveEvent() async {
     if (!_formKey.currentState!.validate()) return;
@@ -360,7 +324,9 @@ class _EventFormScreenState extends State<EventFormScreen> {
                 isRequired: true,
               ),
               const SizedBox(height: 20),
-              _buildDateTimeSection(),
+              _buildDateSection(),
+              const SizedBox(height: 20),
+              _buildTimeSection(),
               const SizedBox(height: 20),
               _buildTypeDropdown(),
               const SizedBox(height: 20),
@@ -501,93 +467,125 @@ class _EventFormScreenState extends State<EventFormScreen> {
     );
   }
 
-  Widget _buildDateTimeSection() {
+  Widget _buildDateSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Date & Time',
+          'Date',
           style: TextStyle(
             color: Colors.white,
             fontSize: 16,
             fontWeight: FontWeight.w500,
           ),
         ),
-        const SizedBox(height: 12),
-        _buildDateTimeRow('Start', _startDate, _startTime, _selectStartDate, _selectStartTime),
-        const SizedBox(height: 12),
-        _buildDateTimeRow('End', _endDate, _endTime, _selectEndDate, _selectEndTime),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: _selectStartDate,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A2332),
+              border: Border.all(color: Colors.grey[600]!),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Text(
+                  DateFormat('MM/dd/yyyy').format(_startDate),
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                ),
+                const Spacer(),
+                Icon(
+                  Icons.calendar_today,
+                  color: Colors.grey[400],
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildDateTimeRow(
-    String label,
-    DateTime date,
-    TimeOfDay time,
-    VoidCallback onDateTap,
-    VoidCallback onTimeTap,
-  ) {
+  Widget _buildTimeSection() {
     return Row(
       children: [
-        SizedBox(
-          width: 60,
-          child: Text(
-            label,
-            style: TextStyle(
-              color: Colors.grey[400],
-              fontSize: 14,
-            ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Start Time',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 8),
+              CupertinoDropdown(
+                value: _formatTimeForDropdown(_startTime),
+                items: _generateTimeSlots(),
+                hintText: 'Select time',
+                onChanged: (value) {
+                  if (value != null) {
+                    final newTime = _parseTimeString(value);
+                    if (newTime != null) {
+                      setState(() {
+                        _startTime = newTime;
+                        // Auto-adjust end time if needed
+                        if (_endDate.isAtSameMomentAs(_startDate) && 
+                            (_endTime.hour < _startTime.hour || 
+                             (_endTime.hour == _startTime.hour && _endTime.minute <= _startTime.minute))) {
+                          _endTime = TimeOfDay(
+                            hour: _startTime.hour + 1 > 23 ? 23 : _startTime.hour + 1,
+                            minute: _startTime.minute,
+                          );
+                        }
+                      });
+                    }
+                  }
+                },
+              ),
+            ],
           ),
         ),
+        const SizedBox(width: 16),
         Expanded(
-          child: InkWell(
-            onTap: onDateTap,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A2332),
-                border: Border.all(color: Colors.grey[600]!),
-                borderRadius: BorderRadius.circular(8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'End Time',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-              child: Row(
-                children: [
-                  Icon(Icons.calendar_today, color: Colors.grey[400], size: 16),
-                  const SizedBox(width: 8),
-                  Text(
-                    DateFormat('MMM dd, yyyy').format(date),
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                ],
+              const SizedBox(height: 8),
+              CupertinoDropdown(
+                value: _formatTimeForDropdown(_endTime),
+                items: _generateTimeSlots(),
+                hintText: 'Select time',
+                onChanged: (value) {
+                  if (value != null) {
+                    final newTime = _parseTimeString(value);
+                    if (newTime != null) {
+                      setState(() {
+                        _endTime = newTime;
+                      });
+                    }
+                  }
+                },
               ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: InkWell(
-            onTap: onTimeTap,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A2332),
-                border: Border.all(color: Colors.grey[600]!),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.access_time, color: Colors.grey[400], size: 16),
-                  const SizedBox(width: 8),
-                  Text(
-                    time.format(context),
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                ],
-              ),
-            ),
+            ],
           ),
         ),
       ],
     );
   }
+
 }

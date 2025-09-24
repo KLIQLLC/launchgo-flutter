@@ -54,7 +54,18 @@ class _SwipeableCardState extends State<SwipeableCard>
   }
 
   @override
+  void didUpdateWidget(covariant SwipeableCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reset swipe state when widget updates (e.g., when list changes)
+    if (_animationController.value != 0) {
+      _animationController.value = 0;
+    }
+  }
+
+  @override
   void dispose() {
+    // Reset animation before disposal to avoid visual glitches
+    _animationController.value = 0;
     _animationController.dispose();
     super.dispose();
   }

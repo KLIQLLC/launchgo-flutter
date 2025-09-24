@@ -25,10 +25,10 @@ class Event extends Equatable {
       id: json['id'] ?? '',
       name: json['name'] ?? '',
       startAt: json['startAt'] != null 
-          ? DateTime.parse(json['startAt'])
+          ? _parseUtcDateTime(json['startAt'])  // Parse UTC and convert to local
           : DateTime.now(),
       endAt: json['endAt'] != null 
-          ? DateTime.parse(json['endAt'])
+          ? _parseUtcDateTime(json['endAt'])    // Parse UTC and convert to local
           : DateTime.now(),
       type: json['type'] ?? '',
       location: json['location'],
@@ -36,12 +36,20 @@ class Event extends Equatable {
     );
   }
 
+  static DateTime _parseUtcDateTime(String dateTimeString) {
+    // Ensure the string is treated as UTC if no timezone is specified
+    if (!dateTimeString.endsWith('Z') && !dateTimeString.contains('+') && !dateTimeString.contains('-', 19)) {
+      dateTimeString += 'Z';
+    }
+    return DateTime.parse(dateTimeString).toLocal();
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
       'name': name,
-      'startAt': startAt.toIso8601String(),
-      'endAt': endAt.toIso8601String(),
+      'startAt': startAt.toUtc().toIso8601String(),  // Convert to UTC before sending
+      'endAt': endAt.toUtc().toIso8601String(),      // Convert to UTC before sending
       'type': type,
       if (location != null) 'location': location,
       if (description != null) 'description': description,

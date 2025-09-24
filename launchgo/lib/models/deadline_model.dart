@@ -49,7 +49,7 @@ class DeadlineAssignment extends Equatable {
       id: json['id'] ?? '',
       title: json['title'] ?? '',
       dueDate: json['dueDateAt'] != null 
-          ? DateTime.parse(json['dueDateAt'])
+          ? DateTime.parse(json['dueDateAt']).toLocal()  // Convert UTC to local timezone
           : DateTime.now(),
       status: json['status'] ?? 'pending',
       attachments: json['attachments'] != null
