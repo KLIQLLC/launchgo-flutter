@@ -67,23 +67,24 @@ class Event extends Equatable {
   Color get color {
     switch (type.toLowerCase()) {
       case 'session':
-        return const Color(0xFF9C88FF); // Soft purple
-      case 'goal':
-        return const Color(0xFF00D2D3); // Turquoise
-      case 'work':
-        return const Color(0xFFFF9F43); // Orange
-      case 'social':
-        return const Color(0xFF54A0FF); // Sky blue
+      case 'lg session':
+        return const Color(0xFF9C88FF); // Purple
       case 'class':
-        return const Color(0xFFFECA57); // Yellow/Gold
+        return const Color(0xFFFF5252); // Red
       case 'homework':
-        return const Color(0xFFFF6B9D); // Pink
+        return const Color(0xFF448AFF); // Blue
       case 'study':
-        return const Color(0xFFE18748); // Yellow
+        return const Color(0xFF4CAF50); // Green
       case 'extracurricular':
-        return const Color(0xFF5F27CD); // Deep purple
+        return const Color(0xFFFFD740); // Yellow
+      case 'goal':
+        return const Color(0xFF40C4FF); // Baby blue
+      case 'work':
+        return const Color(0xFFFF9800); // Orange
+      case 'social':
+        return const Color(0xFF26A69A); // Teal
       default:
-        return const Color(0xFF9C88FF); // Default to soft purple
+        return const Color(0xFF9C88FF); // Default to purple
     }
   }
 
