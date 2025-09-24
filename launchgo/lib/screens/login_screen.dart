@@ -73,47 +73,52 @@ class _LoginScreenState extends State<LoginScreen> {
                     // 1. User is not signed in with Google at all, OR
                     // 2. User is signed in with Google but doesn't have backend access token
                     if (authService.currentUser == null || !authService.hasAccessToken) ...[
-                      SizedBox(
-                        width: double.infinity,
-                        height: 54,
-                        child: ElevatedButton(
-                          onPressed: authService.isSigningIn ? null : _handleSignIn,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.textPrimary,
-                            foregroundColor: Colors.black87,
-                            elevation: 1,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              side: const BorderSide(color: AppColors.textGrey),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          maxWidth: 320, // Maximum width for iPad
+                        ),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: 54,
+                          child: ElevatedButton(
+                            onPressed: authService.isSigningIn ? null : _handleSignIn,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.textPrimary,
+                              foregroundColor: Colors.black87,
+                              elevation: 1,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                side: const BorderSide(color: AppColors.textGrey),
+                              ),
                             ),
-                          ),
-                          child: authService.isSigningIn
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.textGrey),
+                            child: authService.isSigningIn
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.textGrey),
+                                    ),
+                                  )
+                                : Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      SvgPicture.asset(
+                                        'assets/icons/ic_google.svg',
+                                        height: 24,
+                                        width: 24,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        // Show different text based on state
+                                        authService.currentUser != null 
+                                            ? 'Retry Authentication' 
+                                            : 'Sign in with Google',
+                                        style: const TextStyle(fontSize: 16),
+                                      ),
+                                    ],
                                   ),
-                                )
-                              : Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    SvgPicture.asset(
-                                      'assets/icons/ic_google.svg',
-                                      height: 24,
-                                      width: 24,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      // Show different text based on state
-                                      authService.currentUser != null 
-                                          ? 'Retry Authentication' 
-                                          : 'Sign in with Google',
-                                      style: const TextStyle(fontSize: 16),
-                                    ),
-                                  ],
-                                ),
+                          ),
                         ),
                       ),
                       
