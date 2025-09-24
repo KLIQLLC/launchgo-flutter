@@ -310,40 +310,62 @@ class _EventFormScreenState extends State<EventFormScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildTextField(
-                controller: _nameController,
-                label: 'Event Name',
-                hint: 'Enter event name',
-                isRequired: true,
+      body: Column(
+        children: [
+          Expanded(
+            child: Form(
+              key: _formKey,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildTextField(
+                      controller: _nameController,
+                      label: 'Event Name',
+                      hint: 'Enter event name',
+                      isRequired: true,
+                    ),
+                    const SizedBox(height: 20),
+                    _buildDateSection(),
+                    const SizedBox(height: 20),
+                    _buildTimeSection(),
+                    const SizedBox(height: 20),
+                    _buildTypeDropdown(),
+                    const SizedBox(height: 20),
+                    _buildTextField(
+                      controller: _locationController,
+                      label: 'Location',
+                      hint: 'Enter event location',
+                    ),
+                    const SizedBox(height: 20),
+                    _buildTextField(
+                      controller: _descriptionController,
+                      label: 'Description',
+                      hint: 'Enter event description',
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: 20), // Add some bottom padding
+                  ],
+                ),
               ),
-              const SizedBox(height: 20),
-              _buildDateSection(),
-              const SizedBox(height: 20),
-              _buildTimeSection(),
-              const SizedBox(height: 20),
-              _buildTypeDropdown(),
-              const SizedBox(height: 20),
-              _buildTextField(
-                controller: _locationController,
-                label: 'Location',
-                hint: 'Enter event location',
-              ),
-              const SizedBox(height: 20),
-              _buildTextField(
-                controller: _descriptionController,
-                label: 'Description',
-                hint: 'Enter event description',
-                maxLines: 3,
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(16.0),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F1419),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 4,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              top: false,
+              child: SizedBox(
                 width: double.infinity,
                 height: 54,
                 child: ElevatedButton(
@@ -371,10 +393,9 @@ class _EventFormScreenState extends State<EventFormScreen> {
                         ),
                 ),
               ),
-              const SizedBox(height: 16), // Bottom padding
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
