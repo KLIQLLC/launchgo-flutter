@@ -337,6 +337,20 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
         actions: [
           IconButton(
             icon: SvgPicture.asset(
+              'assets/icons/ic_chat.svg',
+              width: 20,
+              height: 20,
+              colorFilter: ColorFilter.mode(
+                themeService.textColor,
+                BlendMode.srcIn,
+              ),
+            ),
+            onPressed: () {
+              // TODO: Handle chat action
+            },
+          ),
+          IconButton(
+            icon: SvgPicture.asset(
               'assets/icons/ic_alert.svg',
               width: 20,
               height: 20,
