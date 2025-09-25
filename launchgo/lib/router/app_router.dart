@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../theme/app_colors.dart';
 import 'package:launchgo/features/documents/domain/entities/document_entity.dart';
 import 'package:launchgo/features/documents/presentation/pages/documents_page.dart';
+import 'package:launchgo/screens/goals/goals_screen.dart';
 import 'package:launchgo/screens/chat/chat_screen.dart';
 import 'package:launchgo/screens/courses/courses_screen.dart';
 import 'package:launchgo/screens/courses/course_form_screen.dart';
@@ -73,6 +74,11 @@ class AppRouter {
           path: '/settings',
           name: 'settings',
           builder: (context, state) => const SettingsScreen(),
+        ),
+        GoRoute(
+          path: '/chat',
+          name: 'chat',
+          builder: (context, state) => const ChatScreen(),
         ),
         GoRoute(
           path: '/new-document',
@@ -184,10 +190,10 @@ class AppRouter {
               ),
             ),
             GoRoute(
-              path: '/chat',
-              name: 'chat',
+              path: '/goals',
+              name: 'goals',
               pageBuilder: (context, state) => const NoTransitionPage(
-                child: ChatScreen(),
+                child: GoalsScreen(),
               ),
             ),
           ],
@@ -221,8 +227,8 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
           return 'Documents';
         case '/recaps':
           return 'Recaps';
-        case '/chat':
-          return 'Chat';
+        case '/goals':
+          return 'Goals';
         default:
           return 'launchgo';
       }
@@ -291,20 +297,20 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
         );
       }
 
-      // Add Chat tab for all roles
+      // Add Goals tab for all roles
       items.add(
         BottomNavigationBarItem(
           icon: CustomIcon(
-            icon: CustomIconPath.chat,
+            icon: CustomIconPath.goal,
             size: const Size(24, 24),
             color: AppColors.bottomNavUnselected,
           ),
           activeIcon: CustomIcon(
-            icon: CustomIconPath.chat,
+            icon: CustomIconPath.goal,
             size: const Size(24, 24),
             color: AppColors.accent,
           ),
-          label: 'Chat',
+          label: 'Goals',
         ),
       );
 
@@ -346,7 +352,7 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
               ),
             ),
             onPressed: () {
-              // TODO: Handle chat action
+              context.push('/chat');
             },
           ),
           IconButton(

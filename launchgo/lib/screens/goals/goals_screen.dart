@@ -3,8 +3,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../../services/theme_service.dart';
 
-class ChatScreen extends StatelessWidget {
-  const ChatScreen({super.key});
+class GoalsScreen extends StatelessWidget {
+  const GoalsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -12,26 +12,6 @@ class ChatScreen extends StatelessWidget {
     
     return Scaffold(
       backgroundColor: themeService.backgroundColor,
-      appBar: AppBar(
-        backgroundColor: themeService.backgroundColor,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back,
-            color: themeService.textColor,
-          ),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Text(
-          'Chat',
-          style: TextStyle(
-            color: themeService.textColor,
-            fontSize: 24,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        centerTitle: true,
-      ),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(32.0),
@@ -49,7 +29,7 @@ class ChatScreen extends StatelessWidget {
                   ),
                 ),
                 child: SvgPicture.asset(
-                  'assets/icons/ic_chat.svg',
+                  'assets/icons/ic_goal.svg',
                   width: 48,
                   height: 48,
                   colorFilter: ColorFilter.mode(
@@ -60,7 +40,7 @@ class ChatScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               Text(
-                'No Messages Yet',
+                'No Goals Yet',
                 style: TextStyle(
                   color: themeService.textColor,
                   fontSize: 18,
@@ -69,7 +49,7 @@ class ChatScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Your messages and conversations\nwill appear here',
+                'Your goals and achievements\nwill appear here',
                 style: TextStyle(
                   color: themeService.textSecondaryColor,
                   fontSize: 14,
