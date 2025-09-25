@@ -336,46 +336,14 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
         centerTitle: true,
         actions: [
           IconButton(
-            icon: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                SvgPicture.asset(
-                  'assets/icons/ic_alert.svg',
-                  width: 20,
-                  height: 20,
-                  colorFilter: ColorFilter.mode(
-                    themeService.textColor,
-                    BlendMode.srcIn,
-                  ),
-                ),
-                // Badge with unread count
-                Positioned(
-                  right: -10,
-                  top: -14,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: AppColors.badgeRed,
-                      shape: BoxShape.circle,
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 14,
-                      minHeight: 14,
-                    ),
-                    child: const Center(
-                      child: Text(
-                        '3',
-                        style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+            icon: SvgPicture.asset(
+              'assets/icons/ic_alert.svg',
+              width: 20,
+              height: 20,
+              colorFilter: ColorFilter.mode(
+                themeService.textColor,
+                BlendMode.srcIn,
+              ),
             ),
             onPressed: () {
               // TODO: Handle alert/notifications action
