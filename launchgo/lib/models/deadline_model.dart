@@ -29,11 +29,39 @@ class DeadlineAttachment extends Equatable {
   List<Object?> get props => [id, name, link, size, mimeType];
 }
 
+// Course info embedded in assignment (new API format)
+class CourseInfo extends Equatable {
+  final String id;
+  final String code;
+  final String name;
+  final String semesterId;
+
+  const CourseInfo({
+    required this.id,
+    required this.code,
+    required this.name,
+    required this.semesterId,
+  });
+
+  factory CourseInfo.fromJson(Map<String, dynamic> json) {
+    return CourseInfo(
+      id: json['id'] ?? '',
+      code: json['code'] ?? '',
+      name: json['name'] ?? '',
+      semesterId: json['semesterId'] ?? '',
+    );
+  }
+
+  @override
+  List<Object?> get props => [id, code, name, semesterId];
+}
+
 class DeadlineAssignment extends Equatable {
   final String id;
   final String title;
   final DateTime dueDate;
   final String status;
+  final CourseInfo? course;  // New: embedded course info
   final List<DeadlineAttachment> attachments;
 
   const DeadlineAssignment({
@@ -41,6 +69,7 @@ class DeadlineAssignment extends Equatable {
     required this.title,
     required this.dueDate,
     required this.status,
+    this.course,
     required this.attachments,
   });
 
@@ -52,6 +81,9 @@ class DeadlineAssignment extends Equatable {
           ? DateTime.parse(json['dueDateAt']).toLocal()  // Convert UTC to local timezone
           : DateTime.now(),
       status: json['status'] ?? 'pending',
+      course: json['course'] != null
+          ? CourseInfo.fromJson(json['course'])
+          : null,
       attachments: json['attachments'] != null
           ? (json['attachments'] as List)
               .map((a) => DeadlineAttachment.fromJson(a))
@@ -64,7 +96,7 @@ class DeadlineAssignment extends Equatable {
   bool get isOverdue => !isCompleted && dueDate.toUtc().isBefore(DateTime.now().toUtc());
 
   @override
-  List<Object?> get props => [id, title, dueDate, status, attachments];
+  List<Object?> get props => [id, title, dueDate, status, course, attachments];
 }
 
 class DeadlineCourse extends Equatable {

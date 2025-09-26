@@ -586,18 +586,21 @@ class ApiServiceRetrofit {
   }
 
   String _formatDateForApi(DateTime dateTime) {
-    return dateTime.toIso8601String().replaceAll('T', ' ').replaceAll('Z', '');
+    // Format as YYYY-MM-DD HH:MM:SS for API
+    // Ensure we're working with local time, not UTC
+    final local = dateTime.toLocal();
+    final year = local.year.toString().padLeft(4, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    final day = local.day.toString().padLeft(2, '0');
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    final second = local.second.toString().padLeft(2, '0');
+    return '$year-$month-$day $hour:$minute:$second';
   }
 
   String _formatDateForDeadlines(DateTime dateTime) {
-    // Format as YYYY-MM-DD HH:MM:SS for deadlines API
-    final year = dateTime.year.toString().padLeft(4, '0');
-    final month = dateTime.month.toString().padLeft(2, '0');
-    final day = dateTime.day.toString().padLeft(2, '0');
-    final hour = dateTime.hour.toString().padLeft(2, '0');
-    final minute = dateTime.minute.toString().padLeft(2, '0');
-    final second = dateTime.second.toString().padLeft(2, '0');
-    return '$year-$month-$day $hour:$minute:$second';
+    // Use the same format as events API
+    return _formatDateForApi(dateTime);
   }
 
   Future<Map<String, dynamic>?> createEvent(Map<String, dynamic> eventData) async {

@@ -13,12 +13,10 @@ import '../documents/document_upload_widget.dart';
 
 class DeadlineCard extends StatefulWidget {
   final DeadlineAssignment assignment;
-  final DeadlineCourse course;
 
   const DeadlineCard({
     super.key,
     required this.assignment,
-    required this.course,
   });
 
   @override
@@ -77,10 +75,16 @@ class _DeadlineCardState extends State<DeadlineCard> {
         newStatus = isOverdue ? 'overdue' : 'pending';
       }
       
-      debugPrint('📝 Updating assignment ${widget.assignment.id} in course ${widget.course.id} to status: $newStatus');
+      // Use course ID from embedded course info
+      final courseId = widget.assignment.course?.id ?? '';
+      if (courseId.isEmpty) {
+        throw Exception('No course ID available for assignment');
+      }
+      
+      debugPrint('📝 Updating assignment ${widget.assignment.id} in course $courseId to status: $newStatus');
       
       final result = await apiService.updateAssignment(
-        widget.course.id,
+        courseId,
         widget.assignment.id,
         {'status': newStatus},
       );
@@ -135,9 +139,15 @@ class _DeadlineCardState extends State<DeadlineCard> {
     try {
       final apiService = context.read<ApiServiceRetrofit>();
       
+      // Use course ID from embedded course info
+      final courseId = widget.assignment.course?.id ?? '';
+      if (courseId.isEmpty) {
+        throw Exception('No course ID available for assignment');
+      }
+      
       debugPrint('🗑️ Deleting attachment: $attachmentId');
       await apiService.deleteAttachment(
-        widget.course.id,
+        courseId,
         widget.assignment.id,
         attachmentId,
       );
@@ -148,8 +158,9 @@ class _DeadlineCardState extends State<DeadlineCard> {
       // If no attachments left and assignment was completed, reset to pending status
       if (widget.assignment.attachments.isEmpty && _isCompleted) {
         try {
+          final courseId = widget.assignment.course?.id ?? '';
           await apiService.updateAssignment(
-            widget.course.id,
+            courseId,
             widget.assignment.id,
             {'status': 'pending'},
           );
@@ -429,9 +440,15 @@ class _DeadlineCardState extends State<DeadlineCard> {
       
       // If a file is selected, upload it first
       if (_selectedFile != null) {
+        // Use course ID from embedded course info
+        final courseId = widget.assignment.course?.id ?? '';
+        if (courseId.isEmpty) {
+          throw Exception('No course ID available for assignment');
+        }
+        
         debugPrint('📎 Uploading file: ${_selectedFile!.path}');
         final uploadResponse = await apiService.uploadAttachment(
-          widget.course.id,
+          courseId,
           widget.assignment.id,
           _selectedFile!,
           _selectedFile!.path.split('/').last,
@@ -453,8 +470,13 @@ class _DeadlineCardState extends State<DeadlineCard> {
       }
       
       // Mark assignment as completed
+      final courseId = widget.assignment.course?.id ?? '';
+      if (courseId.isEmpty) {
+        throw Exception('No course ID available for assignment');
+      }
+      
       await apiService.updateAssignment(
-        widget.course.id,
+        courseId,
         widget.assignment.id,
         {'status': 'completed'},
       );

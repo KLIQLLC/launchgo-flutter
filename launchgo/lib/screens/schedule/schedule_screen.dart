@@ -23,13 +23,11 @@ class ScheduleScreen extends StatefulWidget {
 }
 
 class _ScheduleScreenState extends State<ScheduleScreen> {
-  static const _weekDuration = Duration(days: 7);
-  static const _endOfWeekOffset = Duration(days: 6);
-  
-  List<DeadlineCourse> _courses = [];
+  List<DeadlineAssignment> _assignments = [];
   bool _isLoading = true;
   String? _errorMessage;
   DateTime _currentWeekStart = DateTime.now();
+  DateTime _currentWeekEnd = DateTime.now();
   final GlobalKey<_DeadlinesListState> _deadlinesListKey = GlobalKey<_DeadlinesListState>();
 
   @override
@@ -41,7 +39,21 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   void _initializeWeekStart() {
     final now = DateTime.now();
-    _currentWeekStart = now.subtract(Duration(days: now.weekday % 7));
+    // Get the start of the current week (Sunday at midnight)
+    final weekday = now.weekday % 7; // Sunday = 0
+    _currentWeekStart = DateTime(
+      now.year,
+      now.month,
+      now.day - weekday,
+      0, 0, 0, 0, 0  // Set time to midnight
+    );
+    // End of week is next Sunday at midnight (which captures all of Saturday)
+    _currentWeekEnd = DateTime(
+      _currentWeekStart.year,
+      _currentWeekStart.month,
+      _currentWeekStart.day + 7,
+      0, 0, 0, 0, 0
+    );
   }
 
   Future<void> _loadDeadlines() async {
@@ -52,20 +64,19 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
     try {
       final apiService = context.read<ApiServiceRetrofit>();
-      final endOfWeek = _currentWeekStart.add(_endOfWeekOffset);
 
       final response = await apiService.getDeadlines(
         startAt: _currentWeekStart,
-        endAt: endOfWeek,
+        endAt: _currentWeekEnd,
       );
       
-      // API returns direct array of courses with assignments
-      final courses = response
-          .map((c) => DeadlineCourse.fromJson(c))
+      // API now returns direct array of assignments with embedded course info
+      final assignments = response
+          .map((a) => DeadlineAssignment.fromJson(a))
           .toList();
           
       setState(() {
-        _courses = courses;
+        _assignments = assignments;
       });
     } catch (e) {
       setState(() {
@@ -81,31 +92,44 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   void _navigateWeek(int weekOffset) {
     setState(() {
-      _currentWeekStart = weekOffset > 0
-          ? _currentWeekStart.add(_weekDuration)
-          : _currentWeekStart.subtract(_weekDuration);
+      if (weekOffset > 0) {
+        // Move to next week - add 7 days while maintaining midnight time
+        _currentWeekStart = DateTime(
+          _currentWeekStart.year,
+          _currentWeekStart.month,
+          _currentWeekStart.day + 7,
+          0, 0, 0, 0, 0
+        );
+      } else {
+        // Move to previous week - subtract 7 days while maintaining midnight time  
+        _currentWeekStart = DateTime(
+          _currentWeekStart.year,
+          _currentWeekStart.month,
+          _currentWeekStart.day - 7,
+          0, 0, 0, 0, 0
+        );
+      }
+      // Recalculate week end - next Sunday at midnight
+      _currentWeekEnd = DateTime(
+        _currentWeekStart.year,
+        _currentWeekStart.month,
+        _currentWeekStart.day + 7,
+        0, 0, 0, 0, 0
+      );
     });
     _loadDeadlines();
   }
 
-  List<MapEntry<DeadlineCourse, DeadlineAssignment>> _getSortedAssignments() {
-    final assignments = <MapEntry<DeadlineCourse, DeadlineAssignment>>[];
-    
-    for (final course in _courses) {
-      for (final assignment in course.assignments) {
-        assignments.add(MapEntry(course, assignment));
-      }
-    }
-    
-    assignments.sort((a, b) => a.value.dueDate.compareTo(b.value.dueDate));
+  List<DeadlineAssignment> _getSortedAssignments() {
+    final assignments = List<DeadlineAssignment>.from(_assignments);
+    assignments.sort((a, b) => a.dueDate.compareTo(b.dueDate));
     return assignments;
   }
 
   String _getWeekRangeText() {
-    final endOfWeek = _currentWeekStart.add(_endOfWeekOffset);
     final startFormat = DateFormat('MMM d');
     final endFormat = DateFormat('MMM d, yyyy');
-    return '${startFormat.format(_currentWeekStart)} - ${endFormat.format(endOfWeek)}';
+    return '${startFormat.format(_currentWeekStart)} - ${endFormat.format(_currentWeekEnd)}';
   }
 
   Future<void> _navigateToSingleEvent() async {
@@ -184,7 +208,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         assignments: _getSortedAssignments(),
         weekRangeText: _getWeekRangeText(),
         weekStart: _currentWeekStart,
-        weekEnd: _currentWeekStart.add(_endOfWeekOffset),
+        weekEnd: _currentWeekEnd,
         onPreviousWeek: () => _navigateWeek(-1),
         onNextWeek: () => _navigateWeek(1),
         themeService: themeService,
@@ -337,7 +361,7 @@ class _StudentInfo extends StatelessWidget {
 }
 
 class _DeadlinesList extends StatefulWidget {
-  final List<MapEntry<DeadlineCourse, DeadlineAssignment>> assignments;
+  final List<DeadlineAssignment> assignments;  // Changed: Direct assignments
   final String weekRangeText;
   final DateTime weekStart;
   final DateTime weekEnd;
@@ -480,13 +504,13 @@ class _DeadlinesListState extends State<_DeadlinesList> {
     }
 
     // Group assignments by course code
-    Map<String, List<MapEntry<DeadlineCourse, DeadlineAssignment>>> groupedAssignments = {};
-    for (final entry in widget.assignments) {
-      final courseCode = entry.key.code;
+    Map<String, List<DeadlineAssignment>> groupedAssignments = {};
+    for (final assignment in widget.assignments) {
+      final courseCode = assignment.course?.code ?? 'Unknown Course';
       if (!groupedAssignments.containsKey(courseCode)) {
         groupedAssignments[courseCode] = [];
       }
-      groupedAssignments[courseCode]!.add(entry);
+      groupedAssignments[courseCode]!.add(assignment);
     }
 
     return Column(
@@ -508,12 +532,11 @@ class _DeadlinesListState extends State<_DeadlinesList> {
               ),
             ),
             // Assignments for this course
-            ...courseGroup.value.map((entry) {
+            ...courseGroup.value.map((assignment) {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: DeadlineCard(
-                  assignment: entry.value,
-                  course: entry.key,
+                  assignment: assignment,
                 ),
               );
             }),
