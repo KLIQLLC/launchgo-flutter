@@ -141,7 +141,7 @@ class _EventCardContent extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       border: Border.all(
         color: event.color.withValues(alpha: 0.4),
-        width: 1.5,
+        width: 1.0,
       ),
     );
   }
