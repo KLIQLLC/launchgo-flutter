@@ -10,6 +10,9 @@ import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/widgets/splash_screen.dart';
 import 'package:provider/provider.dart';
+import 'package:stream_chat_flutter/stream_chat_flutter.dart';
+
+final streamChatClient = StreamChatClient('b2xg2crxdpft', logLevel: Level.INFO);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -90,6 +93,10 @@ class _MyAppState extends State<MyApp> {
         theme: themeService.themeData,
         home: const SplashScreen(),
         debugShowCheckedModeBanner: false,
+        builder: (context, child) => StreamChat(
+          client: streamChatClient,
+          child: child!,
+        ),
       );
     }
 
@@ -98,6 +105,10 @@ class _MyAppState extends State<MyApp> {
       theme: themeService.themeData,
       routerConfig: _appRouter.router,
       debugShowCheckedModeBanner: false,
+      builder: (context, child) => StreamChat(
+        client: streamChatClient,
+        child: child!,
+      ),
     );
   }
 }

@@ -26,6 +26,7 @@ class Student extends Equatable {
   final String? role;
   final String? mentorId;
   final String? avatarUrl;
+  final String? getStreamToken;
 
   const Student({
     required this.id,
@@ -38,6 +39,7 @@ class Student extends Equatable {
     this.role,
     this.mentorId,
     this.avatarUrl,
+    this.getStreamToken,
   });
 
   factory Student.fromJson(Map<String, dynamic> json) {
@@ -54,13 +56,14 @@ class Student extends Equatable {
       role: json['role'],
       mentorId: json['mentorId'],
       avatarUrl: json['avatarUrl'] ?? json['avatar'],
+      getStreamToken: json['getStreamToken'],
     );
   }
 
   @override
   List<Object?> get props => [
     id, name, email, status, gpa, academicYear, 
-    createdAt, role, mentorId, avatarUrl
+    createdAt, role, mentorId, avatarUrl, getStreamToken
   ];
 }
 
@@ -74,6 +77,11 @@ class UserModel extends Equatable {
   final List<Student> students; // For mentors
   final List<Semester> semesters; // Available semesters
   final String? avatarUrl;
+  final String? getStreamToken;
+  final String? mentorId;
+  final String? mentorName;
+  final String? mentorAvatar;
+  final String? mentorEmail;
   final String? selectedStudentId; // Currently selected student for mentor
   final String? selectedSemesterId; // Currently selected semester
 
@@ -87,6 +95,11 @@ class UserModel extends Equatable {
     this.students = const [],
     this.semesters = const [],
     this.avatarUrl,
+    this.getStreamToken,
+    this.mentorId,
+    this.mentorName,
+    this.mentorAvatar,
+    this.mentorEmail,
     this.selectedStudentId,
     this.selectedSemesterId,
   });
@@ -154,6 +167,11 @@ class UserModel extends Equatable {
       students: studentsList,
       semesters: const [], // Semesters loaded separately now
       avatarUrl: userData['avatarUrl'] ?? userData['avatar'],
+      getStreamToken: userData['getStreamToken'],
+      mentorId: userData['mentorId'],
+      mentorName: userData['mentorName'],
+      mentorAvatar: userData['mentorAvatar'],
+      mentorEmail: userData['mentorEmail'],
       selectedSemesterId: null, // Will be set when semesters are loaded
     );
   }
@@ -167,6 +185,11 @@ class UserModel extends Equatable {
     List<Student>? students,
     List<Semester>? semesters,
     String? avatarUrl,
+    String? getStreamToken,
+    String? mentorId,
+    String? mentorName,
+    String? mentorAvatar,
+    String? mentorEmail,
     String? selectedStudentId,
     String? selectedSemesterId,
   }) {
@@ -179,6 +202,11 @@ class UserModel extends Equatable {
       students: students ?? this.students,
       semesters: semesters ?? this.semesters,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      getStreamToken: getStreamToken ?? this.getStreamToken,
+      mentorId: mentorId ?? this.mentorId,
+      mentorName: mentorName ?? this.mentorName,
+      mentorAvatar: mentorAvatar ?? this.mentorAvatar,
+      mentorEmail: mentorEmail ?? this.mentorEmail,
       selectedStudentId: selectedStudentId ?? this.selectedStudentId,
       selectedSemesterId: selectedSemesterId ?? this.selectedSemesterId,
     );
@@ -189,5 +217,5 @@ class UserModel extends Equatable {
   bool get isCaseManager => role == UserRole.caseManager;
 
   @override
-  List<Object?> get props => [id, name, email, role, students, avatarUrl, selectedStudentId];
+  List<Object?> get props => [id, name, email, role, students, avatarUrl, getStreamToken, mentorId, mentorName, mentorAvatar, mentorEmail, selectedStudentId];
 }
