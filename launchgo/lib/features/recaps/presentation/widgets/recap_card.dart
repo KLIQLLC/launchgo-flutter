@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
-import '../models/recap_model.dart';
+import '../../../../models/recap_model.dart';
 
 class RecapCard extends StatelessWidget {
   final Recap recap;

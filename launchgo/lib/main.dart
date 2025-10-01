@@ -3,12 +3,15 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:launchgo/config/environment.dart';
 import 'package:launchgo/router/app_router.dart';
 import 'package:launchgo/services/api_service_retrofit.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/widgets/splash_screen.dart';
+import 'package:launchgo/features/recaps/presentation/bloc/recap_bloc.dart';
+import 'package:launchgo/features/recaps/data/recap_repository.dart';
 import 'package:provider/provider.dart';
 
 void main() async {
@@ -47,8 +50,24 @@ void main() async {
             authService: context.read<AuthService>(),
           ),
         ),
+        ProxyProvider<ApiServiceRetrofit, RecapRepository>(
+          update: (context, apiService, _) => RecapRepositoryImpl(apiService),
+        ),
+        ProxyProvider2<RecapRepository, AuthService, RecapBloc>(
+          update: (context, repository, authService, _) => RecapBloc(
+            repository: repository,
+            authService: authService,
+          ),
+        ),
       ],
-      child: const MyApp(),
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider<RecapBloc>(
+            create: (context) => context.read<RecapBloc>(),
+          ),
+        ],
+        child: const MyApp(),
+      ),
     ),
   );
 }
