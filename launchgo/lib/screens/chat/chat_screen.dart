@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
-import '../../services/theme_service.dart';
 import 'package:stream_chat_flutter/stream_chat_flutter.dart';
-import '../../main.dart';
+import '../../services/stream_chat_service.dart';
 import '../../widgets/custom_chat_widget.dart';
 import '../../services/auth_service.dart';
 
@@ -42,32 +40,26 @@ class ChatScreen extends StatelessWidget {
   Future<Map<String, dynamic>> _initStream(BuildContext context) async {
     final data = getChatData(context);
     final authService = Provider.of<AuthService>(context, listen: false);
+    final streamChatService = Provider.of<StreamChatService>(context, listen: false);
     final user = authService.userInfo;
     if (user == null) {
       throw Exception('User info not loaded');
     }
-    // Подключаем пользователя только если ещё не подключён
-    if (streamChatClient.state.currentUser == null || streamChatClient.state.currentUser!.id != data['userId']) {
-      await streamChatClient.connectUser(
-        User(
-          id: data['userId'],
-          extraData: {
-            'name': data['userName'],
-            'image': data['userImage'],
-          },
-        ),
-        data['userToken'],
-      );
-    }
+    
+    // Connect user to Stream Chat
+    await streamChatService.connectUser(
+      userId: data['userId'],
+      token: data['userToken'],
+      userName: data['userName'],
+      userImage: data['userImage'],
+    );
     Channel? channel;
     if (user.isStudent) {
       // Для студента канал — это его id
       final channelId = user.id;
-      final channels = await streamChatClient.queryChannels(
-        filter: Filter.equal('id', channelId),
-        state: true,
-        watch: true,
-      ).first;
+      final channels = await streamChatService.queryChannels(
+        Filter.equal('id', channelId),
+      );
       if (channels.isEmpty) {
         throw Exception('Чат с id= [32m$channelId [0m не найден');
       }
@@ -80,13 +72,11 @@ class ChatScreen extends StatelessWidget {
       if (studentId == null) {
         throw Exception('Не выбран студент для чата');
       }
-      final channels = await streamChatClient.queryChannels(
-        filter: Filter.and([
+      final channels = await streamChatService.queryChannels(
+        Filter.and([
           Filter.in_('members', [mentorId, studentId]),
         ]),
-        state: true,
-        watch: true,
-      ).first;
+      );
       if (channels.isEmpty) {
         throw Exception('Нет чата между ментором и студентом');
       }
@@ -118,7 +108,7 @@ class ChatScreen extends StatelessWidget {
                   : null,
             ),
             body: CustomChatWidget(
-              client: streamChatClient,
+              client: context.read<StreamChatService>().client,
               channel: channel,
             ),
           );

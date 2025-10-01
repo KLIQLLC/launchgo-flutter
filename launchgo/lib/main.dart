@@ -8,11 +8,10 @@ import 'package:launchgo/router/app_router.dart';
 import 'package:launchgo/services/api_service_retrofit.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/theme_service.dart';
+import 'package:launchgo/services/stream_chat_service.dart';
 import 'package:launchgo/widgets/splash_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:stream_chat_flutter/stream_chat_flutter.dart';
-
-final streamChatClient = StreamChatClient('b2xg2crxdpft', logLevel: Level.INFO);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,6 +44,7 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthService()..initialize()),
         ChangeNotifierProvider(create: (_) => ThemeService()),
+        ChangeNotifierProvider(create: (_) => StreamChatService()),
         Provider(
           create: (context) => ApiServiceRetrofit(
             authService: context.read<AuthService>(),
@@ -86,6 +86,7 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     final themeService = context.watch<ThemeService>();
+    final streamChatService = context.watch<StreamChatService>();
     
     if (_showSplash) {
       return MaterialApp(
@@ -94,7 +95,7 @@ class _MyAppState extends State<MyApp> {
         home: const SplashScreen(),
         debugShowCheckedModeBanner: false,
         builder: (context, child) => StreamChat(
-          client: streamChatClient,
+          client: streamChatService.client,
           child: child!,
         ),
       );
@@ -106,7 +107,7 @@ class _MyAppState extends State<MyApp> {
       routerConfig: _appRouter.router,
       debugShowCheckedModeBanner: false,
       builder: (context, child) => StreamChat(
-        client: streamChatClient,
+        client: streamChatService.client,
         child: child!,
       ),
     );
