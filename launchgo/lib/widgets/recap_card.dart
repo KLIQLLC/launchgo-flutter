@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/recap_model.dart';
 
 class RecapCard extends StatelessWidget {
@@ -77,10 +78,13 @@ class RecapCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                Icon(
-                  Icons.share,
-                  size: 20,
-                  color: Colors.white.withValues(alpha: 0.7),
+                GestureDetector(
+                  onTap: () => _shareRecap(recap),
+                  child: Icon(
+                    Icons.share,
+                    size: 20,
+                    color: Colors.white.withValues(alpha: 0.7),
+                  ),
                 ),
               ],
             ),
@@ -105,5 +109,20 @@ class RecapCard extends StatelessWidget {
 
   String _formatDate(DateTime date) {
     return DateFormat('MMM d, yyyy, hh:mm a').format(date);
+  }
+
+  void _shareRecap(Recap recap) {
+    final dateStr = _formatDate(recap.createdAt);
+    final studentInfo = recap.studentName != null ? '\nStudent: ${recap.studentName}' : '';
+    
+    final shareText = '''${recap.title}
+$dateStr$studentInfo
+
+${recap.notes}''';
+    
+    Share.share(
+      shareText,
+      subject: recap.title,
+    );
   }
 }

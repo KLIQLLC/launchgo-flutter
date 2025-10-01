@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:intl/intl.dart';
 import '../models/recap_model.dart';
 import '../services/api_service_retrofit.dart';
 import '../services/theme_service.dart';
@@ -276,9 +278,7 @@ class _RecapDetailsSheet extends StatelessWidget {
                         ),
                       ),
                       IconButton(
-                        onPressed: () {
-                          // TODO: Implement share functionality
-                        },
+                        onPressed: () => _shareRecap(recap),
                         icon: const Icon(
                           Icons.share,
                           color: Colors.white,
@@ -344,5 +344,20 @@ class _RecapDetailsSheet extends StatelessWidget {
     final period = date.hour >= 12 ? 'PM' : 'AM';
     
     return '$month $day, $year, $hour:$minute $period';
+  }
+
+  void _shareRecap(Recap recap) {
+    final dateStr = DateFormat('MMM d, yyyy, hh:mm a').format(recap.createdAt);
+    final studentInfo = recap.studentName != null ? '\nStudent: ${recap.studentName}' : '';
+    
+    final shareText = '''${recap.title}
+$dateStr$studentInfo
+
+${recap.notes}''';
+    
+    Share.share(
+      shareText,
+      subject: recap.title,
+    );
   }
 }
