@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:stream_chat_flutter/stream_chat_flutter.dart';
 import '../services/auth_service.dart';
+import 'dart:async';
 
 class CustomChatWidget extends StatelessWidget {
   final StreamChatClient client;
@@ -35,19 +36,33 @@ class CustomChatWidget extends StatelessWidget {
   }
 }
 
-class _CustomChatAppBar extends StatelessWidget {
+class _CustomChatAppBar extends StatefulWidget {
   final Channel channel;
   const _CustomChatAppBar({required this.channel});
 
   @override
-  Widget build(BuildContext context) {
+  State<_CustomChatAppBar> createState() => _CustomChatAppBarState();
+}
+
+class _CustomChatAppBarState extends State<_CustomChatAppBar> {
+  StreamSubscription? _channelSubscription;
+  bool isOnline = false;
+
+  String displayName = '';
+  String displayAvatar = '';
+  String? otherUserId;
+
+  @override
+  void initState() {
+    super.initState();
+    _initUserData();
+    _subscribeToChannelEvents();
+    _updateOnlineStatus();
+  }
+
+  void _initUserData() {
     final authService = Provider.of<AuthService>(context, listen: false);
     final user = authService.userInfo;
-    String displayName = '';
-    String displayAvatar = '';
-    bool isOnline = false;
-    String? otherUserId;
-
     if (user == null) {
       displayName = 'Unknown';
     } else if (user.isStudent) {
@@ -62,15 +77,37 @@ class _CustomChatAppBar extends StatelessWidget {
       displayAvatar = selectedStudent?.avatarUrl ?? '';
       otherUserId = selectedStudent?.id;
     }
+  }
 
-    // TODO - online-status dont work
-    final members = channel.state?.members ?? [];
+  void _subscribeToChannelEvents() {
+    _channelSubscription = widget.channel.on().listen((event) {
+      if (event.type == 'user.presence.changed' ||
+          event.type == 'user.updated' ||
+          event.type == 'member.updated') {
+        _updateOnlineStatus();
+      }
+    });
+  }
+
+  void _updateOnlineStatus() {
+    final members = widget.channel.state?.members ?? [];
     final otherMember = members.firstWhere(
       (m) => m.userId == otherUserId,
       orElse: () => members.isNotEmpty ? members.first : Member(userId: '', user: null),
     );
-    isOnline = otherMember.user?.online ?? false;
+    setState(() {
+      isOnline = otherMember.user?.online ?? false;
+    });
+  }
 
+  @override
+  void dispose() {
+    _channelSubscription?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return SafeArea(
       child: Container(
         height: 64,
