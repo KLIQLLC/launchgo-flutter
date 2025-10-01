@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../models/recap_model.dart';
+import '../../../../services/theme_service.dart';
 import '../bloc/recap_bloc.dart';
 import '../bloc/recap_event.dart';
 import '../bloc/recap_state.dart';
@@ -62,6 +63,7 @@ class _RecapFormScreenState extends State<RecapFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final themeService = context.watch<ThemeService>();
     return BlocListener<RecapBloc, RecapState>(
       listener: (context, state) {
         if (state is RecapCreated) {
@@ -134,6 +136,7 @@ class _RecapFormScreenState extends State<RecapFormScreen> {
                         label: 'Session Title',
                         hint: 'Enter session title',
                         isRequired: true,
+                        themeService: themeService,
                       ),
                       const SizedBox(height: 24),
                       _buildTextField(
@@ -142,6 +145,7 @@ class _RecapFormScreenState extends State<RecapFormScreen> {
                         hint: 'Enter your session notes here...',
                         isRequired: true,
                         maxLines: 12,
+                        themeService: themeService,
                       ),
                     ],
                   ),
@@ -208,6 +212,7 @@ class _RecapFormScreenState extends State<RecapFormScreen> {
     required TextEditingController controller,
     required String label,
     required String hint,
+    required ThemeService themeService,
     bool isRequired = false,
     int maxLines = 1,
   }) {
@@ -229,7 +234,7 @@ class _RecapFormScreenState extends State<RecapFormScreen> {
           style: const TextStyle(color: Colors.white),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(color: Colors.grey[400]),
+            hintStyle: TextStyle(color: themeService.inputPlaceholderColor),
             filled: true,
             fillColor: const Color(0xFF1A2332),
             border: OutlineInputBorder(

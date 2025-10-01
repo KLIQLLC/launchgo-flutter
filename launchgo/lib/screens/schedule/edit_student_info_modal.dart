@@ -415,7 +415,7 @@ class _EditStudentInfoModalState extends State<EditStudentInfoModal> {
           contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           hintText: 'Enter GPA (0.0 - 4.0)',
           hintStyle: TextStyle(
-            color: Colors.grey,
+            color: Color(0xFF93A2B7),
             fontSize: 14,
           ),
         ),

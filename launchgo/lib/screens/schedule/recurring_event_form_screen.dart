@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
 import '../../services/api_service_retrofit.dart';
+import '../../services/theme_service.dart';
 import '../../widgets/cupertino_dropdown.dart';
 
 class RecurringEventFormScreen extends StatefulWidget {
@@ -293,6 +294,7 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final themeService = context.watch<ThemeService>();
     return Scaffold(
       backgroundColor: const Color(0xFF0F1419),
       appBar: AppBar(
@@ -321,6 +323,7 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
                       label: 'Event Name',
                       hint: 'Enter event name',
                       isRequired: true,
+                      themeService: themeService,
                     ),
                     const SizedBox(height: 20),
                     _buildDateField(),
@@ -335,6 +338,7 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
                       controller: _locationController,
                       label: 'Location (Optional)',
                       hint: 'Enter event location',
+                      themeService: themeService,
                     ),
                     const SizedBox(height: 20),
                     _buildTextField(
@@ -342,6 +346,7 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
                       label: 'Description (Optional)',
                       hint: 'Enter event description',
                       maxLines: 3,
+                      themeService: themeService,
                     ),
                     const SizedBox(height: 20), // Add some bottom padding
                   ],
@@ -375,6 +380,7 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
     required TextEditingController controller,
     required String label,
     required String hint,
+    required ThemeService themeService,
     bool isRequired = false,
     int maxLines = 1,
   }) {
@@ -396,7 +402,7 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
           style: const TextStyle(color: Colors.white),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(color: Colors.grey[400]),
+            hintStyle: TextStyle(color: themeService.inputPlaceholderColor),
             filled: true,
             fillColor: const Color(0xFF1A2332),
             border: OutlineInputBorder(

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
 import '../../services/api_service_retrofit.dart';
+import '../../services/theme_service.dart';
 import '../../models/event_model.dart';
 import '../../widgets/cupertino_dropdown.dart';
 
@@ -297,6 +298,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final themeService = context.watch<ThemeService>();
     return Scaffold(
       backgroundColor: const Color(0xFF0F1419),
       appBar: AppBar(
@@ -325,6 +327,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                       label: 'Event Name',
                       hint: 'Enter event name',
                       isRequired: true,
+                      themeService: themeService,
                     ),
                     const SizedBox(height: 20),
                     _buildDateSection(),
@@ -337,6 +340,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                       controller: _locationController,
                       label: 'Location',
                       hint: 'Enter event location',
+                      themeService: themeService,
                     ),
                     const SizedBox(height: 20),
                     _buildTextField(
@@ -344,6 +348,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                       label: 'Description',
                       hint: 'Enter event description',
                       maxLines: 3,
+                      themeService: themeService,
                     ),
                     const SizedBox(height: 20), // Add some bottom padding
                   ],
@@ -404,6 +409,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
     required TextEditingController controller,
     required String label,
     required String hint,
+    required ThemeService themeService,
     bool isRequired = false,
     int maxLines = 1,
   }) {
@@ -425,7 +431,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
           style: const TextStyle(color: Colors.white),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(color: Colors.grey[400]),
+            hintStyle: TextStyle(color: themeService.inputPlaceholderColor),
             filled: true,
             fillColor: const Color(0xFF1A2332),
             border: OutlineInputBorder(
