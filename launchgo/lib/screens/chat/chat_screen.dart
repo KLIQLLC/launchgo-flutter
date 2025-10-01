@@ -207,11 +207,13 @@ class _ChatScreenState extends State<ChatScreen> {
           return const Center(child: CircularProgressIndicator());
         } else if (snapshot.hasError) {
           return Scaffold(
+            backgroundColor: const Color(0xFF020817), // Match chat background
             appBar: AppBar(
-              title: const Text('Chat'),
+              backgroundColor: const Color(0xFF0F1828), // Slightly lighter app bar
+              title: const Text('Chat', style: TextStyle(color: Colors.white)),
               leading: Navigator.of(context).canPop()
                   ? IconButton(
-                      icon: const Icon(Icons.arrow_back),
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
                       onPressed: () => Navigator.of(context).pop(),
                     )
                   : null,
@@ -246,11 +248,13 @@ class _ChatScreenState extends State<ChatScreen> {
         } else {
           final channel = snapshot.data!['channel'] as Channel;
           return Scaffold(
+            backgroundColor: const Color(0xFF020817), // Match chat background
             appBar: AppBar(
-              title: const Text('Chat'),
+              backgroundColor: const Color(0xFF0F1828), // Slightly lighter app bar
+              title: const Text('Chat', style: TextStyle(color: Colors.white)),
               leading: Navigator.of(context).canPop()
                   ? IconButton(
-                      icon: const Icon(Icons.arrow_back),
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
                       onPressed: () => Navigator.of(context).pop(),
                     )
                   : null,

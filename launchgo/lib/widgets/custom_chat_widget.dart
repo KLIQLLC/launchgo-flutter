@@ -16,20 +16,84 @@ class CustomChatWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamChannel(
-      channel: channel,
-      child: Scaffold(
-        appBar: PreferredSize(
-          preferredSize: const Size.fromHeight(64),
-          child: _CustomChatAppBar(channel: channel),
+    // Get the current theme
+    final streamTheme = StreamChatTheme.of(context);
+    
+    // Create custom theme with message colors
+    final customTheme = streamTheme.copyWith(
+      // Set the main chat background color
+      colorTheme: streamTheme.colorTheme.copyWith(
+        appBg: const Color(0xFF020817), // Main chat background
+        barsBg: const Color(0xFF0F1828), // App bar background
+        inputBg: const Color(0xFF1A2332), // Input background
+      ),
+      ownMessageTheme: streamTheme.ownMessageTheme.copyWith(
+        messageBackgroundColor: const Color(0xFFF8FAFC), // Light background for own messages
+        messageTextStyle: const TextStyle(
+          color: Color(0xFF0E172A), // Dark blue text for own messages
+          fontSize: 15,
         ),
-        body: const Column(
-          children: <Widget>[
-            Expanded(
-              child: StreamMessageListView(),
-            ),
-            StreamMessageInput(),
-          ],
+        repliesStyle: const TextStyle(
+          color: Color(0xFF64748B), // Muted dark text for replies
+        ),
+      ),
+      otherMessageTheme: streamTheme.otherMessageTheme.copyWith(
+        messageBackgroundColor: const Color(0xFF1A2332), // Dark card background
+        messageTextStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 15,
+        ),
+        repliesStyle: TextStyle(
+          color: Colors.white.withValues(alpha: 0.7),
+        ),
+      ),
+      messageInputTheme: streamTheme.messageInputTheme.copyWith(
+        inputBackgroundColor: const Color(0xFF1A2332),
+        inputTextStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 15,
+        ),
+        sendButtonColor: const Color(0xFF7B8CDE),
+        actionButtonColor: const Color(0xFF7B8CDE),
+        actionButtonIdleColor: const Color(0xFF64748B),
+        idleBorderGradient: const LinearGradient(
+          colors: [Color(0xFF2A3441), Color(0xFF2A3441)],
+        ),
+      ),
+      messageListViewTheme: streamTheme.messageListViewTheme.copyWith(
+        backgroundColor: const Color(0xFF020817), // Message list background
+      ),
+    );
+    
+    return StreamChatTheme(
+      data: customTheme,
+      child: StreamChannel(
+        channel: channel,
+        child: Scaffold(
+          backgroundColor: const Color(0xFF020817), // Dark blue-black background
+          appBar: PreferredSize(
+            preferredSize: const Size.fromHeight(64),
+            child: _CustomChatAppBar(channel: channel),
+          ),
+          body: Column(
+            children: <Widget>[
+              Expanded(
+                child: StreamMessageListView(
+                  messageBuilder: (context, details, messages, defaultWidget) {
+                    // You can return custom message widget here if needed
+                    return defaultWidget.copyWith(
+                      showUsername: true,
+                      showTimestamp: true,
+                      showSendingIndicator: true,
+                    );
+                  },
+                ),
+              ),
+              const StreamMessageInput(
+                disableAttachments: false,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -112,7 +176,7 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
       child: Container(
         height: 64,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        color: Colors.black,
+        color: const Color(0xFF0F1828), // Slightly lighter than background for app bar
         child: Row(
           children: [
             CircleAvatar(
