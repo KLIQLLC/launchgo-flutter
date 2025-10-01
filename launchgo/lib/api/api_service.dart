@@ -180,4 +180,23 @@ abstract class ApiService {
     @Path("eventId") String eventId,
     @Body() Map<String, dynamic> eventData,
   );
+
+  @GET("/users/{userId}/recaps")
+  Future<HttpResponse<dynamic>> getRecaps(
+    @Path("userId") String userId,
+    @Query("semesterId") String? semesterId,
+  );
+
+  @POST("/users/{userId}/recaps")
+  Future<HttpResponse<dynamic>> createRecap(
+    @Path("userId") String userId,
+    @Body() Map<String, dynamic> recapData,
+  );
+
+  @PATCH("/users/{userId}/recaps/{recapId}")
+  Future<HttpResponse<dynamic>> updateRecap(
+    @Path("userId") String userId,
+    @Path("recapId") String recapId,
+    @Body() Map<String, dynamic> recapData,
+  );
 }

@@ -742,4 +742,106 @@ class ApiServiceRetrofit {
       rethrow;
     }
   }
+
+  // Recap endpoints
+  
+  Future<List<Map<String, dynamic>>> getRecaps() async {
+    try {
+      // Ensure user info is loaded
+      if (_authService.userInfo == null) {
+        debugPrint('⚠️ User info not loaded yet, loading now...');
+        await _authService.loadUserInfo();
+      }
+      
+      final userId = _getEffectiveUserId();
+      if (userId == null) {
+        debugPrint('❌ Cannot get recaps: User ID is null');
+        return [];
+      }
+      
+      final semesterId = _authService.selectedSemesterId;
+      
+      debugPrint('🔄 Getting recaps for user $userId, semester $semesterId');
+      final response = await _retrofit.getRecaps(userId, semesterId);
+      final data = response.data;
+      
+      final parsedData = _parseJsonResponse(data);
+      if (parsedData is List) {
+        debugPrint('✅ Successfully fetched ${parsedData.length} recaps');
+        return parsedData.map<Map<String, dynamic>>((item) => 
+          item is Map<String, dynamic> ? item : {}
+        ).toList();
+      }
+      
+      debugPrint('⚠️ No recaps found or invalid response format');
+      return [];
+    } catch (e) {
+      debugPrint('❌ Failed to get recaps: $e');
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>?> createRecap(Map<String, dynamic> recapData) async {
+    try {
+      // Ensure user info is loaded
+      if (_authService.userInfo == null) {
+        debugPrint('⚠️ User info not loaded yet, loading now...');
+        await _authService.loadUserInfo();
+      }
+      
+      final userId = _getEffectiveUserId();
+      if (userId == null) {
+        debugPrint('❌ Cannot create recap: User ID is null');
+        return null;
+      }
+      
+      debugPrint('🔄 Creating recap for user $userId with data: $recapData');
+      final response = await _retrofit.createRecap(userId, recapData);
+      final data = response.data;
+      
+      final parsedData = _parseJsonResponse(data);
+      if (parsedData is Map<String, dynamic>) {
+        debugPrint('✅ Successfully created recap');
+        return parsedData;
+      }
+      
+      debugPrint('❌ No valid recap data returned');
+      return null;
+    } catch (e) {
+      debugPrint('❌ Failed to create recap: $e');
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>?> updateRecap(String recapId, Map<String, dynamic> recapData) async {
+    try {
+      // Ensure user info is loaded
+      if (_authService.userInfo == null) {
+        debugPrint('⚠️ User info not loaded yet, loading now...');
+        await _authService.loadUserInfo();
+      }
+      
+      final userId = _getEffectiveUserId();
+      if (userId == null) {
+        debugPrint('❌ Cannot update recap: User ID is null');
+        return null;
+      }
+      
+      debugPrint('🔄 Updating recap $recapId for user $userId with data: $recapData');
+      final response = await _retrofit.updateRecap(userId, recapId, recapData);
+      final data = response.data;
+      
+      final parsedData = _parseJsonResponse(data);
+      if (parsedData is Map<String, dynamic>) {
+        debugPrint('✅ Successfully updated recap');
+        return parsedData;
+      }
+      
+      debugPrint('❌ No valid recap data returned');
+      return null;
+    } catch (e) {
+      debugPrint('❌ Failed to update recap: $e');
+      rethrow;
+    }
+  }
 }

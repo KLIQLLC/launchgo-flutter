@@ -13,6 +13,8 @@ import 'package:launchgo/screens/documents/assignments_screen.dart';
 import 'package:launchgo/screens/login_screen.dart';
 import 'package:launchgo/screens/documents/document_form_screen.dart';
 import 'package:launchgo/screens/recaps_screen.dart';
+import 'package:launchgo/screens/recap_form_screen.dart';
+import 'package:launchgo/models/recap_model.dart';
 import 'package:launchgo/screens/schedule/schedule_screen.dart';
 import 'package:launchgo/screens/settings_screen.dart';
 import 'package:launchgo/screens/schedule/event_form_screen.dart';
@@ -154,6 +156,19 @@ class AppRouter {
           builder: (context, state) {
             final event = state.extra as Event;
             return EventFormScreen(event: event);
+          },
+        ),
+        GoRoute(
+          path: '/new-recap',
+          name: 'newRecap',
+          builder: (context, state) => const RecapFormScreen(),
+        ),
+        GoRoute(
+          path: '/edit-recap/:recapId',
+          name: 'editRecap',
+          builder: (context, state) {
+            final recap = state.extra as Recap;
+            return RecapFormScreen(recap: recap);
           },
         ),
         ShellRoute(
