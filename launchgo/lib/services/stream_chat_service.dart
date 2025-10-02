@@ -111,11 +111,14 @@ class StreamChatService extends ChangeNotifier {
       if (members != null && members.isNotEmpty) {
         await channel.create();
         await channel.addMembers(members);
+        // Watch the channel with presence enabled
+        await channel.watch(presence: true);
       } else {
-        await channel.watch();
+        // Watch the channel with presence enabled
+        await channel.watch(presence: true);
       }
       
-      debugPrint('🟢 Stream Chat: Channel ready - $channelId');
+      debugPrint('🟢 Stream Chat: Channel ready with presence tracking - $channelId');
       return channel;
     } catch (e) {
       debugPrint('❌ Stream Chat: Error with channel - $e');
@@ -129,6 +132,7 @@ class StreamChatService extends ChangeNotifier {
         filter: filter,
         state: true,
         watch: true,
+        presence: true,  // Enable presence tracking
       ).first;
       
       debugPrint('🟢 Stream Chat: Found ${channels.length} channels');

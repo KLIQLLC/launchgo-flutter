@@ -110,6 +110,7 @@ class _CustomChatAppBar extends StatefulWidget {
 
 class _CustomChatAppBarState extends State<_CustomChatAppBar> {
   StreamSubscription? _channelSubscription;
+  Timer? _statusRefreshTimer;
   bool isOnline = false;
 
   String displayName = '';
@@ -122,6 +123,11 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
     _initUserData();
     _subscribeToChannelEvents();
     _updateOnlineStatus();
+    
+    // Set up periodic refresh for status (every 5 seconds)
+    _statusRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _updateOnlineStatus();
+    });
   }
 
   void _initUserData() {
@@ -145,28 +151,49 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
 
   void _subscribeToChannelEvents() {
     _channelSubscription = widget.channel.on().listen((event) {
+      debugPrint('🔵 [CHAT] Channel event: ${event.type}');
+      
+      // Listen for various presence and user events
       if (event.type == 'user.presence.changed' ||
+          event.type == 'user.watching.start' ||
+          event.type == 'user.watching.stop' ||
           event.type == 'user.updated' ||
-          event.type == 'member.updated') {
+          event.type == 'member.updated' ||
+          event.type == 'health.check') {
         _updateOnlineStatus();
       }
+    });
+    
+    // Also listen to channel state changes
+    widget.channel.state?.membersStream.listen((_) {
+      _updateOnlineStatus();
     });
   }
 
   void _updateOnlineStatus() {
+    if (!mounted) return;
+    
     final members = widget.channel.state?.members ?? [];
+    debugPrint('🔵 [CHAT] Updating status for $otherUserId from ${members.length} members');
+    
     final otherMember = members.firstWhere(
       (m) => m.userId == otherUserId,
       orElse: () => members.isNotEmpty ? members.first : Member(userId: '', user: null),
     );
-    setState(() {
-      isOnline = otherMember.user?.online ?? false;
-    });
+    
+    final newOnlineStatus = otherMember.user?.online ?? false;
+    if (newOnlineStatus != isOnline) {
+      setState(() {
+        isOnline = newOnlineStatus;
+      });
+      debugPrint('🔵 [CHAT] Status updated: $displayName is now ${isOnline ? "online" : "offline"}');
+    }
   }
 
   @override
   void dispose() {
     _channelSubscription?.cancel();
+    _statusRefreshTimer?.cancel();
     super.dispose();
   }
 
