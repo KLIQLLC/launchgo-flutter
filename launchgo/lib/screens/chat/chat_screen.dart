@@ -1,86 +1,325 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
-import '../../services/theme_service.dart';
+import 'package:stream_chat_flutter/stream_chat_flutter.dart';
+import '../../services/stream_chat_service.dart';
+import '../../widgets/custom_chat_widget.dart';
+import '../../services/auth_service.dart';
 
-class ChatScreen extends StatelessWidget {
+class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final themeService = context.watch<ThemeService>();
+  State<ChatScreen> createState() => _ChatScreenState();
+}
+
+class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
+  StreamChatService? _streamChatService;
+  Channel? _currentChannel;
+  bool _isConnected = false;
+
+  Map<String, dynamic> getChatData(BuildContext context) {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final user = authService.userInfo;
+    if (user == null) {
+      throw Exception('User info not loaded');
+    }
     
-    return Scaffold(
-      backgroundColor: themeService.backgroundColor,
-      appBar: AppBar(
-        backgroundColor: themeService.backgroundColor,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back,
-            color: themeService.textColor,
-          ),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Text(
-          'Chat',
-          style: TextStyle(
-            color: themeService.textColor,
-            fontSize: 24,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        centerTitle: true,
-      ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: themeService.cardColor,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: themeService.borderColor,
-                    width: 1,
-                  ),
-                ),
-                child: SvgPicture.asset(
-                  'assets/icons/ic_chat.svg',
-                  width: 48,
-                  height: 48,
-                  colorFilter: ColorFilter.mode(
-                    themeService.textTertiaryColor,
-                    BlendMode.srcIn,
-                  ),
+    final userId = user.id;
+    final userToken = user.getStreamToken ?? '';
+    final userName = user.name;
+    final userImage = user.avatarUrl ?? '';
+    
+    // For students, get mentor info; for mentors, get selected student info
+    String? secondUserId;
+    String? secondUserName;
+    String? secondUserImage;
+    
+    if (user.isStudent) {
+      // Student user - get mentor info
+      secondUserId = user.mentorId;
+      secondUserName = user.mentorName ?? 'Mentor';
+      secondUserImage = user.mentorAvatar;
+      
+      debugPrint('🔵 [CHAT] Student chat setup - Mentor: $secondUserName ($secondUserId)');
+    } else if (user.isMentor) {
+      // Mentor user - get selected student info
+      final selectedStudent = authService.getSelectedStudent();
+      if (selectedStudent != null) {
+        secondUserId = selectedStudent.id;
+        secondUserName = selectedStudent.name;
+        secondUserImage = selectedStudent.avatarUrl;
+      } else if (user.students.isNotEmpty) {
+        // Fallback to first student if none selected
+        final firstStudent = user.students.first;
+        secondUserId = firstStudent.id;
+        secondUserName = firstStudent.name;
+        secondUserImage = firstStudent.avatarUrl;
+      } else {
+        throw Exception('No students available for chat');
+      }
+      
+      debugPrint('🟢 [CHAT] Mentor chat setup - Student: $secondUserName ($secondUserId)');
+    }
+    
+    return {
+      'userId': userId,
+      'userToken': userToken,
+      'userName': userName,
+      'userImage': userImage,
+      'secondUserId': secondUserId ?? '',
+      'secondUserName': secondUserName ?? 'Unknown',
+      'secondUserImage': secondUserImage ?? '',
+    };
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _cleanupAndDisconnect();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      // App is going to background - don't disconnect to avoid token issues
+      debugPrint('🟡 [CHAT] App going to background');
+    } else if (state == AppLifecycleState.resumed) {
+      // App is coming to foreground
+      debugPrint('🟢 [CHAT] App resumed');
+    }
+  }
+
+  Future<void> _cleanupAndDisconnect() async {
+    try {
+      // CRITICAL: First dispose of the channel to stop all Stream operations
+      if (_currentChannel != null) {
+        debugPrint('🔴 [CHAT] Disposing channel...');
+        _currentChannel!.dispose();
+        _currentChannel = null;
+        debugPrint('🔴 [CHAT] Channel disposed');
+      }
+      
+      // Then disconnect the user from Stream Chat
+      if (_streamChatService != null && _isConnected) {
+        await _streamChatService!.disconnectUser();
+        _isConnected = false;
+        debugPrint('🔴 [CHAT] User disconnected from Stream Chat');
+      }
+    } catch (e) {
+      debugPrint('❌ [CHAT] Error during cleanup: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> _initStream(BuildContext context) async {
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final streamChatService = Provider.of<StreamChatService>(context, listen: false);
+      _streamChatService = streamChatService;
+      final user = authService.userInfo;
+      
+      if (user == null) {
+        throw Exception('User info not loaded');
+      }
+      
+      // Get chat data (handles both student and mentor cases)
+      final chatData = getChatData(context);
+      
+      // Validate token
+      if (chatData['userToken'].isEmpty) {
+        throw Exception('Stream Chat token not available');
+      }
+      
+      // Connect user to Stream Chat
+      await streamChatService.connectUser(
+        userId: chatData['userId'],
+        token: chatData['userToken'],
+        userName: chatData['userName'],
+        userImage: chatData['userImage'],
+      );
+      
+      _isConnected = true;
+      debugPrint('🟢 [CHAT] User connected and marked as online');
+      
+      Channel? channel;
+      
+      if (user.isStudent) {
+        // For students, use their ID as channel ID
+        final channelId = user.id;
+        debugPrint('🔵 [CHAT] Student attempting to join channel: $channelId');
+        
+        try {
+          // First try to query existing channel
+          final channels = await streamChatService.queryChannels(
+            Filter.equal('id', channelId),
+          );
+          
+          if (channels.isNotEmpty) {
+            channel = channels.first;
+            debugPrint('🔵 [CHAT] Student found existing channel: ${channel.id}');
+          } else {
+            // If channel doesn't exist, try to create it
+            debugPrint('🔵 [CHAT] Creating new channel for student: $channelId');
+            
+            // Make sure we have mentor ID
+            if (chatData['secondUserId'].isEmpty) {
+              throw Exception('Mentor information not available');
+            }
+            
+            channel = await streamChatService.getOrCreateChannel(
+              channelId: channelId,
+              channelType: 'messaging',
+              members: [chatData['userId'], chatData['secondUserId']],
+              extraData: {
+                'name': 'Chat with ${chatData['secondUserName']}',
+                'studentId': user.id,
+                'studentName': user.name,
+                'mentorId': chatData['secondUserId'],
+                'mentorName': chatData['secondUserName'],
+              },
+            );
+          }
+        } catch (e) {
+          debugPrint('❌ [CHAT] Error with student channel: $e');
+          throw Exception('Unable to access chat channel: $e');
+        }
+      } else if (user.isMentor) {
+        // For mentors, use selected student's ID as channel
+        final studentId = authService.selectedStudentId ?? authService.getSelectedStudent()?.id;
+        
+        if (studentId == null) {
+          throw Exception('Please select a student to chat with');
+        }
+        
+        debugPrint('🟢 [CHAT] Mentor attempting to join student channel: $studentId');
+        
+        // Query channels where channel ID equals student ID
+        final channels = await streamChatService.queryChannels(
+          Filter.equal('id', studentId),
+        );
+        
+        if (channels.isNotEmpty) {
+          channel = channels.first;
+          debugPrint('🟢 [CHAT] Mentor found channel: ${channel.id}');
+        } else {
+          // Try alternative query by members
+          final altChannels = await streamChatService.queryChannels(
+            Filter.and([
+              Filter.in_('members', [user.id, studentId]),
+              Filter.equal('type', 'messaging'),
+            ]),
+          );
+          
+          if (altChannels.isNotEmpty) {
+            channel = altChannels.first;
+            debugPrint('🟢 [CHAT] Mentor found channel via members: ${channel.id}');
+          } else {
+            // Create channel with student ID
+            debugPrint('🟢 [CHAT] Creating channel for mentor with student: $studentId');
+            channel = await streamChatService.getOrCreateChannel(
+              channelId: studentId,
+              channelType: 'messaging',
+              members: [user.id, studentId],
+              extraData: {
+                'name': 'Chat with Student',
+                'studentId': studentId,
+                'mentorId': user.id,
+                'mentorName': user.name,
+              },
+            );
+          }
+        }
+      } else {
+        throw Exception('Unknown user role');
+      }
+      
+      if (channel == null) {
+        throw Exception('Failed to initialize chat channel');
+      }
+      
+      // Store the channel reference for proper cleanup later
+      _currentChannel = channel;
+      debugPrint('🟢 [CHAT] Channel stored for lifecycle management');
+      
+      await channel.markRead();
+      
+      return {'channel': channel};
+    } catch (e) {
+      debugPrint('❌ [CHAT] Initialization error: $e');
+      rethrow;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _initStream(context),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (snapshot.hasError) {
+          // Get chat data for error state display
+          String errorTitle = 'Chat';
+          try {
+            final chatData = getChatData(context);
+            errorTitle = chatData['secondUserName'] ?? 'Chat';
+          } catch (e) {
+            // Keep default title if getChatData fails
+          }
+          
+          return Scaffold(
+            backgroundColor: const Color(0xFF020817), // Match chat background
+            appBar: AppBar(
+              backgroundColor: const Color(0xFF0F1828), // Slightly lighter app bar
+              title: Text(errorTitle, style: const TextStyle(color: Colors.white)),
+              leading: Navigator.of(context).canPop()
+                  ? IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      onPressed: () => Navigator.of(context).pop(),
+                    )
+                  : null,
+            ),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: Colors.red,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Unable to load chat',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${snapshot.error}'.replaceAll('Exception: ', ''),
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 24),
-              Text(
-                'No Messages Yet',
-                style: TextStyle(
-                  color: themeService.textColor,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Your messages and conversations\nwill appear here',
-                style: TextStyle(
-                  color: themeService.textSecondaryColor,
-                  fontSize: 14,
-                  height: 1.5,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      ),
+            ),
+          );
+        } else {
+          final channel = snapshot.data!['channel'] as Channel;
+          return CustomChatWidget(
+            client: context.read<StreamChatService>().client,
+            channel: channel,
+          );
+        }
+      },
     );
   }
 }

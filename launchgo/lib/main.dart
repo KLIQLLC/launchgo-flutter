@@ -9,10 +9,12 @@ import 'package:launchgo/router/app_router.dart';
 import 'package:launchgo/services/api_service_retrofit.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/theme_service.dart';
+import 'package:launchgo/services/stream_chat_service.dart';
 import 'package:launchgo/widgets/splash_screen.dart';
 import 'package:launchgo/features/recaps/presentation/bloc/recap_bloc.dart';
 import 'package:launchgo/features/recaps/data/recap_repository.dart';
 import 'package:provider/provider.dart';
+import 'package:stream_chat_flutter/stream_chat_flutter.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,6 +32,12 @@ void main() async {
   
   // Pass all uncaught asynchronous errors that aren't handled by the Flutter framework to Crashlytics
   PlatformDispatcher.instance.onError = (error, stack) {
+    // Filter out known WebSocket close code errors from Stream Chat
+    if (error.toString().contains('close code must be 1000 or in the range 3000-4999')) {
+      debugPrint('🟡 WebSocket close code error handled gracefully (from Stream Chat SDK)');
+      return true; // Don't crash the app
+    }
+    
     FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
     return true;
   };
@@ -45,6 +53,7 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthService()..initialize()),
         ChangeNotifierProvider(create: (_) => ThemeService()),
+        ChangeNotifierProvider(create: (_) => StreamChatService()),
         Provider(
           create: (context) => ApiServiceRetrofit(
             authService: context.read<AuthService>(),
@@ -102,6 +111,7 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     final themeService = context.watch<ThemeService>();
+    final streamChatService = context.watch<StreamChatService>();
     
     if (_showSplash) {
       return MaterialApp(
@@ -109,6 +119,10 @@ class _MyAppState extends State<MyApp> {
         theme: themeService.themeData,
         home: const SplashScreen(),
         debugShowCheckedModeBanner: false,
+        builder: (context, child) => StreamChat(
+          client: streamChatService.client,
+          child: child!,
+        ),
       );
     }
 
@@ -117,6 +131,10 @@ class _MyAppState extends State<MyApp> {
       theme: themeService.themeData,
       routerConfig: _appRouter.router,
       debugShowCheckedModeBanner: false,
+      builder: (context, child) => StreamChat(
+        client: streamChatService.client,
+        child: child!,
+      ),
     );
   }
 }
