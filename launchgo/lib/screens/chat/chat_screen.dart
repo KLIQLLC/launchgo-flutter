@@ -247,6 +247,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       _currentChannel = channel;
       debugPrint('🟢 [CHAT] Channel stored for lifecycle management');
       
+      await channel.markRead();
+      
       return {'channel': channel};
     } catch (e) {
       debugPrint('❌ [CHAT] Initialization error: $e');
