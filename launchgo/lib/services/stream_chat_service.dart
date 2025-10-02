@@ -18,6 +18,20 @@ class StreamChatService extends ChangeNotifier {
       _apiKey,
       logLevel: Level.INFO,
     );
+    
+    // Handle WebSocket errors globally
+    _client.on().listen((event) {
+      if (event.type == 'connection.error') {
+        debugPrint('🟡 Stream Chat: Connection error handled gracefully');
+      }
+    }).onError((error) {
+      if (error.toString().contains('close code must be 1000 or in the range 3000-4999')) {
+        debugPrint('🟡 Stream Chat: WebSocket close code error handled gracefully');
+      } else {
+        debugPrint('❌ Stream Chat: Unexpected error - $error');
+      }
+    });
+    
     _isInitialized = true;
     notifyListeners();
   }
@@ -62,11 +76,22 @@ class StreamChatService extends ChangeNotifier {
   
   Future<void> disconnectUser() async {
     try {
-      await _client.disconnectUser();
-      debugPrint('🟡 Stream Chat: User disconnected');
+      // Check if client is connected before attempting to disconnect
+      if (_client.state.currentUser != null) {
+        await _client.disconnectUser();
+        debugPrint('🟡 Stream Chat: User disconnected');
+      } else {
+        debugPrint('🟡 Stream Chat: No user to disconnect');
+      }
       notifyListeners();
     } catch (e) {
-      debugPrint('❌ Stream Chat: Error disconnecting user - $e');
+      // Handle WebSocket close code errors gracefully
+      if (e.toString().contains('close code must be 1000 or in the range 3000-4999')) {
+        debugPrint('🟡 Stream Chat: WebSocket close code error (handled gracefully)');
+      } else {
+        debugPrint('❌ Stream Chat: Error disconnecting user - $e');
+      }
+      notifyListeners();
     }
   }
   
@@ -116,7 +141,16 @@ class StreamChatService extends ChangeNotifier {
   
   @override
   void dispose() {
-    _client.dispose();
+    try {
+      _client.dispose();
+    } catch (e) {
+      // Handle WebSocket close code errors gracefully during disposal
+      if (e.toString().contains('close code must be 1000 or in the range 3000-4999')) {
+        debugPrint('🟡 Stream Chat: WebSocket close code error during disposal (handled gracefully)');
+      } else {
+        debugPrint('❌ Stream Chat: Error disposing client - $e');
+      }
+    }
     super.dispose();
   }
 }

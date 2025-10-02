@@ -29,6 +29,12 @@ void main() async {
   
   // Pass all uncaught asynchronous errors that aren't handled by the Flutter framework to Crashlytics
   PlatformDispatcher.instance.onError = (error, stack) {
+    // Filter out known WebSocket close code errors from Stream Chat
+    if (error.toString().contains('close code must be 1000 or in the range 3000-4999')) {
+      debugPrint('🟡 WebSocket close code error handled gracefully (from Stream Chat SDK)');
+      return true; // Don't crash the app
+    }
+    
     FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
     return true;
   };
