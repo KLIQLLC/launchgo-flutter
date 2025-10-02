@@ -208,10 +208,11 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
               ],
             ),
             const Spacer(),
-            IconButton(
-              icon: const Icon(Icons.more_vert, color: Colors.white),
-              onPressed: () {},
-            ),
+            if (Navigator.of(context).canPop())
+              IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
           ],
         ),
       ),

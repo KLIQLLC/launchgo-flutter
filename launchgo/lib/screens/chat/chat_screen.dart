@@ -206,11 +206,20 @@ class _ChatScreenState extends State<ChatScreen> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         } else if (snapshot.hasError) {
+          // Get chat data for error state display
+          String errorTitle = 'Chat';
+          try {
+            final chatData = getChatData(context);
+            errorTitle = chatData['secondUserName'] ?? 'Chat';
+          } catch (e) {
+            // Keep default title if getChatData fails
+          }
+          
           return Scaffold(
             backgroundColor: const Color(0xFF020817), // Match chat background
             appBar: AppBar(
               backgroundColor: const Color(0xFF0F1828), // Slightly lighter app bar
-              title: const Text('Chat', style: TextStyle(color: Colors.white)),
+              title: Text(errorTitle, style: const TextStyle(color: Colors.white)),
               leading: Navigator.of(context).canPop()
                   ? IconButton(
                       icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -247,22 +256,9 @@ class _ChatScreenState extends State<ChatScreen> {
           );
         } else {
           final channel = snapshot.data!['channel'] as Channel;
-          return Scaffold(
-            backgroundColor: const Color(0xFF020817), // Match chat background
-            appBar: AppBar(
-              backgroundColor: const Color(0xFF0F1828), // Slightly lighter app bar
-              title: const Text('Chat', style: TextStyle(color: Colors.white)),
-              leading: Navigator.of(context).canPop()
-                  ? IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
-                      onPressed: () => Navigator.of(context).pop(),
-                    )
-                  : null,
-            ),
-            body: CustomChatWidget(
-              client: context.read<StreamChatService>().client,
-              channel: channel,
-            ),
+          return CustomChatWidget(
+            client: context.read<StreamChatService>().client,
+            channel: channel,
           );
         }
       },
