@@ -12,6 +12,7 @@ import '../models/semester_model.dart';
 import 'secure_storage_service.dart';
 import 'permissions_service.dart';
 import 'preferences_service.dart';
+import 'stream_chat_service.dart';
 
 /// Service for managing user authentication with Google Sign-In and backend JWT tokens
 class AuthService extends ChangeNotifier {
@@ -209,8 +210,18 @@ class AuthService extends ChangeNotifier {
   }
 
   /// Sign out
-  Future<void> signOut() async {
+  Future<void> signOut({StreamChatService? streamChatService}) async {
     try {
+      // Disconnect from Stream Chat if service is provided
+      if (streamChatService != null) {
+        try {
+          await streamChatService.disconnectUser();
+          debugPrint('🔴 [AUTH] Disconnected from Stream Chat during logout');
+        } catch (e) {
+          debugPrint('❌ [AUTH] Error disconnecting Stream Chat: $e');
+        }
+      }
+      
       await GoogleSignIn.instance.signOut();
       _currentUser = null;
       _accessToken = null;

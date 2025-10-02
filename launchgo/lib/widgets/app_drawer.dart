@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:launchgo/services/auth_service.dart';
+import 'package:launchgo/services/stream_chat_service.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/theme/app_colors.dart';
 import 'package:launchgo/widgets/cupertino_dropdown.dart';
@@ -302,7 +303,16 @@ class _AppDrawerState extends State<AppDrawer> {
     final shouldLogout = await _showLogoutConfirmationDialog(context);
     
     if (shouldLogout == true && context.mounted) {
-      await authService.signOut();
+      // Get StreamChatService if available
+      StreamChatService? streamChatService;
+      try {
+        streamChatService = Provider.of<StreamChatService>(context, listen: false);
+      } catch (e) {
+        // StreamChatService might not be available in all contexts
+        debugPrint('🟡 [LOGOUT] StreamChatService not available: $e');
+      }
+      
+      await authService.signOut(streamChatService: streamChatService);
       if (context.mounted) {
         context.go('/login');
       }

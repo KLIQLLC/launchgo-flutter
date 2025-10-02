@@ -12,7 +12,9 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
+  StreamChatService? _streamChatService;
+  bool _isConnected = false;
 
   Map<String, dynamic> getChatData(BuildContext context) {
     final authService = Provider.of<AuthService>(context, listen: false);
@@ -69,10 +71,51 @@ class _ChatScreenState extends State<ChatScreen> {
     };
   }
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _disconnectFromStream();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      // App is going to background - disconnect
+      debugPrint('🔴 [CHAT] App going to background - disconnecting');
+      _disconnectFromStream();
+    } else if (state == AppLifecycleState.resumed) {
+      // App is coming to foreground - reconnect if chat is visible
+      if (mounted && _streamChatService != null && !_isConnected) {
+        debugPrint('🟢 [CHAT] App resumed - reconnecting');
+        setState(() {}); // Trigger rebuild to reconnect
+      }
+    }
+  }
+
+  Future<void> _disconnectFromStream() async {
+    if (_streamChatService != null && _isConnected) {
+      try {
+        await _streamChatService!.disconnectUser();
+        _isConnected = false;
+        debugPrint('🔴 [CHAT] User disconnected from Stream Chat');
+      } catch (e) {
+        debugPrint('❌ [CHAT] Error disconnecting: $e');
+      }
+    }
+  }
+
   Future<Map<String, dynamic>> _initStream(BuildContext context) async {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
       final streamChatService = Provider.of<StreamChatService>(context, listen: false);
+      _streamChatService = streamChatService;
       final user = authService.userInfo;
       
       if (user == null) {
@@ -94,6 +137,9 @@ class _ChatScreenState extends State<ChatScreen> {
         userName: chatData['userName'],
         userImage: chatData['userImage'],
       );
+      
+      _isConnected = true;
+      debugPrint('🟢 [CHAT] User connected and marked as online');
       
       Channel? channel;
       
