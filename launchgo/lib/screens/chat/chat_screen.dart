@@ -14,6 +14,7 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   StreamChatService? _streamChatService;
+  Channel? _currentChannel;
   bool _isConnected = false;
 
   Map<String, dynamic> getChatData(BuildContext context) {
@@ -80,34 +81,39 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _disconnectFromStream();
+    _cleanupAndDisconnect();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
-      // App is going to background - disconnect
-      debugPrint('🔴 [CHAT] App going to background - disconnecting');
-      _disconnectFromStream();
+      // App is going to background - don't disconnect to avoid token issues
+      debugPrint('🟡 [CHAT] App going to background');
     } else if (state == AppLifecycleState.resumed) {
-      // App is coming to foreground - reconnect if chat is visible
-      if (mounted && _streamChatService != null && !_isConnected) {
-        debugPrint('🟢 [CHAT] App resumed - reconnecting');
-        setState(() {}); // Trigger rebuild to reconnect
-      }
+      // App is coming to foreground
+      debugPrint('🟢 [CHAT] App resumed');
     }
   }
 
-  Future<void> _disconnectFromStream() async {
-    if (_streamChatService != null && _isConnected) {
-      try {
+  Future<void> _cleanupAndDisconnect() async {
+    try {
+      // CRITICAL: First dispose of the channel to stop all Stream operations
+      if (_currentChannel != null) {
+        debugPrint('🔴 [CHAT] Disposing channel...');
+        _currentChannel!.dispose();
+        _currentChannel = null;
+        debugPrint('🔴 [CHAT] Channel disposed');
+      }
+      
+      // Then disconnect the user from Stream Chat
+      if (_streamChatService != null && _isConnected) {
         await _streamChatService!.disconnectUser();
         _isConnected = false;
         debugPrint('🔴 [CHAT] User disconnected from Stream Chat');
-      } catch (e) {
-        debugPrint('❌ [CHAT] Error disconnecting: $e');
       }
+    } catch (e) {
+      debugPrint('❌ [CHAT] Error during cleanup: $e');
     }
   }
 
@@ -236,6 +242,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (channel == null) {
         throw Exception('Failed to initialize chat channel');
       }
+      
+      // Store the channel reference for proper cleanup later
+      _currentChannel = channel;
+      debugPrint('🟢 [CHAT] Channel stored for lifecycle management');
       
       return {'channel': channel};
     } catch (e) {
