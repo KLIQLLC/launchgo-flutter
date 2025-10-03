@@ -360,16 +360,29 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
         centerTitle: true,
         actions: [
           // Chat icon with unread badge
-          Consumer<StreamChatService>(
-            builder: (context, streamChatService, _) {
+          Consumer2<StreamChatService, AuthService>(
+            builder: (context, streamChatService, authService, _) {
               // Get unread count from Stream Chat
               final client = streamChatService.client;
+              
+              // For mentors, we need to listen to both user stream and channel states
+              // For students, just listen to user stream
+              final isMentor = authService.userInfo?.isMentor == true;
+              final selectedStudentId = authService.selectedStudentId;
               
               return StreamBuilder<OwnUser?>(
                 stream: client.state.currentUserStream,
                 builder: (context, userSnapshot) {
                   final currentUser = userSnapshot.data;
-                  final unreadCount = currentUser?.totalUnreadCount ?? 0;
+                  int unreadCount = 0;
+                  
+                  // For mentors, show unread count for selected student's channel only
+                  if (isMentor && selectedStudentId != null) {
+                    unreadCount = streamChatService.getUnreadCountForStudent(selectedStudentId);
+                  } else {
+                    // For students, show total unread count
+                    unreadCount = currentUser?.totalUnreadCount ?? 0;
+                  }
                   
                   return Transform.translate(
                     offset: const Offset(20, 0),

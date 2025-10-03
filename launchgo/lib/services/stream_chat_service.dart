@@ -169,6 +169,33 @@ class StreamChatService extends ChangeNotifier {
     debugPrint('🟡 Stream Chat: To set offline, disconnect the user');
   }
 
+  /// Get unread count for a specific student's channel (for mentors)
+  int getUnreadCountForStudent(String studentId) {
+    try {
+      // Look for channel with student ID as the channel ID
+      final channels = _client.state.channels;
+      
+      // First try to find channel by ID
+      final channelById = channels.values.where((channel) => channel.id == studentId);
+      if (channelById.isNotEmpty) {
+        return channelById.first.state?.unreadCount ?? 0;
+      }
+      
+      // Then try to find channel by members
+      final channelByMembers = channels.values.where(
+        (channel) => channel.state?.members.any((member) => member.userId == studentId) == true
+      );
+      if (channelByMembers.isNotEmpty) {
+        return channelByMembers.first.state?.unreadCount ?? 0;
+      }
+      
+      return 0;
+    } catch (e) {
+      debugPrint('⚠️ Stream Chat: Error getting unread count for student $studentId: $e');
+      return 0;
+    }
+  }
+
   /// Automatically connect user if auth info is available
   Future<void> autoConnectUser({
     required String? userId,
