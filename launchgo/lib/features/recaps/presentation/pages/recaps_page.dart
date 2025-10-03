@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../models/recap_model.dart';
+import '../../../../services/auth_service.dart';
 import '../../../../services/theme_service.dart';
 import '../widgets/recap_card.dart';
 import '../bloc/recap_bloc.dart';
@@ -36,6 +37,9 @@ class RecapsScreen extends StatefulWidget {
 }
 
 class _RecapsScreenState extends State<RecapsScreen> {
+  String? _previousSelectedSemesterId;
+  String? _previousSelectedStudentId;
+
   @override
   void initState() {
     super.initState();
@@ -70,6 +74,31 @@ class _RecapsScreenState extends State<RecapsScreen> {
   @override
   Widget build(BuildContext context) {
     final themeService = context.watch<ThemeService>();
+    final authService = context.watch<AuthService>();
+    
+    // Check if semester or student changed and trigger recaps reload
+    final currentSemesterId = authService.selectedSemesterId;
+    final currentStudentId = authService.selectedStudentId;
+    
+    bool shouldReload = false;
+    
+    if (_previousSelectedSemesterId != currentSemesterId && currentSemesterId != null) {
+      _previousSelectedSemesterId = currentSemesterId;
+      shouldReload = true;
+    }
+    
+    if (_previousSelectedStudentId != currentStudentId && currentStudentId != null) {
+      _previousSelectedStudentId = currentStudentId;
+      shouldReload = true;
+      debugPrint('🔄 Selected student changed to: $currentStudentId - reloading recaps');
+    }
+    
+    if (shouldReload) {
+      // Trigger reload after build completes
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.read<RecapBloc>().add(const LoadRecaps());
+      });
+    }
     
     return Scaffold(
       backgroundColor: Colors.transparent,
