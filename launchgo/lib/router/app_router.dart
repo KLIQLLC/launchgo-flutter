@@ -370,45 +370,75 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
               final isMentor = authService.userInfo?.isMentor == true;
               final selectedStudentId = authService.selectedStudentId;
               
-              return StreamBuilder<OwnUser?>(
-                stream: client.state.currentUserStream,
-                builder: (context, userSnapshot) {
-                  final currentUser = userSnapshot.data;
-                  int unreadCount = 0;
-                  
-                  // For mentors, show unread count for selected student's channel only
-                  if (isMentor && selectedStudentId != null) {
-                    unreadCount = streamChatService.getUnreadCountForStudent(selectedStudentId);
-                  } else {
-                    // For students, show total unread count
-                    unreadCount = currentUser?.totalUnreadCount ?? 0;
-                  }
-                  
-                  return Transform.translate(
-                    offset: const Offset(20, 0),
-                    child: IconButton(
-                      padding: const EdgeInsets.all(8.0),
-                      constraints: const BoxConstraints(),
-                      icon: BadgeIcon(
-                        icon: SvgPicture.asset(
-                          'assets/icons/ic_chat.svg',
-                          width: 20,
-                          height: 20,
-                          colorFilter: ColorFilter.mode(
-                            themeService.textColor,
-                            BlendMode.srcIn,
+              // Use different StreamBuilder approach based on user type
+              if (isMentor && selectedStudentId != null) {
+                // For mentors, listen to specific student channel updates
+                return StreamBuilder<int>(
+                  stream: streamChatService.getUnreadCountStreamForStudent(selectedStudentId),
+                  builder: (context, snapshot) {
+                    final unreadCount = snapshot.data ?? 0;
+                    debugPrint('🎯 UI Badge: Mentor StreamBuilder - Student: $selectedStudentId, Unread: $unreadCount, hasData: ${snapshot.hasData}');
+                    
+                    return Transform.translate(
+                      offset: const Offset(20, 0),
+                      child: IconButton(
+                        padding: const EdgeInsets.all(8.0),
+                        constraints: const BoxConstraints(),
+                        icon: BadgeIcon(
+                          icon: SvgPicture.asset(
+                            'assets/icons/ic_chat.svg',
+                            width: 20,
+                            height: 20,
+                            colorFilter: ColorFilter.mode(
+                              themeService.textColor,
+                              BlendMode.srcIn,
+                            ),
                           ),
+                          count: unreadCount,
+                          showBadge: unreadCount > 0,
                         ),
-                        count: unreadCount,
-                        showBadge: unreadCount > 0,
+                        onPressed: () {
+                          context.push('/chat');
+                        },
                       ),
-                      onPressed: () {
-                        context.push('/chat');
-                      },
-                    ),
-                  );
-                },
-              );
+                    );
+                  },
+                );
+              } else {
+                // For students, listen to user stream
+                return StreamBuilder<OwnUser?>(
+                  stream: client.state.currentUserStream,
+                  builder: (context, userSnapshot) {
+                    final currentUser = userSnapshot.data;
+                    final unreadCount = currentUser?.totalUnreadCount ?? 0;
+                    debugPrint('🎯 UI Badge: Student StreamBuilder - Unread: $unreadCount, hasData: ${userSnapshot.hasData}');
+                    
+                    return Transform.translate(
+                      offset: const Offset(20, 0),
+                      child: IconButton(
+                        padding: const EdgeInsets.all(8.0),
+                        constraints: const BoxConstraints(),
+                        icon: BadgeIcon(
+                          icon: SvgPicture.asset(
+                            'assets/icons/ic_chat.svg',
+                            width: 20,
+                            height: 20,
+                            colorFilter: ColorFilter.mode(
+                              themeService.textColor,
+                              BlendMode.srcIn,
+                            ),
+                          ),
+                          count: unreadCount,
+                          showBadge: unreadCount > 0,
+                        ),
+                        onPressed: () {
+                          context.push('/chat');
+                        },
+                      ),
+                    );
+                  },
+                );
+              }
             },
           ),
           Transform.translate(

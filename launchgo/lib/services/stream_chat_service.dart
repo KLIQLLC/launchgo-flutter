@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:stream_chat_flutter/stream_chat_flutter.dart';
 
@@ -193,6 +194,136 @@ class StreamChatService extends ChangeNotifier {
     } catch (e) {
       debugPrint('⚠️ Stream Chat: Error getting unread count for student $studentId: $e');
       return 0;
+    }
+  }
+
+  /// Get a stream that emits whenever the unread count changes for a specific student
+  Stream<int> getUnreadCountStreamForStudent(String studentId) {
+    try {
+      // Use a broadcast stream controller to combine multiple stream sources
+      late StreamController<int> controller;
+      controller = StreamController<int>.broadcast();
+      
+      Channel? currentChannel;
+      StreamSubscription? channelSubscription;
+      StreamSubscription? messageSubscription;
+      StreamSubscription? readSubscription;
+      StreamSubscription? channelsSubscription;
+      
+      void emitUnreadCount() {
+        if (currentChannel != null && !controller.isClosed) {
+          final unreadCount = currentChannel!.state?.unreadCount ?? 0;
+          debugPrint('📊 Badge: Emitting unread count: $unreadCount for channel ${currentChannel!.id}');
+          controller.add(unreadCount);
+        }
+      }
+      
+      void updateUnreadCount() {
+        // Find the student's channel
+        final channels = _client.state.channels;
+        Channel? studentChannel;
+        
+        debugPrint('🔍 Badge: Looking for channel for student $studentId, available channels: ${channels.keys.toList()}');
+        
+        // First try to find by ID
+        final channelById = channels.values.where((channel) => channel.id == studentId);
+        if (channelById.isNotEmpty) {
+          studentChannel = channelById.first;
+          debugPrint('✅ Badge: Found channel by ID: ${studentChannel.id}');
+        } else {
+          // Then try by members
+          final channelByMembers = channels.values.where(
+            (channel) => channel.state?.members.any((member) => member.userId == studentId) == true
+          );
+          if (channelByMembers.isNotEmpty) {
+            studentChannel = channelByMembers.first;
+            debugPrint('✅ Badge: Found channel by members: ${studentChannel.id}');
+          }
+        }
+        
+        if (studentChannel == null) {
+          debugPrint('❌ Badge: No channel found for student $studentId');
+          if (!controller.isClosed) {
+            controller.add(0);
+          }
+          return;
+        }
+        
+        // If we found a new channel or the channel changed
+        if (studentChannel != currentChannel) {
+          // Cancel previous subscriptions
+          channelSubscription?.cancel();
+          messageSubscription?.cancel();
+          readSubscription?.cancel();
+          
+          currentChannel = studentChannel;
+          
+          debugPrint('🔄 Badge: Channel changed to ${currentChannel?.id}, setting up new subscriptions');
+          
+          // Subscribe to the new channel's state if it exists
+          if (currentChannel != null) {
+            // Listen to channel state changes
+            channelSubscription = currentChannel!.state?.channelStateStream.listen((_) {
+              debugPrint('📊 Badge: Channel state changed');
+              emitUnreadCount();
+            });
+            
+            // Listen to new messages
+            messageSubscription = currentChannel!.on(EventType.messageNew).listen((event) {
+              debugPrint('💬 Badge: New message received');
+              // Small delay to let the unread count update
+              Future.delayed(const Duration(milliseconds: 100), () {
+                emitUnreadCount();
+              });
+            });
+            
+            // Listen to read events
+            readSubscription = currentChannel!.on(EventType.messageRead).listen((event) {
+              debugPrint('👁️ Badge: Messages marked as read');
+              // Small delay to let the unread count update
+              Future.delayed(const Duration(milliseconds: 100), () {
+                emitUnreadCount();
+              });
+            });
+          }
+        }
+        
+        // Emit current unread count
+        emitUnreadCount();
+      }
+      
+      // Listen to channels changes
+      channelsSubscription = _client.state.channelsStream.listen((_) {
+        updateUnreadCount();
+      });
+      
+      // Also listen to global message events for this channel
+      _client.on(EventType.messageNew, EventType.messageRead, EventType.notificationMarkRead).listen((event) {
+        // Check if the event is for our channel
+        if (event.channelId == studentId || 
+            (currentChannel != null && event.channelId == currentChannel!.id)) {
+          debugPrint('🔔 Badge: Global event for our channel: ${event.type}');
+          Future.delayed(const Duration(milliseconds: 100), () {
+            emitUnreadCount();
+          });
+        }
+      });
+      
+      // Initial update
+      updateUnreadCount();
+      
+      // Clean up when stream is cancelled
+      controller.onCancel = () {
+        channelSubscription?.cancel();
+        messageSubscription?.cancel();
+        readSubscription?.cancel();
+        channelsSubscription?.cancel();
+      };
+      
+      return controller.stream.distinct();
+    } catch (e) {
+      debugPrint('⚠️ Stream Chat: Error creating unread count stream for student $studentId: $e');
+      return Stream.value(0);
     }
   }
 
