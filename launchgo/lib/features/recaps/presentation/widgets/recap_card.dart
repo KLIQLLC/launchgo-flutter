@@ -80,6 +80,7 @@ class RecapCard extends StatelessWidget {
                 ),
                 GestureDetector(
                   onTap: () => _shareRecap(recap),
+                  behavior: HitTestBehavior.opaque,
                   child: SizedBox(
                     width: 44,
                     height: 44,
