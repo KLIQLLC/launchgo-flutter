@@ -3,15 +3,22 @@ import 'package:stream_chat_flutter/stream_chat_flutter.dart';
 
 class StreamChatService extends ChangeNotifier {
   static const String _apiKey = 'b2xg2crxdpft';
+  static StreamChatService? _instance;
   late final StreamChatClient _client;
   bool _isInitialized = false;
+  bool _isUserConnected = false;
   
   StreamChatClient get client => _client;
   bool get isInitialized => _isInitialized;
+  bool get isUserConnected => _isUserConnected;
   
   StreamChatService() {
+    _instance = this;  // Set static reference
     _initializeClient();
   }
+  
+  // Static getter to access the instance
+  static StreamChatService? get instance => _instance;
   
   void _initializeClient() {
     _client = StreamChatClient(
@@ -41,6 +48,7 @@ class StreamChatService extends ChangeNotifier {
     required String token,
     required String userName,
     String? userImage,
+    bool setOnline = true,  // Kept for backward compatibility but not used
   }) async {
     try {
       // Check if already connected with the same user
@@ -54,7 +62,7 @@ class StreamChatService extends ChangeNotifier {
         await disconnectUser();
       }
       
-      // Connect new user
+      // Connect new user - Stream Chat automatically sets them as online when connected
       await _client.connectUser(
         User(
           id: userId,
@@ -66,7 +74,8 @@ class StreamChatService extends ChangeNotifier {
         token,
       );
       
-      debugPrint('🟢 Stream Chat: User connected successfully - $userId');
+      debugPrint('🟢 Stream Chat: User connected successfully - $userId (automatically online)');
+      _isUserConnected = true;
       notifyListeners();
     } catch (e) {
       debugPrint('❌ Stream Chat: Error connecting user - $e');
@@ -83,6 +92,7 @@ class StreamChatService extends ChangeNotifier {
       } else {
         debugPrint('🟡 Stream Chat: No user to disconnect');
       }
+      _isUserConnected = false;
       notifyListeners();
     } catch (e) {
       // Handle WebSocket close code errors gracefully
@@ -143,6 +153,71 @@ class StreamChatService extends ChangeNotifier {
     }
   }
   
+  /// Set user status to online (deprecated - Stream Chat handles this automatically)
+  @Deprecated('Stream Chat automatically manages online presence when connected')
+  Future<void> setUserOnline() async {
+    // Stream Chat automatically sets users as online when they connect
+    // and offline when they disconnect. No manual action needed.
+    debugPrint('🟢 Stream Chat: User is online (managed automatically by Stream)');
+  }
+
+  /// Set user status to offline (deprecated - Stream Chat handles this automatically)
+  @Deprecated('Stream Chat automatically manages online presence when disconnected')
+  Future<void> setUserOffline() async {
+    // Stream Chat automatically sets users as offline when they disconnect.
+    // To appear offline, disconnect the user instead.
+    debugPrint('🟡 Stream Chat: To set offline, disconnect the user');
+  }
+
+  /// Automatically connect user if auth info is available
+  Future<void> autoConnectUser({
+    required String? userId,
+    required String? token,
+    required String? userName,
+    String? userImage,
+  }) async {
+    // Only connect if we have all required info and not already connected
+    if (userId != null && 
+        token != null && 
+        userName != null && 
+        !_isUserConnected &&
+        _client.state.currentUser?.id != userId) {
+      try {
+        await connectUser(
+          userId: userId,
+          token: token,
+          userName: userName,
+          userImage: userImage,
+        );
+        debugPrint('🟢 Stream Chat: Auto-connected user for unread badge (online presence enabled)');
+        
+        // Query and watch user's channels so they appear online to others
+        try {
+          final filter = Filter.in_('members', [userId]);
+          final channels = await _client.queryChannels(
+            filter: filter,
+            state: true,
+            watch: true,
+            presence: true,  // Enable presence tracking
+            paginationParams: const PaginationParams(limit: 10),  // Limit to avoid loading too many channels
+          ).first;
+          
+          debugPrint('🟢 Stream Chat: Watching ${channels.length} channels for presence');
+          
+          // This ensures the user appears online to members of these channels
+          for (final channel in channels) {
+            // Channels are already being watched from queryChannels with presence: true
+            debugPrint('👁️ Watching channel: ${channel.id} with ${channel.memberCount} members');
+          }
+        } catch (e) {
+          debugPrint('⚠️ Stream Chat: Could not watch channels for presence: $e');
+        }
+      } catch (e) {
+        debugPrint('⚠️ Stream Chat: Auto-connect failed (will retry when chat opens): $e');
+      }
+    }
+  }
+
   @override
   void dispose() {
     try {

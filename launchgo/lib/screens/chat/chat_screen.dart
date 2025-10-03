@@ -98,7 +98,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   Future<void> _cleanupAndDisconnect() async {
     try {
-      // CRITICAL: First dispose of the channel to stop all Stream operations
+      // IMPORTANT: Only dispose of the channel, NOT the user connection
+      // The user should stay connected to Stream Chat for online presence
       if (_currentChannel != null) {
         debugPrint('🔴 [CHAT] Disposing channel...');
         _currentChannel!.dispose();
@@ -106,12 +107,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         debugPrint('🔴 [CHAT] Channel disposed');
       }
       
-      // Then disconnect the user from Stream Chat
-      if (_streamChatService != null && _isConnected) {
-        await _streamChatService!.disconnectUser();
-        _isConnected = false;
-        debugPrint('🔴 [CHAT] User disconnected from Stream Chat');
-      }
+      // DON'T disconnect the user - they should remain online
+      // The Stream Chat connection is managed globally, not per chat screen
+      _isConnected = false; // Just mark this screen as disconnected
+      debugPrint('🟢 [CHAT] Chat screen closed but user remains connected for online presence');
     } catch (e) {
       debugPrint('❌ [CHAT] Error during cleanup: $e');
     }
@@ -136,7 +135,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         throw Exception('Stream Chat token not available');
       }
       
-      // Connect user to Stream Chat
+      // Connect user to Stream Chat (Stream automatically manages online presence)
       await streamChatService.connectUser(
         userId: chatData['userId'],
         token: chatData['userToken'],
@@ -145,7 +144,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       );
       
       _isConnected = true;
-      debugPrint('🟢 [CHAT] User connected and marked as online');
+      debugPrint('🟢 [CHAT] User connected to chat (Stream manages online presence automatically)');
       
       Channel? channel;
       

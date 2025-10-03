@@ -307,6 +307,10 @@ class _AppDrawerState extends State<AppDrawer> {
       StreamChatService? streamChatService;
       try {
         streamChatService = Provider.of<StreamChatService>(context, listen: false);
+        // Set user offline before disconnecting
+        await streamChatService.setUserOffline();
+        // Disconnect Stream Chat on logout
+        await streamChatService.disconnectUser();
       } catch (e) {
         // StreamChatService might not be available in all contexts
         debugPrint('🟡 [LOGOUT] StreamChatService not available: $e');

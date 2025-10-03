@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:dio/dio.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import '../api/dio_client.dart';
 import 'api_service_retrofit.dart';
@@ -24,6 +23,7 @@ class AuthService extends ChangeNotifier {
   bool _isSigningIn = false;
   Completer<void>? _signInCompleter;
   ApiServiceRetrofit? _apiService;
+  StreamChatService? _streamChatService;
 
   // Getters
   GoogleSignInAccount? get currentUser => _currentUser;
@@ -140,6 +140,12 @@ class AuthService extends ChangeNotifier {
       if (_currentUser != null && _accessToken != null) {
         debugPrint('🔐 Loading user info during silent sign-in...');
         await loadUserInfo();
+        
+        // Set user online after successful silent sign-in
+        if (_streamChatService != null && _streamChatService!.isUserConnected) {
+          await _streamChatService!.setUserOnline();
+          debugPrint('🟢 User set to ONLINE after silent sign-in');
+        }
       }
     } catch (error) {
       // Silent sign-in failure is expected for new users
@@ -212,14 +218,19 @@ class AuthService extends ChangeNotifier {
   /// Sign out
   Future<void> signOut({StreamChatService? streamChatService}) async {
     try {
-      // Disconnect from Stream Chat if service is provided
-      if (streamChatService != null) {
+      // Always try to disconnect from Stream Chat during logout
+      // Try with provided service first, then try to get it from static instance
+      StreamChatService? chatService = streamChatService ?? StreamChatService.instance;
+      
+      if (chatService != null) {
         try {
-          await streamChatService.disconnectUser();
+          await chatService.disconnectUser();
           debugPrint('🔴 [AUTH] Disconnected from Stream Chat during logout');
         } catch (e) {
           debugPrint('❌ [AUTH] Error disconnecting Stream Chat: $e');
         }
+      } else {
+        debugPrint('🟡 [AUTH] No StreamChatService available for disconnect');
       }
       
       await GoogleSignIn.instance.signOut();
@@ -327,6 +338,13 @@ class AuthService extends ChangeNotifier {
         // Load user info after successful token storage
         debugPrint('🔐 Loading user info...');
         await loadUserInfo();
+        
+        // Set user online after successful authentication
+        if (_streamChatService != null && _streamChatService!.isUserConnected) {
+          await _streamChatService!.setUserOnline();
+          debugPrint('🟢 User set to ONLINE after authentication');
+        }
+        
         debugPrint('🔐 Sign-in complete!');
       } else {
         debugPrint('❌ No access token in response');
@@ -359,6 +377,11 @@ class AuthService extends ChangeNotifier {
   /// Set API service for dependency injection
   void setApiService(ApiServiceRetrofit apiService) {
     _apiService = apiService;
+  }
+
+  /// Set StreamChat service for presence management
+  void setStreamChatService(StreamChatService streamChatService) {
+    _streamChatService = streamChatService;
   }
   
   /// Load user information including role and students

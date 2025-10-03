@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:stream_chat_flutter/stream_chat_flutter.dart' hide Event;
 import '../theme/app_colors.dart';
+import 'package:launchgo/services/stream_chat_service.dart';
+import 'package:launchgo/widgets/badge_icon.dart';
 import 'package:launchgo/features/documents/domain/entities/document_entity.dart';
 import 'package:launchgo/features/documents/presentation/pages/documents_page.dart';
 import 'package:launchgo/screens/goals/goals_screen.dart';
@@ -356,34 +359,65 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
         ),
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: SvgPicture.asset(
-              'assets/icons/ic_chat.svg',
-              width: 20,
-              height: 20,
-              colorFilter: ColorFilter.mode(
-                themeService.textColor,
-                BlendMode.srcIn,
-              ),
-            ),
-            onPressed: () {
-              context.push('/chat');
+          // Chat icon with unread badge
+          Consumer<StreamChatService>(
+            builder: (context, streamChatService, _) {
+              // Get unread count from Stream Chat
+              final client = streamChatService.client;
+              
+              return StreamBuilder<OwnUser?>(
+                stream: client.state.currentUserStream,
+                builder: (context, userSnapshot) {
+                  final currentUser = userSnapshot.data;
+                  final unreadCount = currentUser?.totalUnreadCount ?? 0;
+                  
+                  return Transform.translate(
+                    offset: const Offset(20, 0),
+                    child: IconButton(
+                      padding: const EdgeInsets.all(8.0),
+                      constraints: const BoxConstraints(),
+                      icon: BadgeIcon(
+                        icon: SvgPicture.asset(
+                          'assets/icons/ic_chat.svg',
+                          width: 20,
+                          height: 20,
+                          colorFilter: ColorFilter.mode(
+                            themeService.textColor,
+                            BlendMode.srcIn,
+                          ),
+                        ),
+                        count: unreadCount,
+                        showBadge: unreadCount > 0,
+                      ),
+                      onPressed: () {
+                        context.push('/chat');
+                      },
+                    ),
+                  );
+                },
+              );
             },
           ),
-          IconButton(
-            icon: SvgPicture.asset(
-              'assets/icons/ic_alert.svg',
-              width: 20,
-              height: 20,
-              colorFilter: ColorFilter.mode(
-                themeService.textColor,
-                BlendMode.srcIn,
+          Transform.translate(
+            offset: const Offset(6, 0),
+            child: IconButton(
+              padding: const EdgeInsets.all(8.0),
+              constraints: const BoxConstraints(),
+              icon: SvgPicture.asset(
+                'assets/icons/ic_alert.svg',
+                width: 20,
+                height: 20,
+                colorFilter: ColorFilter.mode(
+                  themeService.textColor,
+                  BlendMode.srcIn,
+                ),
               ),
+              onPressed: () {
+                // TODO: Handle alert/notifications action
+              },
             ),
-            onPressed: () {
-              // TODO: Handle alert/notifications action
-            },
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: child,

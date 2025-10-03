@@ -88,15 +88,46 @@ class MyApp extends StatefulWidget {
   State<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   late final AppRouter _appRouter;
   bool _showSplash = true;
+  late final AuthService _authService;
+  late final StreamChatService _streamChatService;
 
   @override
   void initState() {
     super.initState();
-    final authService = context.read<AuthService>();
-    _appRouter = AppRouter(authService);
+    _authService = context.read<AuthService>();
+    _streamChatService = context.read<StreamChatService>();
+    _appRouter = AppRouter(_authService);
+    
+    // Set StreamChatService reference in AuthService for presence management
+    _authService.setStreamChatService(_streamChatService);
+    
+    // Add app lifecycle observer
+    WidgetsBinding.instance.addObserver(this);
+    
+    // Auto-connect Stream Chat for unread badge when user is authenticated
+    _authService.addListener(() async {
+      if (_authService.userInfo != null && _authService.userInfo!.getStreamToken != null) {
+        await _streamChatService.autoConnectUser(
+          userId: _authService.userInfo!.id,
+          token: _authService.userInfo!.getStreamToken,
+          userName: _authService.userInfo!.name,
+          userImage: _authService.userInfo!.avatarUrl,
+        );
+      }
+    });
+    
+    // Try to connect immediately if already authenticated
+    if (_authService.userInfo != null && _authService.userInfo!.getStreamToken != null) {
+      _streamChatService.autoConnectUser(
+        userId: _authService.userInfo!.id,
+        token: _authService.userInfo!.getStreamToken,
+        userName: _authService.userInfo!.name,
+        userImage: _authService.userInfo!.avatarUrl,
+      );
+    }
     
     // Show splash screen for 2 seconds
     Future.delayed(const Duration(seconds: 2), () {
@@ -106,6 +137,36 @@ class _MyAppState extends State<MyApp> {
         });
       }
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    debugPrint('🔄 App Lifecycle State: $state');
+    
+    // Stream Chat automatically manages presence based on WebSocket connection
+    // When app resumes, ensure connection is active for presence
+    if (state == AppLifecycleState.resumed) {
+      if (_authService.userInfo != null && _authService.userInfo!.getStreamToken != null) {
+        // Re-establish connection when app comes to foreground
+        // This ensures the user appears online
+        _streamChatService.autoConnectUser(
+          userId: _authService.userInfo!.id,
+          token: _authService.userInfo!.getStreamToken,
+          userName: _authService.userInfo!.name,
+          userImage: _authService.userInfo!.avatarUrl,
+        );
+        debugPrint('🟢 App resumed - Ensuring Stream Chat connection is active');
+      }
+    }
+    // Note: Stream Chat automatically sets users offline when WebSocket disconnects
+    // No manual offline handling needed
   }
 
   @override
