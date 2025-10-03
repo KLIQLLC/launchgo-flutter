@@ -3,12 +3,12 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:stream_chat_flutter/stream_chat_flutter.dart' hide Event;
 import '../theme/app_colors.dart';
-import 'package:launchgo/services/stream_chat_service.dart';
+import 'package:launchgo/services/chat/stream_chat_service.dart';
 import 'package:launchgo/widgets/badge_icon.dart';
 import 'package:launchgo/features/documents/domain/entities/document_entity.dart';
 import 'package:launchgo/features/documents/presentation/pages/documents_page.dart';
 import 'package:launchgo/screens/goals/goals_screen.dart';
-import 'package:launchgo/screens/chat/chat_screen.dart';
+import 'package:launchgo/screens/chat/refactored_chat_screen.dart';
 import 'package:launchgo/screens/courses/courses_screen.dart';
 import 'package:launchgo/screens/courses/course_form_screen.dart';
 import 'package:launchgo/screens/documents/assignment_form_screen.dart';
@@ -83,7 +83,7 @@ class AppRouter {
         GoRoute(
           path: '/chat',
           name: 'chat',
-          builder: (context, state) => const ChatScreen(),
+          builder: (context, state) => const RefactoredChatScreen(),
         ),
         GoRoute(
           path: '/new-document',

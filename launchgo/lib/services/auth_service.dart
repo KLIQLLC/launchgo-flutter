@@ -11,7 +11,7 @@ import '../models/semester_model.dart';
 import 'secure_storage_service.dart';
 import 'permissions_service.dart';
 import 'preferences_service.dart';
-import 'stream_chat_service.dart';
+import 'chat/stream_chat_service.dart';
 
 /// Service for managing user authentication with Google Sign-In and backend JWT tokens
 class AuthService extends ChangeNotifier {

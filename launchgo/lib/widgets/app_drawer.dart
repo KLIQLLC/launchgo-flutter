@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:launchgo/services/auth_service.dart';
-import 'package:launchgo/services/stream_chat_service.dart';
+import 'package:launchgo/services/chat/stream_chat_service.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/theme/app_colors.dart';
 import 'package:launchgo/widgets/cupertino_dropdown.dart';
