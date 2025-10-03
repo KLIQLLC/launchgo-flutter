@@ -80,10 +80,16 @@ class RecapCard extends StatelessWidget {
                 ),
                 GestureDetector(
                   onTap: () => _shareRecap(recap),
-                  child: Icon(
-                    Icons.share,
-                    size: 20,
-                    color: Colors.white.withValues(alpha: 0.7),
+                  child: SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: Center(
+                      child: Icon(
+                        Icons.share,
+                        size: 20,
+                        color: Colors.white.withValues(alpha: 0.7),
+                      ),
+                    ),
                   ),
                 ),
               ],
