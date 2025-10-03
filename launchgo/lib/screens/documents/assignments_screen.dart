@@ -25,12 +25,32 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
   bool _isLoading = false;
   Map<String, dynamic> _currentCourse = {};
   bool _hasChanges = false; // Track if any assignments were modified
+  String? _lastSelectedStudentId; // Track current student to detect changes
 
   @override
   void initState() {
     super.initState();
     _currentCourse = widget.course;
     _loadAssignments();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // Check if selected student has changed
+    final authService = context.watch<AuthService>();
+    final currentStudentId = authService.selectedStudentId;
+    
+    if (_lastSelectedStudentId != currentStudentId) {
+      _lastSelectedStudentId = currentStudentId;
+      
+      // Only reload if this isn't the initial load (which happens in initState)
+      if (_lastSelectedStudentId != null) {
+        debugPrint('🔄 Selected student changed to: $currentStudentId - reloading assignments');
+        _loadAssignments();
+      }
+    }
   }
 
   Future<void> _loadAssignments() async {

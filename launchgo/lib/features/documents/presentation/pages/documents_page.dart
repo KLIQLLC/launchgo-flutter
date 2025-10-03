@@ -47,6 +47,7 @@ class DocumentsView extends StatefulWidget {
 class _DocumentsViewState extends State<DocumentsView> {
   final TextEditingController _searchController = TextEditingController();
   String? _previousSelectedSemesterId;
+  String? _previousSelectedStudentId;
 
   @override
   void dispose() {
@@ -69,10 +70,24 @@ class _DocumentsViewState extends State<DocumentsView> {
     final themeService = context.watch<ThemeService>();
     final authService = context.watch<AuthService>();
     
-    // Check if semester changed and trigger documents reload
+    // Check if semester or student changed and trigger documents reload
     final currentSemesterId = authService.selectedSemesterId;
+    final currentStudentId = authService.selectedStudentId;
+    
+    bool shouldReload = false;
+    
     if (_previousSelectedSemesterId != currentSemesterId && currentSemesterId != null) {
       _previousSelectedSemesterId = currentSemesterId;
+      shouldReload = true;
+    }
+    
+    if (_previousSelectedStudentId != currentStudentId && currentStudentId != null) {
+      _previousSelectedStudentId = currentStudentId;
+      shouldReload = true;
+      debugPrint('🔄 Selected student changed to: $currentStudentId - reloading documents');
+    }
+    
+    if (shouldReload) {
       // Trigger reload after build completes
       WidgetsBinding.instance.addPostFrameCallback((_) {
         context.read<DocumentsBloc>().add(const LoadDocuments());

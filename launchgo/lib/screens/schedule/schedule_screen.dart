@@ -29,12 +29,32 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   DateTime _currentWeekStart = DateTime.now();
   DateTime _currentWeekEnd = DateTime.now();
   final GlobalKey<_DeadlinesListState> _deadlinesListKey = GlobalKey<_DeadlinesListState>();
+  String? _lastSelectedStudentId; // Track current student to detect changes
 
   @override
   void initState() {
     super.initState();
     _initializeWeekStart();
     _loadDeadlines();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // Check if selected student has changed
+    final authService = context.watch<AuthService>();
+    final currentStudentId = authService.selectedStudentId;
+    
+    if (_lastSelectedStudentId != currentStudentId) {
+      _lastSelectedStudentId = currentStudentId;
+      
+      // Only reload if this isn't the initial load (which happens in initState)
+      if (_lastSelectedStudentId != null) {
+        debugPrint('🔄 Selected student changed to: $currentStudentId - reloading schedule data');
+        _loadDeadlines();
+      }
+    }
   }
 
   void _initializeWeekStart() {
