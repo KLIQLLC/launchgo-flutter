@@ -39,15 +39,17 @@ class UpdateRecap extends RecapEvent {
   final String recapId;
   final String title;
   final String notes;
+  final String? semesterId;
 
   const UpdateRecap({
     required this.recapId,
     required this.title,
     required this.notes,
+    this.semesterId,
   });
 
   @override
-  List<Object?> get props => [recapId, title, notes];
+  List<Object?> get props => [recapId, title, notes, semesterId];
 }
 
 

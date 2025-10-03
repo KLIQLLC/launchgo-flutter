@@ -88,10 +88,13 @@ class RecapBloc extends Bloc<RecapEvent, RecapState> {
     emit(RecapUpdating(event.recapId));
     
     try {
+      final semesterId = event.semesterId ?? _authService.selectedSemesterId;
+      
       final updatedRecap = await _repository.updateRecap(
         recapId: event.recapId,
         title: event.title,
         notes: event.notes,
+        semesterId: semesterId,
       );
       
       emit(RecapUpdated(updatedRecap));

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:provider/provider.dart';
 import '../../../../models/recap_model.dart';
+import '../../../../services/auth_service.dart';
 import '../../../../services/theme_service.dart';
+import '../../../../widgets/cupertino_dropdown.dart';
 import '../bloc/recap_bloc.dart';
 import '../bloc/recap_event.dart';
 import '../bloc/recap_state.dart';
@@ -22,6 +25,7 @@ class _RecapFormScreenState extends State<RecapFormScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _titleController;
   late final TextEditingController _notesController;
+  late final TextEditingController _semesterController;
 
   bool get isEditMode => widget.recap != null;
 
@@ -30,12 +34,48 @@ class _RecapFormScreenState extends State<RecapFormScreen> {
     super.initState();
     _titleController = TextEditingController(text: widget.recap?.title ?? '');
     _notesController = TextEditingController(text: widget.recap?.notes ?? '');
+    _semesterController = TextEditingController();
+    
+    // Load semesters when form opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authService = context.read<AuthService>();
+      if (authService.semesters.isEmpty) {
+        authService.loadSemesters().then((_) {
+          _setSemesterValue(authService);
+        });
+      } else {
+        _setSemesterValue(authService);
+      }
+    });
+  }
+
+  void _setSemesterValue(AuthService authService) {
+    if (isEditMode && widget.recap != null) {
+      // In edit mode, find semester by recap's semesterId
+      try {
+        final semester = authService.semesters.firstWhere(
+          (s) => s.id == widget.recap!.semesterId,
+        );
+        setState(() {
+          _semesterController.text = semester.name;
+        });
+      } catch (e) {
+        // Leave semester unselected if not found
+      }
+    } else {
+      // In create mode, use currently selected semester as initial value
+      final selectedSemester = authService.getSelectedSemester();
+      setState(() {
+        _semesterController.text = selectedSemester?.name ?? '';
+      });
+    }
   }
 
   @override
   void dispose() {
     _titleController.dispose();
     _notesController.dispose();
+    _semesterController.dispose();
     super.dispose();
   }
 
@@ -46,17 +86,43 @@ class _RecapFormScreenState extends State<RecapFormScreen> {
 
     final title = _titleController.text.trim();
     final notes = _notesController.text.trim();
+    final selectedSemesterName = _semesterController.text.trim();
+    
+    // Find semester ID from name
+    String? semesterId;
+    final authService = context.read<AuthService>();
+    
+    if (selectedSemesterName.isNotEmpty) {
+      try {
+        final semester = authService.semesters.firstWhere(
+          (s) => s.name == selectedSemesterName,
+        );
+        semesterId = semester.id;
+      } catch (e) {
+        // Semester not found
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please select a valid semester'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+    }
 
     if (isEditMode) {
       context.read<RecapBloc>().add(UpdateRecap(
         recapId: widget.recap!.id,
         title: title,
         notes: notes,
+        semesterId: semesterId,
       ));
     } else {
       context.read<RecapBloc>().add(CreateRecap(
         title: title,
         notes: notes,
+        semesterId: semesterId,
       ));
     }
   }
@@ -138,6 +204,8 @@ class _RecapFormScreenState extends State<RecapFormScreen> {
                         isRequired: true,
                         themeService: themeService,
                       ),
+                      const SizedBox(height: 24),
+                      _buildSemesterDropdown(),
                       const SizedBox(height: 24),
                       _buildTextField(
                         controller: _notesController,
@@ -258,6 +326,45 @@ class _RecapFormScreenState extends State<RecapFormScreen> {
                   return null;
                 }
               : null,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSemesterDropdown() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Semester *',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Consumer<AuthService>(
+          builder: (context, authService, child) {
+            final semesterNames = authService.semesters.map((s) => s.name).toList();
+            return CupertinoDropdown(
+              value: _semesterController.text.isEmpty ? null : _semesterController.text,
+              items: semesterNames.isNotEmpty ? semesterNames : [],
+              hintText: semesterNames.isEmpty ? 'Loading semesters...' : 'Select semester',
+              isRequired: true,
+              onChanged: semesterNames.isEmpty ? null : (value) {
+                setState(() {
+                  _semesterController.text = value ?? '';
+                });
+              },
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please select a semester';
+                }
+                return null;
+              },
+            );
+          },
         ),
       ],
     );

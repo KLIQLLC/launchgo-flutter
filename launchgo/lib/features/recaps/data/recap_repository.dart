@@ -12,6 +12,7 @@ abstract class RecapRepository {
     required String recapId,
     required String title,
     required String notes,
+    String? semesterId,
   });
 }
 
@@ -64,11 +65,13 @@ class RecapRepositoryImpl implements RecapRepository {
     required String recapId,
     required String title,
     required String notes,
+    String? semesterId,
   }) async {
     try {
       final recapData = {
         'title': title,
         'notes': notes,
+        if (semesterId != null) 'semesterId': semesterId,
       };
 
       final result = await _apiService.updateRecap(recapId, recapData);
