@@ -66,5 +66,7 @@
 		<false/>
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>This app needs access to photo library to allow you to upload documents and images.</string>
+		<key>NSCameraUsageDescription</key>
+		<string>This app needs access to the camera to allow you to take and send photos in chat.</string>
 	</dict>
 </plist>
