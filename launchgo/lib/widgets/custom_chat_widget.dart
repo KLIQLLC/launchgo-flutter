@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'package:stream_chat_flutter/stream_chat_flutter.dart';
 import '../services/auth_service.dart';
@@ -89,8 +90,57 @@ class CustomChatWidget extends StatelessWidget {
                   },
                 ),
               ),
-              const StreamMessageInput(
+              StreamMessageInput(
                 disableAttachments: false,
+                showCommandsButton: false,
+                attachmentButtonBuilder: (context, defaultButton) {
+                  return IconButton(
+                    onPressed: defaultButton.onPressed,
+                    icon: SvgPicture.asset(
+                      'assets/icons/ic_attachment.svg',
+                      width: 24,
+                      height: 24,
+                      colorFilter: const ColorFilter.mode(
+                        Color(0xFF64748B), // Muted icon color
+                        BlendMode.srcIn,
+                      ),
+                    ),
+                  );
+                },
+                sendButtonBuilder: (context, messageController) {
+                  return ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: messageController.textFieldController,
+                    builder: (context, value, child) {
+                      final hasText = value.text.trim().isNotEmpty;
+                      return IconButton(
+                        onPressed: hasText
+                            ? () {
+                                // The StreamMessageInput widget handles sending internally
+                                // We just need to trigger the send action
+                                final channel = StreamChannel.of(context).channel;
+                                if (messageController.text.trim().isNotEmpty) {
+                                  channel.sendMessage(
+                                    Message(text: messageController.text.trim()),
+                                  );
+                                  messageController.clear();
+                                }
+                              }
+                            : null,
+                        icon: SvgPicture.asset(
+                          'assets/icons/ic_send.svg',
+                          width: 20,
+                          height: 20,
+                          colorFilter: ColorFilter.mode(
+                            hasText
+                              ? const Color(0xFF7B8CDE)  // Active send button color
+                              : const Color(0xFF64748B), // Disabled send button color
+                            BlendMode.srcIn,
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
               ),
             ],
           ),
