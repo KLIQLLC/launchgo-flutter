@@ -3,9 +3,10 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'package:stream_chat_flutter/stream_chat_flutter.dart';
 import '../services/auth_service.dart';
+import 'chat/custom_attachment_handler.dart';
 import 'dart:async';
 
-class CustomChatWidget extends StatelessWidget {
+class CustomChatWidget extends StatefulWidget {
   final StreamChatClient client;
   final Channel channel;
 
@@ -14,6 +15,25 @@ class CustomChatWidget extends StatelessWidget {
     required this.client,
     required this.channel,
   }) : super(key: key);
+  
+  @override
+  State<CustomChatWidget> createState() => _CustomChatWidgetState();
+}
+
+class _CustomChatWidgetState extends State<CustomChatWidget> {
+  late StreamMessageInputController _messageInputController;
+  
+  @override
+  void initState() {
+    super.initState();
+    _messageInputController = StreamMessageInputController();
+  }
+  
+  @override
+  void dispose() {
+    _messageInputController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -69,12 +89,12 @@ class CustomChatWidget extends StatelessWidget {
     return StreamChatTheme(
       data: customTheme,
       child: StreamChannel(
-        channel: channel,
+        channel: widget.channel,
         child: Scaffold(
           backgroundColor: const Color(0xFF020817), // Dark blue-black background
           appBar: PreferredSize(
             preferredSize: const Size.fromHeight(64),
-            child: _CustomChatAppBar(channel: channel),
+            child: _CustomChatAppBar(channel: widget.channel),
           ),
           body: Column(
             children: <Widget>[
@@ -91,11 +111,17 @@ class CustomChatWidget extends StatelessWidget {
                 ),
               ),
               StreamMessageInput(
+                messageInputController: _messageInputController,
                 disableAttachments: false,
                 showCommandsButton: false,
                 attachmentButtonBuilder: (context, defaultButton) {
                   return IconButton(
-                    onPressed: defaultButton.onPressed,
+                    onPressed: () async {
+                      await CustomAttachmentHandler.showAttachmentOptions(
+                        context: context,
+                        messageInputController: _messageInputController,
+                      );
+                    },
                     icon: SvgPicture.asset(
                       'assets/icons/ic_attachment.svg',
                       width: 24,
@@ -108,22 +134,24 @@ class CustomChatWidget extends StatelessWidget {
                   );
                 },
                 sendButtonBuilder: (context, messageController) {
-                  return ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: messageController.textFieldController,
-                    builder: (context, value, child) {
-                      final hasText = value.text.trim().isNotEmpty;
+                  return AnimatedBuilder(
+                    animation: messageController,
+                    builder: (context, child) {
+                      final hasText = messageController.text.trim().isNotEmpty;
+                      final hasAttachments = messageController.attachments.isNotEmpty;
+                      final canSend = hasText || hasAttachments;
+                      
                       return IconButton(
-                        onPressed: hasText
+                        onPressed: canSend
                             ? () {
-                                // The StreamMessageInput widget handles sending internally
-                                // We just need to trigger the send action
+                                // Send message using the controller
                                 final channel = StreamChannel.of(context).channel;
-                                if (messageController.text.trim().isNotEmpty) {
-                                  channel.sendMessage(
-                                    Message(text: messageController.text.trim()),
-                                  );
-                                  messageController.clear();
-                                }
+                                final message = Message(
+                                  text: messageController.text.trim(),
+                                  attachments: messageController.attachments,
+                                );
+                                channel.sendMessage(message);
+                                messageController.clear();
                               }
                             : null,
                         icon: SvgPicture.asset(
@@ -131,7 +159,7 @@ class CustomChatWidget extends StatelessWidget {
                           width: 20,
                           height: 20,
                           colorFilter: ColorFilter.mode(
-                            hasText
+                            canSend
                               ? const Color(0xFF7B8CDE)  // Active send button color
                               : const Color(0xFF64748B), // Disabled send button color
                             BlendMode.srcIn,

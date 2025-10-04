@@ -71,6 +71,7 @@ dependencies:
   url_launcher: ^6.2.4
   file_picker: ^8.1.4
   share_plus: ^10.1.2
+  image_picker: ^1.2.0
   
   ## Dependency Injection
   get_it: ^7.6.7
