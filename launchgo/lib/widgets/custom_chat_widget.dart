@@ -17,7 +17,9 @@ class CustomChatWidget extends StatefulWidget {
   }) : super(key: key);
   
   @override
-  State<CustomChatWidget> createState() => _CustomChatWidgetState();
+  State<CustomChatWidget> createState() {
+    return _CustomChatWidgetState();
+  }
 }
 
 class _CustomChatWidgetState extends State<CustomChatWidget> {
@@ -150,6 +152,7 @@ class _CustomChatWidgetState extends State<CustomChatWidget> {
                                   text: messageController.text.trim(),
                                   attachments: messageController.attachments,
                                 );
+                                
                                 channel.sendMessage(message);
                                 messageController.clear();
                               }
@@ -229,8 +232,6 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
 
   void _subscribeToChannelEvents() {
     _channelSubscription = widget.channel.on().listen((event) {
-      debugPrint('🔵 [CHAT] Channel event: ${event.type}');
-      
       // Listen for various presence and user events
       if (event.type == 'user.presence.changed' ||
           event.type == 'user.watching.start' ||
@@ -252,7 +253,6 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
     if (!mounted) return;
     
     final members = widget.channel.state?.members ?? [];
-    debugPrint('🔵 [CHAT] Updating status for $otherUserId from ${members.length} members');
     
     final otherMember = members.firstWhere(
       (m) => m.userId == otherUserId,
@@ -264,7 +264,6 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
       setState(() {
         isOnline = newOnlineStatus;
       });
-      debugPrint('🔵 [CHAT] Status updated: $displayName is now ${isOnline ? "online" : "offline"}');
     }
   }
 

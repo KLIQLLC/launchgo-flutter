@@ -377,7 +377,6 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
                   stream: streamChatService.getUnreadCountStreamForStudent(selectedStudentId),
                   builder: (context, snapshot) {
                     final unreadCount = snapshot.data ?? 0;
-                    debugPrint('🎯 UI Badge: Mentor StreamBuilder - Student: $selectedStudentId, Unread: $unreadCount, hasData: ${snapshot.hasData}');
                     
                     return Transform.translate(
                       offset: const Offset(20, 0),
@@ -411,7 +410,6 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
                   builder: (context, userSnapshot) {
                     final currentUser = userSnapshot.data;
                     final unreadCount = currentUser?.totalUnreadCount ?? 0;
-                    debugPrint('🎯 UI Badge: Student StreamBuilder - Unread: $unreadCount, hasData: ${userSnapshot.hasData}');
                     
                     return Transform.translate(
                       offset: const Offset(20, 0),

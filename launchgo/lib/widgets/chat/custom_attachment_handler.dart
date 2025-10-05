@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:stream_chat_flutter/stream_chat_flutter.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
 
 class CustomAttachmentHandler {
@@ -28,15 +29,97 @@ class CustomAttachmentHandler {
     required BuildContext context,
     required StreamMessageInputController messageInputController,
   }) async {
+    final parentContext = context; // Store the original context
     await showModalBottomSheet(
       context: context,
       backgroundColor: _backgroundColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (BuildContext context) => _AttachmentBottomSheet(
-        messageInputController: messageInputController,
-      ),
+      builder: (BuildContext modalContext) {
+        return _AttachmentBottomSheet(
+          messageInputController: messageInputController,
+          parentContext: parentContext,
+        );
+      },
+    );
+  }
+
+  // Permission handling methods
+  static Future<bool> _requestCameraPermission() async {
+    if (Platform.isIOS) {
+      // iOS handles permissions automatically through Info.plist
+      return true;
+    }
+    final cameraStatus = await Permission.camera.request();
+    return cameraStatus.isGranted;
+  }
+
+  static Future<bool> _requestPhotosPermission() async {
+    if (Platform.isIOS) {
+      // iOS handles permissions automatically through Info.plist
+      return true;
+    }
+    
+    if (Platform.isAndroid) {
+      // Try storage permission first (works for most Android versions)
+      try {
+        final storageStatus = await Permission.storage.request();
+        if (storageStatus.isGranted) return true;
+        
+        // For Android 13+, try photos permission
+        final photosStatus = await Permission.photos.request();
+        return photosStatus.isGranted;
+      } catch (e) {
+        return false;
+      }
+    }
+    
+    return false;
+  }
+
+  static Future<bool> _requestMicrophonePermission() async {
+    if (Platform.isIOS) {
+      // iOS handles permissions automatically through Info.plist
+      return true;
+    }
+    final micStatus = await Permission.microphone.request();
+    return micStatus.isGranted;
+  }
+
+  static void _showPermissionDeniedDialog(BuildContext context, String permissionType) {
+    final settingsText = Platform.isIOS 
+        ? 'Settings > Privacy & Security > $permissionType > launchgo'
+        : 'Settings > Apps > launchgo > Permissions';
+        
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: _backgroundColor,
+          title: Text(
+            'Permission Required',
+            style: TextStyle(color: _textColor),
+          ),
+          content: Text(
+            'Please enable $permissionType permission in $settingsText',
+            style: TextStyle(color: _textColor),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancel', style: TextStyle(color: _textColor)),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                openAppSettings();
+              },
+              child: Text('Settings', style: TextStyle(color: _primaryColor)),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -74,9 +157,11 @@ class CustomAttachmentHandler {
 
 class _AttachmentBottomSheet extends StatelessWidget {
   final StreamMessageInputController messageInputController;
+  final BuildContext parentContext;
 
   const _AttachmentBottomSheet({
     required this.messageInputController,
+    required this.parentContext,
   });
 
   @override
@@ -122,34 +207,81 @@ class _AttachmentBottomSheet extends StatelessWidget {
 
   Future<void> _handlePhotoLibrary(BuildContext context) async {
     Navigator.pop(context);
-    await _AttachmentPicker.pickImage(
-      context: context,
-      source: ImageSource.gallery,
-      messageInputController: messageInputController,
-    );
+    
+    // Request photos permission
+    final hasPermission = await CustomAttachmentHandler._requestPhotosPermission();
+    
+    if (!hasPermission) {
+      if (parentContext.mounted) {
+        CustomAttachmentHandler._showPermissionDeniedDialog(parentContext, 'Photos');
+      }
+      return;
+    }
+    
+    if (parentContext.mounted) {
+      await _AttachmentPicker.pickImage(
+        context: parentContext,
+        source: ImageSource.gallery,
+        messageInputController: messageInputController,
+      );
+    }
   }
 
   Future<void> _handleCamera(BuildContext context) async {
     Navigator.pop(context);
-    await _AttachmentPicker.pickImage(
-      context: context,
-      source: ImageSource.camera,
-      messageInputController: messageInputController,
-    );
+    
+    // Request camera permission
+    final hasPermission = await CustomAttachmentHandler._requestCameraPermission();
+    
+    if (!hasPermission) {
+      if (parentContext.mounted) {
+        CustomAttachmentHandler._showPermissionDeniedDialog(parentContext, 'Camera');
+      }
+      return;
+    }
+    
+    if (parentContext.mounted) {
+      await _AttachmentPicker.pickImage(
+        context: parentContext,
+        source: ImageSource.camera,
+        messageInputController: messageInputController,
+      );
+    }
   }
 
   Future<void> _handleVideo(BuildContext context) async {
     Navigator.pop(context);
-    await _AttachmentPicker.pickVideo(
-      context: context,
-      messageInputController: messageInputController,
-    );
+    
+    // Request both photos and microphone permission for video
+    final hasPhotosPermission = await CustomAttachmentHandler._requestPhotosPermission();
+    final hasMicPermission = await CustomAttachmentHandler._requestMicrophonePermission();
+    
+    if (!hasPhotosPermission) {
+      if (parentContext.mounted) {
+        CustomAttachmentHandler._showPermissionDeniedDialog(parentContext, 'Photos');
+      }
+      return;
+    }
+    
+    if (!hasMicPermission) {
+      if (parentContext.mounted) {
+        CustomAttachmentHandler._showPermissionDeniedDialog(parentContext, 'Microphone');
+      }
+      return;
+    }
+    
+    if (parentContext.mounted) {
+      await _AttachmentPicker.pickVideo(
+        context: parentContext,
+        messageInputController: messageInputController,
+      );
+    }
   }
 
   Future<void> _handleFile(BuildContext context) async {
     Navigator.pop(context);
     await _AttachmentPicker.pickFile(
-      context: context,
+      context: parentContext, // Use parent context instead of modal context
       messageInputController: messageInputController,
     );
   }
@@ -203,16 +335,32 @@ class _AttachmentPicker {
         imageQuality: CustomAttachmentHandler._imageQuality,
       );
       
-      if (image != null && context.mounted) {
-        await _processImageFile(context, image, messageInputController);
+      if (image != null) {
+        // Process the image even if context is not mounted - the controller is still valid
+        await _processImageFileWithoutContext(image, messageInputController);
+        
+        // Only show UI feedback if context is still mounted
+        if (context.mounted) {
+          CustomAttachmentHandler._showSuccessMessage(
+            context, 
+            'Image attached - tap send to upload'
+          );
+        }
       }
     } catch (e) {
-      debugPrint('Error picking image: $e');
       if (context.mounted) {
-        CustomAttachmentHandler._showErrorMessage(
-          context, 
-          'Failed to pick image: ${e.toString()}'
-        );
+        String errorMessage = 'Failed to pick image';
+        if (e.toString().contains('photo_access_denied') || 
+            e.toString().contains('camera_access_denied') ||
+            e.toString().contains('Permission denied')) {
+          final settingsPath = Platform.isIOS 
+              ? 'Settings > Privacy & Security > Camera/Photos > launchgo'
+              : 'Settings > Apps > launchgo > Permissions';
+          errorMessage = 'Camera/Photos permission denied. Please enable in $settingsPath';
+        } else {
+          errorMessage = 'Failed to pick image: ${e.toString()}';
+        }
+        CustomAttachmentHandler._showErrorMessage(context, errorMessage);
       }
     }
   }
@@ -227,16 +375,22 @@ class _AttachmentPicker {
         maxDuration: CustomAttachmentHandler._maxVideoDuration,
       );
       
-      if (video != null && context.mounted) {
+      if (video != null) {
         await _processVideoFile(context, video, messageInputController);
       }
     } catch (e) {
-      debugPrint('Error picking video: $e');
       if (context.mounted) {
-        CustomAttachmentHandler._showErrorMessage(
-          context, 
-          'Failed to pick video: ${e.toString()}'
-        );
+        String errorMessage = 'Failed to pick video';
+        if (e.toString().contains('photo_access_denied') || 
+            e.toString().contains('Permission denied')) {
+          final settingsPath = Platform.isIOS 
+              ? 'Settings > Privacy & Security > Photos > launchgo'
+              : 'Settings > Apps > launchgo > Permissions';
+          errorMessage = 'Photos/Storage permission denied. Please enable in $settingsPath';
+        } else {
+          errorMessage = 'Failed to pick video: ${e.toString()}';
+        }
+        CustomAttachmentHandler._showErrorMessage(context, errorMessage);
       }
     }
   }
@@ -255,7 +409,6 @@ class _AttachmentPicker {
         await _processGenericFile(context, result.files.first, messageInputController);
       }
     } catch (e) {
-      debugPrint('Error picking file: $e');
       if (context.mounted) {
         CustomAttachmentHandler._showErrorMessage(
           context, 
@@ -265,28 +418,34 @@ class _AttachmentPicker {
     }
   }
 
-  static Future<void> _processImageFile(
-    BuildContext context,
+
+  static Future<void> _processImageFileWithoutContext(
     XFile image,
     StreamMessageInputController messageInputController,
   ) async {
     final file = File(image.path);
+    
+    if (!await file.exists()) {
+      throw Exception('Image file not found');
+    }
+    
+    final fileSize = await file.length();
+    final fileName = image.path.split('/').last;
+    final bytes = await file.readAsBytes();
+    
+    // Create attachment with all required fields
     final attachment = Attachment(
       type: 'image',
+      title: fileName,
       file: AttachmentFile(
-        size: await file.length(),
+        size: fileSize,
         path: file.path,
-        bytes: await file.readAsBytes(),
+        bytes: bytes,
+        name: fileName,
       ),
     );
     
     messageInputController.addAttachment(attachment);
-    if (context.mounted) {
-      CustomAttachmentHandler._showSuccessMessage(
-        context, 
-        'Image attached - tap send to upload'
-      );
-    }
   }
 
   static Future<void> _processVideoFile(
@@ -294,34 +453,44 @@ class _AttachmentPicker {
     XFile video,
     StreamMessageInputController messageInputController,
   ) async {
-    final file = File(video.path);
-    final fileSize = await file.length();
-    
-    if (fileSize > CustomAttachmentHandler._maxVideoSizeBytes) {
+    try {
+      final file = File(video.path);
+      final fileSize = await file.length();
+      
+      if (fileSize > CustomAttachmentHandler._maxVideoSizeBytes) {
+        if (context.mounted) {
+          CustomAttachmentHandler._showWarningMessage(
+            context,
+            'Video file is too large. Maximum size is ${CustomAttachmentHandler._maxVideoSizeMB}MB.'
+          );
+        }
+        return;
+      }
+      
+      final attachment = Attachment(
+        type: 'video',
+        file: AttachmentFile(
+          size: fileSize,
+          path: file.path,
+          bytes: await file.readAsBytes(),
+        ),
+      );
+      
+      messageInputController.addAttachment(attachment);
+      
       if (context.mounted) {
-        CustomAttachmentHandler._showWarningMessage(
-          context,
-          'Video file is too large. Maximum size is ${CustomAttachmentHandler._maxVideoSizeMB}MB.'
+        CustomAttachmentHandler._showSuccessMessage(
+          context, 
+          'Video attached - tap send to upload'
         );
       }
-      return;
-    }
-    
-    final attachment = Attachment(
-      type: 'video',
-      file: AttachmentFile(
-        size: fileSize,
-        path: file.path,
-        bytes: await file.readAsBytes(),
-      ),
-    );
-    
-    messageInputController.addAttachment(attachment);
-    if (context.mounted) {
-      CustomAttachmentHandler._showSuccessMessage(
-        context, 
-        'Video attached - tap send to upload'
-      );
+    } catch (e) {
+      if (context.mounted) {
+        CustomAttachmentHandler._showErrorMessage(
+          context,
+          'Failed to process video: ${e.toString()}'
+        );
+      }
     }
   }
 
@@ -330,40 +499,63 @@ class _AttachmentPicker {
     PlatformFile platformFile,
     StreamMessageInputController messageInputController,
   ) async {
-    if (platformFile.path == null) {
-      CustomAttachmentHandler._showErrorMessage(context, 'File path is invalid');
-      return;
-    }
+    try {
+      if (platformFile.path == null) {
+        if (context.mounted) {
+          CustomAttachmentHandler._showErrorMessage(context, 'File path is invalid');
+        }
+        return;
+      }
 
-    final file = File(platformFile.path!);
-    final fileSize = await file.length();
-    
-    if (fileSize > CustomAttachmentHandler._maxFileSizeBytes) {
+      final file = File(platformFile.path!);
+      
+      if (!await file.exists()) {
+        if (context.mounted) {
+          CustomAttachmentHandler._showErrorMessage(context, 'Selected file not found');
+        }
+        return;
+      }
+      
+      final fileSize = await file.length();
+      
+      if (fileSize > CustomAttachmentHandler._maxFileSizeBytes) {
+        if (context.mounted) {
+          CustomAttachmentHandler._showWarningMessage(
+            context,
+            'File is too large. Maximum size is ${CustomAttachmentHandler._maxFileSizeMB}MB.'
+          );
+        }
+        return;
+      }
+      
+      final bytes = await file.readAsBytes();
+      
+      final attachment = Attachment(
+        type: 'file',
+        title: platformFile.name,
+        file: AttachmentFile(
+          size: fileSize,
+          path: file.path,
+          bytes: bytes,
+          name: platformFile.name,
+        ),
+      );
+      
+      messageInputController.addAttachment(attachment);
+      
       if (context.mounted) {
-        CustomAttachmentHandler._showWarningMessage(
-          context,
-          'File is too large. Maximum size is ${CustomAttachmentHandler._maxFileSizeMB}MB.'
+        CustomAttachmentHandler._showSuccessMessage(
+          context, 
+          'File attached - tap send to upload'
         );
       }
-      return;
-    }
-    
-    final attachment = Attachment(
-      type: 'file',
-      title: platformFile.name,
-      file: AttachmentFile(
-        size: fileSize,
-        path: file.path,
-        bytes: await file.readAsBytes(),
-      ),
-    );
-    
-    messageInputController.addAttachment(attachment);
-    if (context.mounted) {
-      CustomAttachmentHandler._showSuccessMessage(
-        context, 
-        'File attached - tap send to upload'
-      );
+    } catch (e) {
+      if (context.mounted) {
+        CustomAttachmentHandler._showErrorMessage(
+          context,
+          'Failed to process file: ${e.toString()}'
+        );
+      }
     }
   }
 }
