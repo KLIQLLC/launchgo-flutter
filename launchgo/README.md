@@ -74,6 +74,14 @@ fvm flutter build appbundle
 # Build for TestFlight (may need updating for FVM)
 ./scripts/build_testflight.sh
 
+# Distribute Android to Firebase App Distribution
+./scripts/distribute_android.sh stage "Release notes"  # Stage environment
+./scripts/distribute_android.sh prod "Release notes"   # Production environment
+# Builds APK with appropriate flavor (stage/prod)
+# Uses environment-specific Firebase app ID
+# Distributes to Firebase App Distribution
+# Targets 'testers' group automatically
+
 # Clear tokens for testing
 ./scripts/clear_tokens.sh
 ```
@@ -147,6 +155,29 @@ fvm flutter pub outdated
 - **Multi-role Support**: Student and Mentor user roles
 - **Environment-specific Tokens**: Separate token storage per environment
 
+### Chat & Presence Management
+**Stream Chat Presence Behavior:**
+
+**App Startup:**
+1. **Students**: Connect to Stream Chat immediately when authenticated ✅
+2. **Mentors**: Connect only when a student is selected ✅
+3. **No premature connections** - Prevents false online status ✅
+
+**When Mentor Opens Chat:**
+1. **Watch selected student's channel** - Mentor appears online to that student ✅
+2. **Specific presence management** - Only online where intended ✅
+
+**When Mentor Switches Students:**
+1. **Stop watching previous channel** - Previous student sees offline ✅
+2. **Disconnect/reconnect cycle** - Forces immediate presence update ✅
+3. **Watch new student's channel** - New student sees online ✅
+4. **Unread message count displayed** - Badge shows count for the new student ✅
+
+**Benefits:**
+- Mentors only appear online to currently selected student
+- Immediate presence updates when switching
+- No false online status on app startup
+
 ### Document Management
 - **Document List**: Browse documents with search and filter
 - **Role-Based CRUD Operations**: 
@@ -184,6 +215,12 @@ fvm flutter pub outdated
 - **Error Handling**: Comprehensive error states
 
 ## Architecture Decisions
+
+### Date/Time Handling
+- **UTC for Server Communication**: Always use UTC timestamps for API requests/responses and data storage
+- **Local Time for Display**: Convert UTC to user's local timezone only when presenting dates/times in the UI
+- **Consistent Comparisons**: Use UTC for all date comparisons (e.g., checking if assignments are overdue)
+- **Benefits**: Ensures timezone-independent data consistency, prevents timezone-related bugs, and maintains synchronization between server and clients across different timezones
 
 ### State Management
 - **Provider**: For app-wide state (auth, theme)
