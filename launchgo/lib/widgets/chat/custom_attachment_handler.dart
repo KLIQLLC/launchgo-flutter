@@ -123,17 +123,6 @@ class CustomAttachmentHandler {
     );
   }
 
-  // Helper methods for showing feedback
-  static void _showSuccessMessage(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: const Duration(seconds: 2),
-        backgroundColor: _primaryColor,
-      ),
-    );
-  }
-
   static void _showErrorMessage(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -182,11 +171,11 @@ class _AttachmentBottomSheet extends StatelessWidget {
               label: 'Camera',
               onTap: () => _handleCamera(context),
             ),
-            _AttachmentOption(
-              icon: Icons.videocam,
-              label: 'Video',
-              onTap: () => _handleVideo(context),
-            ),
+            // _AttachmentOption(
+            //   icon: Icons.videocam,
+            //   label: 'Video',
+            //   onTap: () => _handleVideo(context),
+            // ),
             _AttachmentOption(
               icon: Icons.attach_file,
               label: 'File',
@@ -338,14 +327,6 @@ class _AttachmentPicker {
       if (image != null) {
         // Process the image even if context is not mounted - the controller is still valid
         await _processImageFileWithoutContext(image, messageInputController);
-        
-        // Only show UI feedback if context is still mounted
-        if (context.mounted) {
-          CustomAttachmentHandler._showSuccessMessage(
-            context, 
-            'Image attached - tap send to upload'
-          );
-        }
       }
     } catch (e) {
       if (context.mounted) {
@@ -477,13 +458,6 @@ class _AttachmentPicker {
       );
       
       messageInputController.addAttachment(attachment);
-      
-      if (context.mounted) {
-        CustomAttachmentHandler._showSuccessMessage(
-          context, 
-          'Video attached - tap send to upload'
-        );
-      }
     } catch (e) {
       if (context.mounted) {
         CustomAttachmentHandler._showErrorMessage(
@@ -542,13 +516,6 @@ class _AttachmentPicker {
       );
       
       messageInputController.addAttachment(attachment);
-      
-      if (context.mounted) {
-        CustomAttachmentHandler._showSuccessMessage(
-          context, 
-          'File attached - tap send to upload'
-        );
-      }
     } catch (e) {
       if (context.mounted) {
         CustomAttachmentHandler._showErrorMessage(
