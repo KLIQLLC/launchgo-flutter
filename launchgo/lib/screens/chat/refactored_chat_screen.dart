@@ -93,34 +93,6 @@ class _RefactoredChatScreenState extends State<RefactoredChatScreen>
     );
   }
 
-  Future<void> _handleStudentSwitch(String newStudentId) async {
-    if (_channelManager == null) return;
-
-    try {
-      final authService = context.read<AuthService>();
-      final user = authService.userInfo;
-
-      if (user == null || user.getStreamToken?.isEmpty == true) {
-        throw Exception('User info or token not available');
-      }
-
-      await _channelManager!.switchChannel(
-        user: user,
-        token: user.getStreamToken!,
-        newStudentId: newStudentId,
-      );
-
-      // Trigger rebuild
-      setState(() {});
-
-      debugPrint('✅ [CHAT] Successfully switched to student: $newStudentId');
-    } catch (e) {
-      debugPrint('❌ [CHAT] Failed to switch student: $e');
-      setState(() {
-        _errorMessage = 'Failed to switch chat: $e';
-      });
-    }
-  }
 
   String _getChatTitle() {
     try {
@@ -149,15 +121,8 @@ class _RefactoredChatScreenState extends State<RefactoredChatScreen>
         // Check for student changes (mentor switching students)
         final currentStudentId = authService.selectedStudentId;
 
-        if (_previousSelectedStudentId != currentStudentId &&
-            currentStudentId != null &&
-            _previousSelectedStudentId != null) {
-          // Student changed, trigger switch
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _handleStudentSwitch(currentStudentId);
-          });
-        }
-
+        // Presence switching is now handled in AuthService.selectStudent()
+        // Just track the current student for UI purposes
         _previousSelectedStudentId = currentStudentId;
 
         if (_errorMessage != null) {

@@ -119,14 +119,13 @@ class StreamChatService extends ChangeNotifier {
         extraData: extraData,
       );
       
-      if (members != null && members.isNotEmpty) {
-        await channel.create();
-        await channel.addMembers(members);
-        // Watch the channel with presence enabled
+      // First, try to watch the channel (most common case - channel already exists)
+      try {
         await channel.watch(presence: true);
-      } else {
-        // Watch the channel with presence enabled
-        await channel.watch(presence: true);
+        debugPrint('🟢 Stream Chat: Existing channel watched - $channelId');
+      } catch (watchError) {
+        debugPrint('⚠️ Stream Chat: Channel not found, cannot proceed - $watchError');
+        rethrow; // Don't return channel if we can't watch it
       }
       
       debugPrint('🟢 Stream Chat: Channel ready with presence tracking - $channelId');

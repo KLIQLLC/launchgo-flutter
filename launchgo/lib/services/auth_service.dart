@@ -490,11 +490,53 @@ class AuthService extends ChangeNotifier {
   /// Select a student (for mentors)
   Future<void> selectStudent(String studentId) async {
     if (_userInfo?.isMentor == true) {
+      final previousStudentId = _selectedStudentId;
       _selectedStudentId = studentId;
-      debugPrint('Selected student: $studentId');
+      debugPrint('Selected student: $studentId (previous: $previousStudentId)');
       
       // Persist the selection
       await PreferencesService.saveSelectedStudentId(studentId);
+      
+      // Handle Stream Chat presence switching immediately
+      if (previousStudentId != null && 
+          previousStudentId != studentId && 
+          _streamChatService != null &&
+          _streamChatService!.isUserConnected) {
+        try {
+          debugPrint('🔄 [PRESENCE] Mentor switching students: $previousStudentId → $studentId');
+          
+          // Step 1: Stop watching previous student's channel
+          try {
+            final client = _streamChatService!.client;
+            final previousChannel = client.channel('messaging', id: previousStudentId);
+            await previousChannel.stopWatching();
+            debugPrint('✅ [PRESENCE] Stopped watching previous student channel: $previousStudentId');
+          } catch (e) {
+            debugPrint('⚠️ [PRESENCE] Could not stop watching previous channel: $e');
+          }
+          
+          // Step 2: Start watching new student's channel
+          try {
+            final newChannel = await _streamChatService!.getOrCreateChannel(
+              channelId: studentId,
+              channelType: 'messaging',
+              members: [_userInfo!.id, studentId],
+              extraData: {
+                'name': 'Chat with ${getSelectedStudent()?.name ?? 'Student'}',
+                'studentId': studentId,
+                'mentorId': _userInfo!.id,
+              },
+            );
+            if (newChannel != null) {
+              debugPrint('✅ [PRESENCE] Mentor now online for student: $studentId');
+            }
+          } catch (e) {
+            debugPrint('❌ [PRESENCE] Error watching new student channel: $e');
+          }
+        } catch (e) {
+          debugPrint('❌ [PRESENCE] Error switching presence: $e');
+        }
+      }
       
       notifyListeners();
     }

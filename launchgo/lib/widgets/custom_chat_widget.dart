@@ -29,6 +29,11 @@ class _CustomChatWidgetState extends State<CustomChatWidget> {
   void initState() {
     super.initState();
     _messageInputController = StreamMessageInputController();
+    
+    // Mark messages as read when user opens the chat UI
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.channel.markRead();
+    });
   }
   
   @override

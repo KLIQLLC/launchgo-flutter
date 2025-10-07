@@ -44,9 +44,6 @@ class ChatChannelManager {
       _currentChannel = channel;
       _currentChannelId = channelConfig.channelId;
       
-      // Mark channel as read
-      await channel.markRead();
-      
       debugPrint('✅ [CHANNEL] Channel initialized successfully: ${channelConfig.channelId}');
       return channel;
       
@@ -65,10 +62,33 @@ class ChatChannelManager {
     try {
       debugPrint('🔄 [CHANNEL] Switching to student channel: $newStudentId');
       
-      // Clean up current channel
-      await _cleanupCurrentChannel();
+      // For mentors: Force disconnect/reconnect cycle to ensure immediate presence update
+      if (user.isMentor) {
+        debugPrint('🔄 [PRESENCE] Mentor switching - forcing disconnect/reconnect for immediate presence update');
+        
+        // Step 1: Stop watching current channel (mentor goes offline to current student)
+        await _stopWatchingCurrentChannel();
+        
+        // Step 2: Disconnect from Stream Chat completely
+        await _streamChatService.disconnectUser();
+        
+        // Step 3: Small delay to ensure presence update propagates
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        // Step 4: Reconnect to Stream Chat
+        await _streamChatService.connectUser(
+          userId: user.id,
+          token: token,
+          userName: user.name,
+          userImage: user.avatarUrl,
+        );
+      } else {
+        // For students: just clear state (no channel operations needed)
+        _currentChannel = null;
+        _currentChannelId = null;
+      }
       
-      // Initialize new channel
+      // Initialize new channel (mentor appears online to new student)
       return await initializeChannel(
         user: user,
         token: token,
@@ -83,7 +103,8 @@ class ChatChannelManager {
   
   /// Clean up current channel properly
   Future<void> cleanup() async {
-    await _cleanupCurrentChannel();
+    _currentChannel = null;
+    _currentChannelId = null;
   }
   
   /// Private: Get channel configuration based on user role
@@ -167,29 +188,23 @@ class ChatChannelManager {
     }
   }
   
-  /// Private: Clean up current channel
-  Future<void> _cleanupCurrentChannel() async {
+  
+  /// Private: Stop watching current channel (for mentor presence management)
+  Future<void> _stopWatchingCurrentChannel() async {
     if (_currentChannel != null) {
       try {
-        debugPrint('🔄 [CHANNEL] Cleaning up channel: $_currentChannelId');
+        debugPrint('🔄 [PRESENCE] Stopping watch on channel: $_currentChannelId');
         
-        // Mark as read to maintain accurate unread counts
-        await _currentChannel!.markRead();
+        // Don't mark as read - preserve unread state for accurate badges
+        // markRead() will be called when user actually opens the chat UI
         
-        // DON'T stop watching - keep channel watched for:
-        // 1. Online presence (so others see you as online)
-        // 2. Badge unread count tracking
-        // 3. Background message receiving
+        // Stop watching the channel - this removes presence for this channel
+        await _currentChannel!.stopWatching();
         
-        // The channel remains watched and active for presence and badges
-        
-        debugPrint('✅ [CHANNEL] Channel cleaned up (kept watched for presence & badges): $_currentChannelId');
+        debugPrint('✅ [PRESENCE] Stopped watching channel (unread state preserved): $_currentChannelId');
         
       } catch (e) {
-        debugPrint('❌ [CHANNEL] Error during cleanup: $e');
-      } finally {
-        _currentChannel = null;
-        _currentChannelId = null;
+        debugPrint('❌ [PRESENCE] Error stopping watch on channel: $e');
       }
     }
   }
