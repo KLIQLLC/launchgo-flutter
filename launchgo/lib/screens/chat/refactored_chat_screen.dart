@@ -82,7 +82,7 @@ class _RefactoredChatScreenState extends State<RefactoredChatScreen>
       selectedStudentId = authService.selectedStudentId ??
           authService.getSelectedStudent()?.id;
       if (selectedStudentId == null) {
-        throw Exception('Please select a student to chat with');
+        throw Exception('No students available for chat');
       }
     }
 

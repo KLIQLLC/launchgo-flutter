@@ -19,7 +19,7 @@ class ChatErrorHandler {
     }
     
     if (errorString.contains('student')) {
-      return 'Please select a student to chat with.';
+      return 'No students available for chat.';
     }
     
     if (errorString.contains('channel')) {

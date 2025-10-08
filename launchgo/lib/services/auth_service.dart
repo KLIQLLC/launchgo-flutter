@@ -405,6 +405,7 @@ class AuthService extends ChangeNotifier {
           final savedStudentId = PreferencesService.getSelectedStudentId();
           if (savedStudentId != null && 
               _userInfo!.students.any((s) => s.id == savedStudentId)) {
+            // Restore previously selected student
             _selectedStudentId = savedStudentId;
             
             // Connect to Stream Chat if service is available
@@ -412,7 +413,16 @@ class AuthService extends ChangeNotifier {
               _connectMentorToStreamChat(savedStudentId);
             }
           } else {
-            _selectedStudentId = null;
+            // No saved selection - auto-select first student for better UX
+            _selectedStudentId = _userInfo!.students.first.id;
+            
+            // Save the auto-selection for future app starts
+            await PreferencesService.saveSelectedStudentId(_selectedStudentId!);
+            
+            // Connect to Stream Chat if service is available
+            if (_streamChatService != null && _userInfo!.getStreamToken != null) {
+              _connectMentorToStreamChat(_selectedStudentId!);
+            }
           }
         }
       }
@@ -505,7 +515,7 @@ class AuthService extends ChangeNotifier {
         }
         
         // Watch the student's channel
-        final channel = await _streamChatService!.getOrCreateChannel(
+        await _streamChatService!.getOrCreateChannel(
           channelId: studentId,
           channelType: 'messaging',
           members: [_userInfo!.id, studentId],
