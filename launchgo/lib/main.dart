@@ -108,19 +108,25 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     
     // Auto-connect Stream Chat for unread badge when user is authenticated
+    // Only for students - mentors connect when they select a student
     _authService.addListener(() async {
       if (_authService.userInfo != null && _authService.userInfo!.getStreamToken != null) {
-        await _streamChatService.autoConnectUser(
-          userId: _authService.userInfo!.id,
-          token: _authService.userInfo!.getStreamToken,
-          userName: _authService.userInfo!.name,
-          userImage: _authService.userInfo!.avatarUrl,
-        );
+        // Only auto-connect students - mentors connect selectively
+        if (_authService.userInfo!.isStudent) {
+          await _streamChatService.autoConnectUser(
+            userId: _authService.userInfo!.id,
+            token: _authService.userInfo!.getStreamToken,
+            userName: _authService.userInfo!.name,
+            userImage: _authService.userInfo!.avatarUrl,
+          );
+        }
       }
     });
     
-    // Try to connect immediately if already authenticated
-    if (_authService.userInfo != null && _authService.userInfo!.getStreamToken != null) {
+    // Try to connect immediately if already authenticated (students only)
+    if (_authService.userInfo != null && 
+        _authService.userInfo!.getStreamToken != null &&
+        _authService.userInfo!.isStudent) {
       _streamChatService.autoConnectUser(
         userId: _authService.userInfo!.id,
         token: _authService.userInfo!.getStreamToken,
@@ -154,15 +160,18 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // When app resumes, ensure connection is active for presence
     if (state == AppLifecycleState.resumed) {
       if (_authService.userInfo != null && _authService.userInfo!.getStreamToken != null) {
-        // Re-establish connection when app comes to foreground
-        // This ensures the user appears online
-        _streamChatService.autoConnectUser(
-          userId: _authService.userInfo!.id,
-          token: _authService.userInfo!.getStreamToken,
-          userName: _authService.userInfo!.name,
-          userImage: _authService.userInfo!.avatarUrl,
-        );
-        debugPrint('🟢 App resumed - Ensuring Stream Chat connection is active');
+        // Only auto-reconnect students - mentors will reconnect when they select students
+        if (_authService.userInfo!.isStudent) {
+          _streamChatService.autoConnectUser(
+            userId: _authService.userInfo!.id,
+            token: _authService.userInfo!.getStreamToken,
+            userName: _authService.userInfo!.name,
+            userImage: _authService.userInfo!.avatarUrl,
+          );
+          debugPrint('🟢 App resumed - Student reconnected to Stream Chat');
+        } else {
+          debugPrint('🟡 App resumed - Mentor will connect when selecting student');
+        }
       }
     }
     // Note: Stream Chat automatically sets users offline when WebSocket disconnects

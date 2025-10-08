@@ -18,7 +18,7 @@ class AuthService extends ChangeNotifier {
   GoogleSignInAccount? _currentUser;
   String? _accessToken;
   UserModel? _userInfo;
-  String? _selectedStudentId; // For mentors to track selected student
+  String? _selectedStudentId;
   bool _isInitialized = false;
   bool _isSigningIn = false;
   Completer<void>? _signInCompleter;
@@ -400,17 +400,19 @@ class AuthService extends ChangeNotifier {
         debugPrint('✅ User info parsed: ${_userInfo?.id} - ${_userInfo?.name} (${_userInfo?.role})');
         
         
-        // Restore saved student selection or select first student for mentors
+        // Restore saved student selection for mentors
         if (_userInfo?.isMentor == true && _userInfo!.students.isNotEmpty) {
-          // Try to restore previously selected student
           final savedStudentId = PreferencesService.getSelectedStudentId();
           if (savedStudentId != null && 
               _userInfo!.students.any((s) => s.id == savedStudentId)) {
             _selectedStudentId = savedStudentId;
+            
+            // Connect to Stream Chat if service is available
+            if (_streamChatService != null && _userInfo!.getStreamToken != null) {
+              _connectMentorToStreamChat(savedStudentId);
+            }
           } else {
-            // Default to first student if no valid saved selection
-            _selectedStudentId = _userInfo!.students.first.id;
-            await PreferencesService.saveSelectedStudentId(_selectedStudentId);
+            _selectedStudentId = null;
           }
         }
       }
@@ -487,54 +489,91 @@ class AuthService extends ChangeNotifier {
     }
   }
   
+  /// Connect mentor to Stream Chat for selected student (non-blocking)
+  void _connectMentorToStreamChat(String studentId) {
+    // Run asynchronously to avoid blocking loadUserInfo
+    Future.microtask(() async {
+      try {
+        // Connect if not connected yet
+        if (!_streamChatService!.isUserConnected) {
+          await _streamChatService!.connectUser(
+            userId: _userInfo!.id,
+            token: _userInfo!.getStreamToken!,
+            userName: _userInfo!.name,
+            userImage: _userInfo!.avatarUrl,
+          );
+        }
+        
+        // Watch the student's channel
+        final channel = await _streamChatService!.getOrCreateChannel(
+          channelId: studentId,
+          channelType: 'messaging',
+          members: [_userInfo!.id, studentId],
+          extraData: {
+            'name': 'Chat with ${getSelectedStudent()?.name ?? 'Student'}',
+            'studentId': studentId,
+            'mentorId': _userInfo!.id,
+          },
+        );
+      } catch (e) {
+        debugPrint('❌ Error connecting mentor to Stream Chat: $e');
+      }
+    });
+  }
+
   /// Select a student (for mentors)
   Future<void> selectStudent(String studentId) async {
     if (_userInfo?.isMentor == true) {
       final previousStudentId = _selectedStudentId;
       _selectedStudentId = studentId;
-      debugPrint('Selected student: $studentId (previous: $previousStudentId)');
       
       // Persist the selection
       await PreferencesService.saveSelectedStudentId(studentId);
       
       // Handle Stream Chat presence switching immediately
-      if (previousStudentId != null && 
-          previousStudentId != studentId && 
-          _streamChatService != null &&
-          _streamChatService!.isUserConnected) {
-        try {
-          debugPrint('🔄 [PRESENCE] Mentor switching students: $previousStudentId → $studentId');
-          
-          // Step 1: Stop watching previous student's channel
+      if (_streamChatService != null) {
+        // Connect if not connected yet (first time selecting student)
+        if (!_streamChatService!.isUserConnected) {
           try {
-            final client = _streamChatService!.client;
-            final previousChannel = client.channel('messaging', id: previousStudentId);
-            await previousChannel.stopWatching();
-            debugPrint('✅ [PRESENCE] Stopped watching previous student channel: $previousStudentId');
-          } catch (e) {
-            debugPrint('⚠️ [PRESENCE] Could not stop watching previous channel: $e');
-          }
-          
-          // Step 2: Start watching new student's channel
-          try {
-            final newChannel = await _streamChatService!.getOrCreateChannel(
-              channelId: studentId,
-              channelType: 'messaging',
-              members: [_userInfo!.id, studentId],
-              extraData: {
-                'name': 'Chat with ${getSelectedStudent()?.name ?? 'Student'}',
-                'studentId': studentId,
-                'mentorId': _userInfo!.id,
-              },
+            await _streamChatService!.connectUser(
+              userId: _userInfo!.id,
+              token: _userInfo!.getStreamToken!,
+              userName: _userInfo!.name,
+              userImage: _userInfo!.avatarUrl,
             );
-            if (newChannel != null) {
-              debugPrint('✅ [PRESENCE] Mentor now online for student: $studentId');
-            }
           } catch (e) {
-            debugPrint('❌ [PRESENCE] Error watching new student channel: $e');
+            debugPrint('❌ [PRESENCE] Error connecting mentor: $e');
+            notifyListeners();
+            return;
           }
+        }
+        
+        // Handle channel watching for the selected student
+        try {
+          // If switching from previous student, stop watching their channel first
+          if (previousStudentId != null && previousStudentId != studentId) {
+            try {
+              final client = _streamChatService!.client;
+              final previousChannel = client.channel('messaging', id: previousStudentId);
+              await previousChannel.stopWatching();
+            } catch (e) {
+              debugPrint('⚠️ Could not stop watching previous channel: $e');
+            }
+          }
+          
+          // Start watching new student's channel
+          await _streamChatService!.getOrCreateChannel(
+            channelId: studentId,
+            channelType: 'messaging',
+            members: [_userInfo!.id, studentId],
+            extraData: {
+              'name': 'Chat with ${getSelectedStudent()?.name ?? 'Student'}',
+              'studentId': studentId,
+              'mentorId': _userInfo!.id,
+            },
+          );
         } catch (e) {
-          debugPrint('❌ [PRESENCE] Error switching presence: $e');
+          debugPrint('❌ Error managing presence: $e');
         }
       }
       

@@ -76,6 +76,7 @@ class StreamChatService extends ChangeNotifier {
       );
       
       debugPrint('🟢 Stream Chat: User connected successfully - $userId (automatically online)');
+      debugPrint('🔍 [DEBUG] connectUser called for user: $userId');
       _isUserConnected = true;
       notifyListeners();
     } catch (e) {

@@ -160,23 +160,33 @@ fvm flutter pub outdated
 
 **App Startup:**
 1. **Students**: Connect to Stream Chat immediately when authenticated ✅
-2. **Mentors**: Connect only when a student is selected ✅
-3. **No premature connections** - Prevents false online status ✅
+2. **Mentors**: Connect when a student is selected OR when restoring previously selected student ✅
+3. **Selective Presence**: Mentors only appear online to their selected student ✅
+4. **No false online status** - Prevents appearing online to all students ✅
 
-**When Mentor Opens Chat:**
-1. **Watch selected student's channel** - Mentor appears online to that student ✅
-2. **Specific presence management** - Only online where intended ✅
+**Student Selection & Presence:**
+1. **Explicit Selection**: When mentor selects student from dropdown, immediate presence switch ✅
+2. **Restored Selection**: When app restarts, mentor appears online to previously selected student ✅
+3. **Persistent Storage**: Student selections saved and properly restored across app restarts ✅
+4. **No Default Selection**: Dropdown doesn't auto-select first student unless previously chosen ✅
 
 **When Mentor Switches Students:**
-1. **Stop watching previous channel** - Previous student sees offline ✅
-2. **Disconnect/reconnect cycle** - Forces immediate presence update ✅
-3. **Watch new student's channel** - New student sees online ✅
-4. **Unread message count displayed** - Badge shows count for the new student ✅
+1. **Stop watching previous channel** - Previous student sees mentor offline ✅
+2. **Watch new student's channel** - New student sees mentor online ✅
+3. **Immediate presence update** - No delay in online/offline status changes ✅
+4. **Unread message count updates** - Badge shows count for newly selected student ✅
+
+**Technical Implementation:**
+- **AuthService.selectStudent()**: Handles immediate presence switching when mentor changes students
+- **Restored selections**: Non-blocking async connection for previously selected students on app startup
+- **Selective channel watching**: Only watches channels for selected student, not all students
+- **Connection management**: Students auto-connect, mentors connect selectively based on student selection
 
 **Benefits:**
 - Mentors only appear online to currently selected student
-- Immediate presence updates when switching
-- No false online status on app startup
+- Immediate presence updates when switching students
+- Proper restoration of mentor presence on app restart
+- No confusion about mentor availability across multiple students
 
 ### Document Management
 - **Document List**: Browse documents with search and filter
@@ -198,6 +208,7 @@ fvm flutter pub outdated
   - Mentors/Case Managers: 5 tabs (Schedule, Courses, Documents, Recaps, Chat)
 - **Student Selection**: Mentors can select students from dropdown in app drawer
 - **Persistent Selections**: Selected student and semester saved using UserDefaults (iOS) / SharedPreferences (Android)
+- **Smart Restoration**: Student selections properly restored without auto-selecting first student by default
 - **API Context**: Document operations use selected student ID for mentors
 - **Route Protection**: Prevents unauthorized access to role-restricted screens
 
