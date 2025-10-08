@@ -316,7 +316,7 @@ class _StudentInfo extends StatelessWidget {
     } else if (student is UserModel && student.students.isNotEmpty) {
       gpaValue = student.students.first.gpa;
     }
-    return gpaValue != null ? gpaValue.toStringAsFixed(1) : '2.4';
+    return gpaValue != null ? gpaValue.toStringAsFixed(1) : 'N/A';
   }
 
   @override

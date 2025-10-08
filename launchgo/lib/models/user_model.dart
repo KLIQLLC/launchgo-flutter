@@ -48,7 +48,7 @@ class Student extends Equatable {
       name: json['name'] ?? json['firstName'] ?? '',
       email: json['email'],
       status: json['status'],
-      gpa: json['gpa'] != null ? double.tryParse(json['gpa']) : null,
+      gpa: json['gpa'] != null ? double.tryParse(json['gpa'].toString()) : null,
       academicYear: json['academicYear'],
       createdAt: json['createdAt'] != null 
           ? DateTime.parse(json['createdAt'])

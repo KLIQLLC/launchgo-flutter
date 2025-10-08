@@ -66,7 +66,7 @@ class _EditStudentInfoModalState extends State<EditStudentInfoModal> {
       _selectedYear = 'Sophomore';
     }
     
-    _gpaController.text = gpa ?? '2.4';
+    _gpaController.text = gpa ?? '';
   }
   
   String _normalizeAcademicYear(String year) {
