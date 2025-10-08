@@ -28,8 +28,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   String? _errorMessage;
   DateTime _currentWeekStart = DateTime.now();
   DateTime _currentWeekEnd = DateTime.now();
-  final GlobalKey<_DeadlinesListState> _deadlinesListKey = GlobalKey<_DeadlinesListState>();
+  final GlobalKey<_WeeklyScheduleViewState> _weeklyViewKey = GlobalKey<_WeeklyScheduleViewState>();
   String? _lastSelectedStudentId; // Track current student to detect changes
+  int _selectedSegment = 0; // 0 = Weekly Schedule, 1 = Upcoming Deadlines
 
   @override
   void initState() {
@@ -157,7 +158,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     
     // If event was created successfully, reload events
     if (eventResult == true) {
-      _deadlinesListKey.currentState?.reloadEvents();
+      _weeklyViewKey.currentState?.reloadEvents();
     }
   }
 
@@ -166,7 +167,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     
     // If events were created successfully, reload events
     if (eventResult == true) {
-      _deadlinesListKey.currentState?.reloadEvents();
+      _weeklyViewKey.currentState?.reloadEvents();
     }
   }
 
@@ -190,7 +191,19 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           Expanded(
             child: Container(
               color: const Color(0xFF0F1419),
-              child: _buildContent(themeService, authService),
+              child: Column(
+                children: [
+                  _WeekNavigator(
+                    key: const ValueKey('week_navigator'),
+                    weekRangeText: _getWeekRangeText(),
+                    onPreviousWeek: () => _navigateWeek(-1),
+                    onNextWeek: () => _navigateWeek(1),
+                  ),
+                  Expanded(
+                    child: _buildSegmentedContent(themeService, authService),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -200,11 +213,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   Future<void> _handleRefresh() async {
     await _loadDeadlines();
-    // Also refresh events if the list is available
-    _deadlinesListKey.currentState?.reloadEvents();
+    // Also refresh events if the weekly view is available
+    if (_selectedSegment == 0) {
+      _weeklyViewKey.currentState?.reloadEvents();
+    }
   }
 
-  Widget _buildContent(ThemeService themeService, AuthService authService) {
+  Widget _buildSegmentedContent(ThemeService themeService, AuthService authService) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -219,22 +234,463 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
     final permissions = PermissionsService(authService.userInfo);
     
-    return RefreshIndicator(
-      onRefresh: _handleRefresh,
-      color: ThemeService.accent,
-      backgroundColor: themeService.cardColor,
-      child: _DeadlinesList(
-        key: _deadlinesListKey,
-        assignments: _getSortedAssignments(),
-        weekRangeText: _getWeekRangeText(),
-        weekStart: _currentWeekStart,
-        weekEnd: _currentWeekEnd,
-        onPreviousWeek: () => _navigateWeek(-1),
-        onNextWeek: () => _navigateWeek(1),
-        themeService: themeService,
-        permissions: permissions,
+    return Column(
+      children: [
+        _SegmentedControl(
+          selectedIndex: _selectedSegment,
+          onSegmentChanged: (index) {
+            setState(() {
+              _selectedSegment = index;
+            });
+          },
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _handleRefresh,
+            color: ThemeService.accent,
+            backgroundColor: themeService.cardColor,
+            child: _selectedSegment == 0
+                ? _WeeklyScheduleView(
+                    key: _weeklyViewKey,
+                    weekStart: _currentWeekStart,
+                    weekEnd: _currentWeekEnd,
+                    themeService: themeService,
+                    permissions: permissions,
+                  )
+                : _UpcomingDeadlinesView(
+                    assignments: _getSortedAssignments(),
+                    themeService: themeService,
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SegmentedControl extends StatelessWidget {
+  final int selectedIndex;
+  final ValueChanged<int> onSegmentChanged;
+
+  const _SegmentedControl({
+    required this.selectedIndex,
+    required this.onSegmentChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: const Color(0xFF1A2332),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _SegmentButton(
+              text: 'Weekly Schedule',
+              isSelected: selectedIndex == 0,
+              onTap: () => onSegmentChanged(0),
+              isFirst: true,
+            ),
+          ),
+          Expanded(
+            child: _SegmentButton(
+              text: 'Upcoming Deadlines',
+              isSelected: selectedIndex == 1,
+              onTap: () => onSegmentChanged(1),
+              isFirst: false,
+            ),
+          ),
+        ],
       ),
     );
+  }
+}
+
+class _SegmentButton extends StatelessWidget {
+  final String text;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final bool isFirst;
+
+  const _SegmentButton({
+    required this.text,
+    required this.isSelected,
+    required this.onTap,
+    required this.isFirst,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: isSelected 
+              ? const Color(0xFF0F1419) // Dark background for selected
+              : Colors.transparent,
+          border: isSelected
+              ? Border.all(color: Colors.grey.withValues(alpha: 0.2), width: 1)
+              : null,
+        ),
+        child: Text(
+          text,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: isSelected 
+                ? Colors.white 
+                : Colors.grey[500], // Dimmed text for unselected
+            fontSize: 15,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            letterSpacing: 0.2,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WeekNavigator extends StatelessWidget {
+  final String weekRangeText;
+  final VoidCallback onPreviousWeek;
+  final VoidCallback onNextWeek;
+
+  const _WeekNavigator({
+    super.key,
+    required this.weekRangeText,
+    required this.onPreviousWeek,
+    required this.onNextWeek,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          _NavigationButton(
+            label: 'Previous',
+            onPressed: onPreviousWeek,
+          ),
+          Expanded(
+            child: Center(
+              child: Text(
+                weekRangeText,
+                style: TextStyle(
+                  color: Colors.grey[400],
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+          _NavigationButton(
+            label: 'Next',
+            onPressed: onNextWeek,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WeeklyScheduleView extends StatefulWidget {
+  final DateTime weekStart;
+  final DateTime weekEnd;
+  final ThemeService themeService;
+  final PermissionsService permissions;
+
+  const _WeeklyScheduleView({
+    super.key,
+    required this.weekStart,
+    required this.weekEnd,
+    required this.themeService,
+    required this.permissions,
+  });
+
+  @override
+  State<_WeeklyScheduleView> createState() => _WeeklyScheduleViewState();
+}
+
+class _WeeklyScheduleViewState extends State<_WeeklyScheduleView> {
+  List<Event> _events = [];
+  bool _isLoadingEvents = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEvents();
+  }
+
+  @override
+  void didUpdateWidget(_WeeklyScheduleView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.weekStart != widget.weekStart || oldWidget.weekEnd != widget.weekEnd) {
+      _loadEvents();
+    }
+  }
+
+  void reloadEvents() {
+    _loadEvents();
+  }
+
+  Future<void> _loadEvents() async {
+    setState(() {
+      _isLoadingEvents = true;
+    });
+
+    try {
+      final apiService = context.read<ApiServiceRetrofit>();
+
+      final response = await apiService.getEvents(
+        startAt: widget.weekStart,
+        endAt: widget.weekEnd,
+      );
+
+      final events = response.map((eventData) => Event.fromJson(eventData)).toList();
+      
+      setState(() {
+        _events = events;
+      });
+    } catch (e) {
+      debugPrint('Failed to load events: $e');
+    } finally {
+      setState(() {
+        _isLoadingEvents = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoadingEvents) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32.0),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_events.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.calendar_month_outlined,
+                size: 48,
+                color: Colors.grey[600],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No events for this week',
+                style: TextStyle(
+                  color: Colors.grey[400],
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final eventsByDay = _groupEventsByDay(_events);
+    
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 12.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ...eventsByDay.entries.map((dayEntry) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Center(
+                    child: Text(
+                      dayEntry.key,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                ...dayEntry.value.map((event) {
+                  return Padding(
+                    key: ValueKey(event.id),
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: EventCard(
+                      key: ValueKey('event_card_${event.id}'),
+                      event: event,
+                      onEdit: widget.permissions.canEditEvents ? () => _editEvent(event) : null,
+                      onDelete: widget.permissions.canDeleteEvents ? () => _onEventDeleted(event) : null,
+                    ),
+                  );
+                }),
+                const SizedBox(height: 24),
+              ],
+            );
+          }),
+          const SizedBox(height: 100),
+        ],
+      ),
+    );
+  }
+
+  Map<String, List<Event>> _groupEventsByDay(List<Event> events) {
+    final grouped = <String, List<Event>>{};
+    final dayDates = <String, DateTime>{};
+    
+    for (final event in events) {
+      final dayKey = _formatDayKey(event.startAt);
+      if (!grouped.containsKey(dayKey)) {
+        grouped[dayKey] = [];
+        dayDates[dayKey] = DateTime(event.startAt.year, event.startAt.month, event.startAt.day);
+      }
+      grouped[dayKey]!.add(event);
+    }
+    
+    for (final dayEvents in grouped.values) {
+      dayEvents.sort((a, b) => a.startAt.compareTo(b.startAt));
+    }
+    
+    final sortedEntries = grouped.entries.toList();
+    sortedEntries.sort((a, b) => dayDates[a.key]!.compareTo(dayDates[b.key]!));
+    
+    return Map.fromEntries(sortedEntries);
+  }
+
+  String _formatDayKey(DateTime date) {
+    final dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    
+    final dayName = dayNames[date.weekday % 7];
+    final month = date.month;
+    final day = date.day;
+    
+    return '$dayName $month/$day';
+  }
+
+  void _onEventDeleted(Event event) {
+    setState(() {
+      _events.removeWhere((e) => e.id == event.id);
+    });
+  }
+
+  Future<void> _editEvent(Event event) async {
+    final result = await context.push(
+      '/edit-event/${event.id}',
+      extra: event,
+    );
+    
+    if (result == true) {
+      _loadEvents();
+    }
+  }
+}
+
+class _UpcomingDeadlinesView extends StatelessWidget {
+  final List<DeadlineAssignment> assignments;
+  final ThemeService themeService;
+
+  const _UpcomingDeadlinesView({
+    required this.assignments,
+    required this.themeService,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (assignments.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.calendar_today_outlined,
+                size: 48,
+                color: Colors.grey[600],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No deadlines for this week',
+                style: TextStyle(
+                  color: Colors.grey[400],
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final groupedAssignments = _groupAssignmentsByCourse(assignments);
+
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 12.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ...groupedAssignments.entries.map((courseGroup) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(left: 0, bottom: 16),
+                  child: Text(
+                    courseGroup.key,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                ...courseGroup.value.map((assignment) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: DeadlineCard(
+                      assignment: assignment,
+                    ),
+                  );
+                }),
+                const SizedBox(height: 16),
+              ],
+            );
+          }),
+          const SizedBox(height: 100),
+        ],
+      ),
+    );
+  }
+
+  Map<String, List<DeadlineAssignment>> _groupAssignmentsByCourse(List<DeadlineAssignment> assignments) {
+    final Map<String, List<DeadlineAssignment>> grouped = {};
+    for (final assignment in assignments) {
+      final courseCode = assignment.course?.code ?? 'Unknown Course';
+      if (!grouped.containsKey(courseCode)) {
+        grouped[courseCode] = [];
+      }
+      grouped[courseCode]!.add(assignment);
+    }
+    return grouped;
   }
 }
 
@@ -380,343 +836,6 @@ class _StudentInfo extends StatelessWidget {
   }
 }
 
-class _DeadlinesList extends StatefulWidget {
-  final List<DeadlineAssignment> assignments;  // Changed: Direct assignments
-  final String weekRangeText;
-  final DateTime weekStart;
-  final DateTime weekEnd;
-  final VoidCallback onPreviousWeek;
-  final VoidCallback onNextWeek;
-  final ThemeService themeService;
-  final PermissionsService permissions;
-
-  const _DeadlinesList({
-    super.key,
-    required this.assignments,
-    required this.weekRangeText,
-    required this.weekStart,
-    required this.weekEnd,
-    required this.onPreviousWeek,
-    required this.onNextWeek,
-    required this.themeService,
-    required this.permissions,
-  });
-
-  @override
-  State<_DeadlinesList> createState() => _DeadlinesListState();
-}
-
-class _DeadlinesListState extends State<_DeadlinesList> {
-  List<Event> _events = [];
-  bool _isLoadingEvents = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadEvents();
-  }
-
-  @override
-  void didUpdateWidget(_DeadlinesList oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // Reload events when week dates change
-    if (oldWidget.weekStart != widget.weekStart || oldWidget.weekEnd != widget.weekEnd) {
-      _loadEvents();
-    }
-  }
-
-  void reloadEvents() {
-    _loadEvents();
-  }
-
-  Future<void> _loadEvents() async {
-    setState(() {
-      _isLoadingEvents = true;
-    });
-
-    try {
-      final apiService = context.read<ApiServiceRetrofit>();
-
-      final response = await apiService.getEvents(
-        startAt: widget.weekStart,
-        endAt: widget.weekEnd,
-      );
-
-      final events = response.map((eventData) => Event.fromJson(eventData)).toList();
-      
-      setState(() {
-        _events = events;
-      });
-    } catch (e) {
-      debugPrint('Failed to load events: $e');
-    } finally {
-      setState(() {
-        _isLoadingEvents = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 12.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeader(),
-          const SizedBox(height: 16),
-          _buildAssignmentsList(),
-          const SizedBox(height: 10),
-          _buildWeeklySchedule(),
-          const SizedBox(height: 100),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Upcoming Deadlines',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            _NavigationButton(
-              label: 'Previous',
-              onPressed: widget.onPreviousWeek,
-            ),
-            Expanded(
-              child: Center(
-                child: Text(
-                  widget.weekRangeText,
-                  style: TextStyle(
-                    color: Colors.grey[400],
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-            ),
-            _NavigationButton(
-              label: 'Next',
-              onPressed: widget.onNextWeek,
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAssignmentsList() {
-    if (widget.assignments.isEmpty) {
-      return _EmptyState(
-        message: 'No deadlines for this week',
-        themeService: widget.themeService,
-      );
-    }
-
-    // Group assignments by course code
-    Map<String, List<DeadlineAssignment>> groupedAssignments = {};
-    for (final assignment in widget.assignments) {
-      final courseCode = assignment.course?.code ?? 'Unknown Course';
-      if (!groupedAssignments.containsKey(courseCode)) {
-        groupedAssignments[courseCode] = [];
-      }
-      groupedAssignments[courseCode]!.add(assignment);
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: groupedAssignments.entries.map((courseGroup) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Course header
-            Padding(
-              padding: const EdgeInsets.only(left: 0, bottom: 16),
-              child: Text(
-                courseGroup.key,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            // Assignments for this course
-            ...courseGroup.value.map((assignment) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: DeadlineCard(
-                  assignment: assignment,
-                ),
-              );
-            }),
-            const SizedBox(height: 16), // Space between course groups
-          ],
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildWeeklySchedule() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Weekly Schedule',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 24),
-        _buildScheduleDays(),
-      ],
-    );
-  }
-
-  Widget _buildScheduleDays() {
-    if (_isLoadingEvents) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(32.0),
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    if (_events.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            children: [
-              Icon(
-                Icons.calendar_month_outlined,
-                size: 48,
-                color: Colors.grey[600],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'No events for this week',
-                style: TextStyle(
-                  color: Colors.grey[400],
-                  fontSize: 16,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    // Group events by day
-    final eventsByDay = _groupEventsByDay(_events);
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: eventsByDay.entries.map((dayEntry) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Center(
-                child: Text(
-                  dayEntry.key,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-            ...dayEntry.value.map((event) {
-              return Padding(
-                key: ValueKey(event.id), // Add unique key based on event ID
-                padding: const EdgeInsets.only(bottom: 12),
-                child: EventCard(
-                  key: ValueKey('event_card_${event.id}'), // Add unique key to EventCard
-                  event: event,
-                  onEdit: widget.permissions.canEditEvents ? () => _editEvent(event) : null,
-                  onDelete: widget.permissions.canDeleteEvents ? () => _onEventDeleted(event) : null,
-                ),
-              );
-            }),
-            const SizedBox(height: 24),
-          ],
-        );
-      }).toList(),
-    );
-  }
-
-  Map<String, List<Event>> _groupEventsByDay(List<Event> events) {
-    final grouped = <String, List<Event>>{};
-    final dayDates = <String, DateTime>{};
-    
-    for (final event in events) {
-      final dayKey = _formatDayKey(event.startAt);
-      if (!grouped.containsKey(dayKey)) {
-        grouped[dayKey] = [];
-        dayDates[dayKey] = DateTime(event.startAt.year, event.startAt.month, event.startAt.day);
-      }
-      grouped[dayKey]!.add(event);
-    }
-    
-    // Sort events within each day by start time
-    for (final dayEvents in grouped.values) {
-      dayEvents.sort((a, b) => a.startAt.compareTo(b.startAt));
-    }
-    
-    // Return days sorted by date (chronological order)
-    final sortedEntries = grouped.entries.toList();
-    sortedEntries.sort((a, b) => dayDates[a.key]!.compareTo(dayDates[b.key]!));
-    
-    return Map.fromEntries(sortedEntries);
-  }
-
-  String _formatDayKey(DateTime date) {
-    final dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    
-    final dayName = dayNames[date.weekday % 7];
-    final month = date.month;
-    final day = date.day;
-    
-    return '$dayName $month/$day';
-  }
-
-
-  void _onEventDeleted(Event event) {
-    // Remove the event from the local list and rebuild
-    setState(() {
-      _events.removeWhere((e) => e.id == event.id);
-    });
-  }
-
-  Future<void> _editEvent(Event event) async {
-    final result = await context.push(
-      '/edit-event/${event.id}',
-      extra: event,
-    );
-    
-    // If event was updated successfully, reload events
-    if (result == true) {
-      _loadEvents();
-    }
-  }
-
-}
 
 
 class _NavigationButton extends StatelessWidget {
@@ -749,41 +868,6 @@ class _NavigationButton extends StatelessWidget {
 }
 
 
-class _EmptyState extends StatelessWidget {
-  final String message;
-  final ThemeService themeService;
-
-  const _EmptyState({
-    required this.message,
-    required this.themeService,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(32),
-      child: Center(
-        child: Column(
-          children: [
-            Icon(
-              Icons.calendar_today_outlined,
-              size: 48,
-              color: themeService.textTertiaryColor,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              message,
-              style: TextStyle(
-                color: themeService.textSecondaryColor,
-                fontSize: 16,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _ErrorState extends StatelessWidget {
   final String message;
