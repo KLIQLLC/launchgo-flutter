@@ -576,17 +576,18 @@ class _DeadlineCardState extends State<DeadlineCard> {
           ),
         ),
         const SizedBox(width: 0),
-        Text(
-          widget.assignment.title,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
+        Expanded(
+          child: Text(
+            widget.assignment.title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+            ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
         ),
-        const SizedBox(width: 8),
-        StatusBadge.fromStatus(_status ?? widget.assignment.status),
-        const Spacer(), // Push everything else to the right
       ],
     );
   }
@@ -604,18 +605,18 @@ class _DeadlineCardState extends State<DeadlineCard> {
             ),
           ),
         ),
-        // Show attachment indicator only if there are attachments
-        if (widget.assignment.attachments.isNotEmpty)
-          _AttachmentIndicator(
-            count: widget.assignment.attachments.length,
-            onTap: () => _showAttachments(),
-          ),
-        // Show submit button only if not completed AND no attachments exist
+        const SizedBox(width: 8),
+        StatusBadge.fromStatus(_status ?? widget.assignment.status),
         if (!_isCompleted && widget.assignment.attachments.isEmpty)
           _SubmitButton(
             onPressed: () {
               _showSubmitDialog();
             },
+          ),
+        if (widget.assignment.attachments.isNotEmpty)
+          _AttachmentIndicator(
+            count: widget.assignment.attachments.length,
+            onTap: () => _showAttachments(),
           ),
       ],
     );
