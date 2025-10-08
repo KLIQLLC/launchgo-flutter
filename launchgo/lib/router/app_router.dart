@@ -42,6 +42,10 @@ class AppRouter {
       redirect: (context, state) {
         final isAuthenticated = authService.isAuthenticated;
         final isLoginRoute = state.matchedLocation == '/login';
+        // Special case: If we have a token but auth isn't complete, wait for it to finish
+        if (!isAuthenticated && authService.hasAccessToken && !authService.isInitialized) {
+          return null; // Stay on current route until auth completes
+        }
 
         if (!isAuthenticated && !isLoginRoute) {
           return '/login';

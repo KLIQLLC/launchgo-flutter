@@ -64,7 +64,7 @@ class _AppDrawerState extends State<AppDrawer> {
                     const SizedBox(height: 12),
                     // User info
                     Text(
-                      authService.currentUser?.displayName ?? 'Unknown',
+                      authService.userInfo?.name ?? authService.currentUser?.displayName ?? 'Unknown',
                       style: const TextStyle(
                         color: AppColors.textPrimary,
                         fontSize: 16,
@@ -73,7 +73,7 @@ class _AppDrawerState extends State<AppDrawer> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      authService.currentUser?.email ?? '',
+                      authService.userInfo?.email ?? authService.currentUser?.email ?? '',
                       style: const TextStyle(
                         color: AppColors.textWhite70,
                         fontSize: 12,

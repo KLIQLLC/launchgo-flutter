@@ -32,7 +32,7 @@ class AuthService extends ChangeNotifier {
   String? get selectedStudentId => _selectedStudentId;
   bool get isInitialized => _isInitialized;
   bool get isSigningIn => _isSigningIn;
-  bool get isAuthenticated => _currentUser != null && _accessToken != null;
+  bool get isAuthenticated => _accessToken != null && !(_accessToken != null ? JwtDecoder.isExpired(_accessToken!) : true);
   bool get hasAccessToken => _accessToken != null;
   
   // Role-based getters
@@ -95,23 +95,13 @@ class AuthService extends ChangeNotifier {
       // Listen for authentication events
       signIn.authenticationEvents.listen(_handleAuthenticationEvent);
       
-      // Attempt silent sign-in only if we have a valid token
+      // If we have a valid token, skip Google Sign-In and use stored credentials
       if (_accessToken != null && !JwtDecoder.isExpired(_accessToken!)) {
-        await _attemptSilentSignIn();
         
         // Load user info and semesters immediately for valid tokens
         if (_accessToken != null) {
           debugPrint('🔐 Loading user data during initialization...');
           await loadUserInfo();
-        }
-        
-        // Request new token if needed
-        if (_currentUser != null && (_accessToken == null || JwtDecoder.isExpired(_accessToken!))) {
-          try {
-            await requestServerAuthorization();
-          } catch (e) {
-            await signOut();
-          }
         }
       } else if (_accessToken != null && JwtDecoder.isExpired(_accessToken!)) {
         // Clear expired tokens
@@ -127,31 +117,6 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  /// Attempt silent sign-in without UI
-  Future<void> _attemptSilentSignIn() async {
-    try {
-      await GoogleSignIn.instance.attemptLightweightAuthentication();
-      
-      if (_currentUser != null && shouldRequestServerAuth()) {
-        // User will need to explicitly sign in to get backend token
-      }
-      
-      // Load user info and semesters for silent sign-in
-      if (_currentUser != null && _accessToken != null) {
-        debugPrint('🔐 Loading user info during silent sign-in...');
-        await loadUserInfo();
-        
-        // Set user online after successful silent sign-in
-        if (_streamChatService != null && _streamChatService!.isUserConnected) {
-          await _streamChatService!.setUserOnline();
-          debugPrint('🟢 User set to ONLINE after silent sign-in');
-        }
-      }
-    } catch (error) {
-      // Silent sign-in failure is expected for new users
-      debugPrint('🔐 Silent sign-in failed: $error');
-    }
-  }
 
   /// Handle Google Sign-In authentication events
   Future<void> _handleAuthenticationEvent(GoogleSignInAuthenticationEvent event) async {
@@ -162,7 +127,8 @@ class AuthService extends ChangeNotifier {
 
     _currentUser = user;
     
-    if (user != null && _accessToken == null) {
+    // Only request server authorization if user is signing in explicitly
+    if (user != null && _accessToken == null && _signInCompleter != null) {
       try {
         await requestServerAuthorization();
       } catch (e) {
