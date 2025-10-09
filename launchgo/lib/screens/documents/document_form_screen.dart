@@ -35,8 +35,9 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
   late TextEditingController _semesterController;
   String? _selectedCourse;
   bool _isSubmitting = false;
+  bool _isLoadingCourses = false;
 
-  final List<String> _courses = ['Select course (optional)', 'CODE11', 'CODE12', 'CODE13'];
+  List<String> _courses = ['Select course (optional)'];
   final List<String> _categories = [
     'Notes',
     'Assignment',
@@ -84,16 +85,18 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
       _selectedCourse = null;
     }
     
-    // Load semesters when form opens
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    // Load semesters and courses when form opens
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final authService = context.read<AuthService>();
+      
+      // Ensure semesters are loaded
       if (authService.semesters.isEmpty) {
-        authService.loadSemesters().then((_) {
-          _setSemesterValue(authService);
-        });
-      } else {
-        _setSemesterValue(authService);
+        await authService.loadSemesters();
       }
+      
+      // Initialize form values
+      _setSemesterValue(authService);
+      _loadCourses();
     });
   }
 
@@ -119,6 +122,46 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
         _semesterController.text = selectedSemester?.name ?? '';
       });
       debugPrint('Set initial semester for create mode: ${selectedSemester?.name ?? 'none'}');
+    }
+  }
+
+  Future<void> _loadCourses() async {
+    setState(() {
+      _isLoadingCourses = true;
+    });
+
+    try {
+      final authService = context.read<AuthService>();
+      final apiService = ApiServiceRetrofit(authService: authService);
+      
+      final coursesData = await apiService.getCourses();
+      final courseOptions = <String>['Select course (optional)'];
+      
+      for (final course in coursesData) {
+        final courseCode = course['code'] as String? ?? 'Unknown';
+        courseOptions.add(courseCode);
+      }
+      
+      setState(() {
+        _courses = courseOptions;
+        
+        // If editing and had a course selected, try to match it
+        if (isEditMode && widget.document != null && widget.document!.courseId != null) {
+          final courseId = widget.document!.courseId!.toUpperCase();
+          if (_courses.contains(courseId)) {
+            _selectedCourse = courseId;
+          }
+        }
+      });
+      
+      debugPrint('Loaded ${coursesData.length} courses');
+    } catch (e) {
+      debugPrint('Failed to load courses: $e');
+      // Keep the default empty list with just the placeholder
+    } finally {
+      setState(() {
+        _isLoadingCourses = false;
+      });
     }
   }
 
@@ -372,8 +415,8 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
                 CupertinoDropdown(
                   value: _selectedCourse,
                   items: _courses,
-                  hintText: 'Select course (optional)',
-                  onChanged: (value) {
+                  hintText: _isLoadingCourses ? 'Loading courses...' : 'Select course (optional)',
+                  onChanged: _isLoadingCourses ? null : (value) {
                     setState(() {
                       _selectedCourse = value;
                     });
