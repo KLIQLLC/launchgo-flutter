@@ -195,33 +195,33 @@ class _CourseFormScreenState extends State<CourseFormScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Semester (Read-only)
+                    // Semester
                     _buildLabel('Semester*', themeService),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: themeService.cardColor,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: themeService.borderColor),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              selectedSemester?.name ?? 'No semester selected',
-                              style: TextStyle(
-                                color: themeService.textColor,
-                                fontSize: 17,
-                              ),
-                            ),
-                          ),
-                          Icon(
-                            Icons.lock_outline,
-                            color: themeService.textSecondaryColor,
-                            size: 20,
-                          ),
-                        ],
-                      ),
+                    Consumer<AuthService>(
+                      builder: (context, authService, child) {
+                        final semesterNames = authService.semesters.map((s) => s.name).toList();
+                        return CupertinoDropdown(
+                          value: selectedSemester?.name,
+                          items: semesterNames.isNotEmpty ? semesterNames : [],
+                          hintText: semesterNames.isEmpty ? 'Loading semesters...' : 'Select semester',
+                          isRequired: true,
+                          onChanged: semesterNames.isEmpty ? null : (semesterName) {
+                            if (semesterName != null) {
+                              // Find semester by name and select it
+                              final semester = authService.semesters.firstWhere(
+                                (s) => s.name == semesterName,
+                              );
+                              authService.selectSemester(semester.id);
+                            }
+                          },
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please select a semester';
+                            }
+                            return null;
+                          },
+                        );
+                      },
                     ),
                     const SizedBox(height: 16),
 
