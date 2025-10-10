@@ -598,7 +598,7 @@ class _DeadlineCardState extends State<DeadlineCard> {
         Padding(
           padding: const EdgeInsets.only(left: 12),
           child: Text(
-            'Due ${DateFormat('M/d').format(widget.assignment.dueDate)}',
+            'Due ${DateFormat('M/d').format(widget.assignment.dueDate)} at ${DateFormat('h:mm a').format(widget.assignment.dueDate)}',
             style: TextStyle(
               color: Colors.grey[400],
               fontSize: 14,

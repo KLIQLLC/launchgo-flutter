@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -52,6 +51,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
   Set<String> _deletingAttachmentIds = {}; // Track which attachments are being deleted
   
   DateTime? _dueDate;
+  TimeOfDay? _dueTime;
   String _selectedStatus = 'pending';
   bool _isLoading = false;
   
@@ -75,7 +75,9 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
       _earnedPointsController.text = widget.assignment!['pointsEarned']?.toString() ?? '0';
       _selectedStatus = widget.assignment!['status'] ?? 'pending';
       if (widget.assignment!['dueDateAt'] != null) {
-        _dueDate = DateTime.parse(widget.assignment!['dueDateAt']);
+        final dueDateAt = DateTime.parse(widget.assignment!['dueDateAt']);
+        _dueDate = DateTime(dueDateAt.year, dueDateAt.month, dueDateAt.day);
+        _dueTime = TimeOfDay(hour: dueDateAt.hour, minute: dueDateAt.minute);
       }
       
       // Load existing steps - Enhanced debugging
@@ -226,8 +228,17 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
       // Don't send attachments metadata with the assignment data
       // Files will be uploaded separately after assignment is created/updated
 
-      // Use selected date or default to 7 days from now if not set
-      final dueDateToUse = _dueDate ?? DateTime.now().add(_FormConstants.defaultDueDateOffset);
+      // Combine date and time, or use defaults
+      final dateToUse = _dueDate ?? DateTime.now().add(_FormConstants.defaultDueDateOffset);
+      final timeToUse = _dueTime ?? const TimeOfDay(hour: 23, minute: 59); // Default to 11:59 PM
+      
+      final dueDateTimeToUse = DateTime(
+        dateToUse.year,
+        dateToUse.month,
+        dateToUse.day,
+        timeToUse.hour,
+        timeToUse.minute,
+      );
       
       final assignmentData = {
         'title': _titleController.text,
@@ -235,7 +246,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
         'pointsGoal': int.tryParse(_pointsController.text) ?? 0,
         'pointsEarned': int.tryParse(_earnedPointsController.text) ?? 0,
         'status': _selectedStatus,
-        'dueDateAt': '${dueDateToUse.year}-${dueDateToUse.month.toString().padLeft(2, '0')}-${dueDateToUse.day.toString().padLeft(2, '0')}',
+        'dueDateAt': dueDateTimeToUse.toIso8601String(),
         'steps': stepsData,
         // Attachments will be uploaded separately after assignment creation/update
       };
@@ -416,6 +427,21 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
     }
   }
 
+  Future<void> _selectDueTime() async {
+    final initialTime = _dueTime ?? TimeOfDay.now();
+    
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: initialTime,
+    );
+    
+    if (picked != null) {
+      setState(() {
+        _dueTime = picked;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final themeService = context.watch<ThemeService>();
@@ -478,7 +504,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                     ),
                     const SizedBox(height: _FormConstants.spacingMedium),
 
-                    // Due Date and Points in the same row
+                    // Due Date and Due Time row
                     Row(
                       children: [
                         // Due Date (takes 50% of width)
@@ -510,7 +536,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                                             color: _dueDate != null 
                                                 ? themeService.textColor 
                                                 : themeService.textSecondaryColor,
-                                            fontSize: 17,
+                                            fontSize: 16,
                                           ),
                                         ),
                                       ),
@@ -527,6 +553,58 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                           ),
                         ),
                         const SizedBox(width: 12),
+                        // Due Time (takes 50% of width)
+                        Expanded(
+                          flex: 1,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildLabel('Due Time', themeService),
+                              GestureDetector(
+                                onTap: isStudent ? null : _selectDueTime,
+                                child: Container(
+                                  height: _FormConstants.fieldHeight,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  decoration: BoxDecoration(
+                                    color: themeService.cardColor,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: themeService.borderColor),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          _dueTime != null
+                                              ? _dueTime!.format(context)
+                                              : '--:-- --',
+                                          style: TextStyle(
+                                            color: _dueTime != null 
+                                                ? themeService.textColor 
+                                                : themeService.textSecondaryColor,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                      ),
+                                      Icon(
+                                        Icons.access_time,
+                                        color: themeService.textSecondaryColor,
+                                        size: 20,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: _FormConstants.spacingMedium),
+
+                    // Points and Earned Points row
+                    Row(
+                      children: [
                         // Points (takes 50% of width)
                         Expanded(
                           flex: 1,
@@ -541,24 +619,6 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                                 keyboardType: TextInputType.number,
                                 enabled: !isStudent,
                               ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: _FormConstants.spacingMedium),
-
-                    // Status and Earned Points in the same row
-                    Row(
-                      children: [
-                        // Status (takes 50% of width)
-                        Expanded(
-                          flex: 1,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildLabel('Status', themeService),
-                              _buildStatusDropdown(themeService, enabled: !isStudent),
                             ],
                           ),
                         ),
@@ -580,6 +640,16 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                             ],
                           ),
                         ),
+                      ],
+                    ),
+                    const SizedBox(height: _FormConstants.spacingMedium),
+
+                    // Status row (full width)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildLabel('Status', themeService),
+                        _buildStatusDropdown(themeService, enabled: !isStudent),
                       ],
                     ),
                     const SizedBox(height: _FormConstants.spacingLarge),

@@ -61,9 +61,24 @@ class _AssignmentCardState extends State<AssignmentCard> {
     
     try {
       final date = DateTime.parse(dateStr);
-      return '${date.month}/${date.day}/${date.year}';
+      return '${date.month}/${date.day}';
     } catch (e) {
       return 'Invalid date';
+    }
+  }
+
+  String _formatTime(String? dateStr) {
+    if (dateStr == null) return '';
+    
+    try {
+      final date = DateTime.parse(dateStr);
+      final hour = date.hour;
+      final minute = date.minute.toString().padLeft(2, '0');
+      final period = hour >= 12 ? 'PM' : 'AM';
+      final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+      return '$displayHour:$minute $period';
+    } catch (e) {
+      return '';
     }
   }
 
@@ -200,18 +215,23 @@ class _AssignmentCardState extends State<AssignmentCard> {
               // Due date and points
               Row(
                 children: [
-                  // Due date
+                  // Due date with time
                   Icon(
                     Icons.calendar_today_outlined,
                     size: 16,
                     color: widget.themeService.textSecondaryColor,
                   ),
                   const SizedBox(width: 6),
-                  Text(
-                    'Due: ${_formatDate(widget.assignment['dueDateAt'])}',
-                    style: TextStyle(
-                      color: widget.themeService.textSecondaryColor,
-                      fontSize: 14,
+                  Flexible(
+                    child: Text(
+                      widget.assignment['dueDateAt'] != null
+                          ? 'Due ${_formatDate(widget.assignment['dueDateAt'])} at ${_formatTime(widget.assignment['dueDateAt'])}'
+                          : 'No due date',
+                      style: TextStyle(
+                        color: widget.themeService.textSecondaryColor,
+                        fontSize: 14,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   const SizedBox(width: 20),
