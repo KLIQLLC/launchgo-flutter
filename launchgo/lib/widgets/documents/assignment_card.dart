@@ -236,12 +236,6 @@ class _AssignmentCardState extends State<AssignmentCard> {
                   ),
                   const SizedBox(width: 20),
                   // Points
-                  Icon(
-                    Icons.access_time,
-                    size: 16,
-                    color: widget.themeService.textSecondaryColor,
-                  ),
-                  const SizedBox(width: 6),
                   Text(
                     '${widget.assignment['pointsEarned'] ?? 0}/${widget.assignment['pointsGoal'] ?? 100} pts',
                     style: TextStyle(
