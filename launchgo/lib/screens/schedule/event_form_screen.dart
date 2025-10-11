@@ -6,6 +6,7 @@ import '../../services/api_service_retrofit.dart';
 import '../../services/theme_service.dart';
 import '../../models/event_model.dart';
 import '../../widgets/cupertino_dropdown.dart';
+import '../../utils/time_utils.dart';
 
 class EventFormScreen extends StatefulWidget {
   final Event? event;
@@ -116,44 +117,6 @@ class _EventFormScreenState extends State<EventFormScreen> {
     return type[0].toUpperCase() + type.substring(1);
   }
 
-  String _formatTimeForDropdown(TimeOfDay time) {
-    final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
-    final period = time.period == DayPeriod.am ? 'AM' : 'PM';
-    return '${hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')} $period';
-  }
-
-  List<String> _generateTimeSlots() {
-    final List<String> slots = [];
-    for (int hour = 0; hour < 24; hour++) {
-      for (int minute = 0; minute < 60; minute += 15) {
-        final time = TimeOfDay(hour: hour, minute: minute);
-        final displayHour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
-        final period = time.period == DayPeriod.am ? 'AM' : 'PM';
-        slots.add('${displayHour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')} $period');
-      }
-    }
-    return slots;
-  }
-
-  TimeOfDay? _parseTimeString(String timeStr) {
-    try {
-      final parts = timeStr.split(' ');
-      final timeParts = parts[0].split(':');
-      var hour = int.parse(timeParts[0]);
-      final minute = int.parse(timeParts[1]);
-      final isPM = parts[1] == 'PM';
-      
-      if (hour == 12 && !isPM) {
-        hour = 0; // 12:00 AM is 0:00
-      } else if (hour != 12 && isPM) {
-        hour += 12; // Convert PM hours
-      }
-      
-      return TimeOfDay(hour: hour, minute: minute);
-    } catch (e) {
-      return null;
-    }
-  }
 
   Future<void> _selectStartDate() async {
     final picked = await showDatePicker(
@@ -553,12 +516,12 @@ class _EventFormScreenState extends State<EventFormScreen> {
               ),
               const SizedBox(height: 8),
               CupertinoDropdown(
-                value: _formatTimeForDropdown(_startTime),
-                items: _generateTimeSlots(),
+                value: TimeUtils.formatTimeForDropdown(_startTime),
+                items: TimeUtils.getTimeSlots(),
                 hintText: 'Select time',
                 onChanged: (value) {
                   if (value != null) {
-                    final newTime = _parseTimeString(value);
+                    final newTime = TimeUtils.parseTimeString(value);
                     if (newTime != null) {
                       setState(() {
                         _startTime = newTime;
@@ -594,12 +557,12 @@ class _EventFormScreenState extends State<EventFormScreen> {
               ),
               const SizedBox(height: 8),
               CupertinoDropdown(
-                value: _formatTimeForDropdown(_endTime),
-                items: _generateTimeSlots(),
+                value: TimeUtils.formatTimeForDropdown(_endTime),
+                items: TimeUtils.getTimeSlots(),
                 hintText: 'Select time',
                 onChanged: (value) {
                   if (value != null) {
-                    final newTime = _parseTimeString(value);
+                    final newTime = TimeUtils.parseTimeString(value);
                     if (newTime != null) {
                       setState(() {
                         _endTime = newTime;

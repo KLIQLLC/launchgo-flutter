@@ -11,6 +11,7 @@ import '../../widgets/cupertino_dropdown.dart';
 import '../../widgets/documents/assignment_steps_widget.dart';
 import '../../widgets/documents/document_upload_widget.dart';
 import '../../theme/app_colors.dart';
+import '../../utils/time_utils.dart';
 
 // Constants
 class _FormConstants {
@@ -51,7 +52,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
   Set<String> _deletingAttachmentIds = {}; // Track which attachments are being deleted
   
   DateTime? _dueDate;
-  TimeOfDay? _dueTime;
+  String? _selectedDueTime;
   String _selectedStatus = 'pending';
   bool _isLoading = false;
   
@@ -60,6 +61,9 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
     'completed',
     'overdue'
   ];
+
+  // Get time options from shared utility
+  List<String> get _timeOptions => TimeUtils.getTimeSlots();
 
   @override
   void initState() {
@@ -77,7 +81,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
       if (widget.assignment!['dueDateAt'] != null) {
         final dueDateAt = DateTime.parse(widget.assignment!['dueDateAt']);
         _dueDate = DateTime(dueDateAt.year, dueDateAt.month, dueDateAt.day);
-        _dueTime = TimeOfDay(hour: dueDateAt.hour, minute: dueDateAt.minute);
+        _selectedDueTime = TimeUtils.formatDateTimeForDropdown(dueDateAt);
       }
       
       // Load existing steps - Enhanced debugging
@@ -147,6 +151,10 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
       } else {
         debugPrint('📎 No attachments found in assignment data or wrong type');
       }
+    } else {
+      // For new assignments, set default date and time
+      _dueDate = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day); // Date only (midnight)
+      _selectedDueTime = '12:00 PM';
     }
   }
 
@@ -230,15 +238,20 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
 
       // Combine date and time, or use defaults
       final dateToUse = _dueDate ?? DateTime.now().add(_FormConstants.defaultDueDateOffset);
-      final timeToUse = _dueTime ?? const TimeOfDay(hour: 23, minute: 59); // Default to 11:59 PM
+      final timeToUse = _selectedDueTime ?? '12:00 PM'; // Default to 12:00 PM
+      
+      // Parse AM/PM time string using shared utility
+      final timeData = TimeUtils.parseTimeStringTo24Hour(timeToUse);
+      final hour = timeData?['hour'] ?? 12;
+      final minute = timeData?['minute'] ?? 0;
       
       final dueDateTimeToUse = DateTime(
         dateToUse.year,
         dateToUse.month,
         dateToUse.day,
-        timeToUse.hour,
-        timeToUse.minute,
-      );
+        hour,
+        minute,
+      ).toUtc(); // Convert to UTC for proper ISO format
       
       final assignmentData = {
         'title': _titleController.text,
@@ -247,6 +260,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
         'pointsEarned': int.tryParse(_earnedPointsController.text) ?? 0,
         'status': _selectedStatus,
         'dueDateAt': dueDateTimeToUse.toIso8601String(),
+        'dueTimeAt': timeToUse, // Add the AM/PM time format for server
         'steps': stepsData,
         // Attachments will be uploaded separately after assignment creation/update
       };
@@ -427,20 +441,6 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
     }
   }
 
-  Future<void> _selectDueTime() async {
-    final initialTime = _dueTime ?? TimeOfDay.now();
-    
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: initialTime,
-    );
-    
-    if (picked != null) {
-      setState(() {
-        _dueTime = picked;
-      });
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -560,41 +560,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildLabel('Due Time', themeService),
-                              GestureDetector(
-                                onTap: isStudent ? null : _selectDueTime,
-                                child: Container(
-                                  height: _FormConstants.fieldHeight,
-                                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                                  decoration: BoxDecoration(
-                                    color: themeService.cardColor,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: themeService.borderColor),
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          _dueTime != null
-                                              ? _dueTime!.format(context)
-                                              : '--:-- --',
-                                          style: TextStyle(
-                                            color: _dueTime != null 
-                                                ? themeService.textColor 
-                                                : themeService.textSecondaryColor,
-                                            fontSize: 16,
-                                          ),
-                                        ),
-                                      ),
-                                      Icon(
-                                        Icons.access_time,
-                                        color: themeService.textSecondaryColor,
-                                        size: 20,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
+                              _buildTimeDropdown(themeService, enabled: !isStudent),
                             ],
                           ),
                         ),
@@ -860,6 +826,24 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
               if (index != -1) {
                 setState(() => _selectedStatus = _statusOptions[index]);
               }
+            }
+          } : null,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTimeDropdown(ThemeService themeService, {bool enabled = true}) {
+    return AbsorbPointer(
+      absorbing: !enabled,
+      child: Opacity(
+        opacity: enabled ? 1.0 : 0.5,
+        child: CupertinoDropdown(
+          value: _selectedDueTime,
+          items: _timeOptions,
+          onChanged: enabled ? (value) {
+            if (value != null) {
+              setState(() => _selectedDueTime = value);
             }
           } : null,
         ),
