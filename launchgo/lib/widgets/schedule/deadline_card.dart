@@ -625,7 +625,7 @@ class _DeadlineCardState extends State<DeadlineCard> {
             ),
           ),
         ),
-        const SizedBox(width: 4),
+        const SizedBox(width: 12),
         StatusBadge.fromStatus(_status ?? widget.assignment.status),
         if (!_isCompleted && widget.assignment.attachments.isEmpty)
           _SubmitButton(

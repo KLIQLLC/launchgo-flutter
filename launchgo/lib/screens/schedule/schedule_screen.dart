@@ -640,38 +640,33 @@ class _UpcomingDeadlinesView extends StatelessWidget {
       );
     }
 
-    final groupedAssignments = _groupAssignmentsByCourse(assignments);
-
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 12.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ...groupedAssignments.entries.map((courseGroup) {
+          ...assignments.map((assignment) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.only(left: 0, bottom: 16),
+                  padding: const EdgeInsets.only(left: 4, bottom: 8),
                   child: Text(
-                    courseGroup.key,
+                    assignment.course?.code ?? 'Unknown Course',
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-                ...courseGroup.value.map((assignment) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: DeadlineCard(
-                      assignment: assignment,
-                    ),
-                  );
-                }),
-                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: DeadlineCard(
+                    assignment: assignment,
+                  ),
+                ),
               ],
             );
           }),
@@ -681,17 +676,6 @@ class _UpcomingDeadlinesView extends StatelessWidget {
     );
   }
 
-  Map<String, List<DeadlineAssignment>> _groupAssignmentsByCourse(List<DeadlineAssignment> assignments) {
-    final Map<String, List<DeadlineAssignment>> grouped = {};
-    for (final assignment in assignments) {
-      final courseCode = assignment.course?.code ?? 'Unknown Course';
-      if (!grouped.containsKey(courseCode)) {
-        grouped[courseCode] = [];
-      }
-      grouped[courseCode]!.add(assignment);
-    }
-    return grouped;
-  }
 }
 
 class _StudentHeader extends StatelessWidget {
