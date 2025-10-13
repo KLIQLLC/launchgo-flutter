@@ -280,8 +280,8 @@ class _SegmentedControl extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      padding: const EdgeInsets.all(4),
+      margin: const EdgeInsets.only(left: 16, right: 16),
+      padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         color: const Color(0xFF1A2332),
@@ -330,7 +330,7 @@ class _SegmentButton extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeInOut,
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           color: isSelected 
@@ -376,23 +376,23 @@ class _WeekNavigator extends StatelessWidget {
       child: Row(
         children: [
           _NavigationButton(
-            label: 'Previous',
+            icon: Icons.arrow_back_ios,
             onPressed: onPreviousWeek,
           ),
           Expanded(
             child: Center(
               child: Text(
                 weekRangeText,
-                style: TextStyle(
-                  color: Colors.grey[400],
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
           ),
           _NavigationButton(
-            label: 'Next',
+            icon: Icons.arrow_forward_ios,
             onPressed: onNextWeek,
           ),
         ],
@@ -542,7 +542,7 @@ class _WeeklyScheduleViewState extends State<_WeeklyScheduleView> {
                     ),
                   );
                 }),
-                const SizedBox(height: 24),
+                const SizedBox(height: 4),
               ],
             );
           }),
@@ -839,18 +839,18 @@ class _StudentInfo extends StatelessWidget {
 
 
 class _NavigationButton extends StatelessWidget {
-  final String label;
+  final IconData icon;
   final VoidCallback onPressed;
 
   const _NavigationButton({
-    required this.label,
+    required this.icon,
     required this.onPressed,
   });
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 90, // Fixed width for both buttons
+      width: 50, // Reduced width for icon buttons
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
@@ -858,9 +858,9 @@ class _NavigationButton extends StatelessWidget {
           side: const BorderSide(color: Colors.white54),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         ),
-        child: Text(
-          label,
-          style: const TextStyle(fontSize: 14),
+        child: Icon(
+          icon,
+          size: 18,
         ),
       ),
     );
