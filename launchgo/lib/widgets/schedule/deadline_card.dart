@@ -546,12 +546,33 @@ class _DeadlineCardState extends State<DeadlineCard> {
             horizontal: 0,
             vertical: 0,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(),
-              _buildFooter(),
-            ],
+          child: SizedBox(
+            height: 70, // Exact height needed
+            child: Stack(
+              clipBehavior: Clip.hardEdge,
+              children: [
+                // Header positioned at top
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: SizedBox(
+                    height: 44, // Fixed header height
+                    child: _buildHeader(),
+                  ),
+                ),
+                // Footer positioned 20px up from its normal position
+                Positioned(
+                  top: 34, // Header height minus 10px overlap
+                  left: 0,
+                  right: 0,
+                  child: SizedBox(
+                    height: 30, // Fixed footer height
+                    child: _buildFooter(),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -634,20 +655,24 @@ class _StatusIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const SizedBox(
-        width: 24,
-        height: 24,
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          valueColor: AlwaysStoppedAnimation<Color>(Colors.white54),
+      return const Center(
+        child: SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.white54),
+          ),
         ),
       );
     }
     
-    return Icon(
-      isCompleted ? Icons.check_circle : Icons.circle_outlined,
-      color: Colors.white,
-      size: 24,
+    return Center(
+      child: Icon(
+        isCompleted ? Icons.check_circle : Icons.circle_outlined,
+        color: Colors.white,
+        size: 24,
+      ),
     );
   }
 }
