@@ -544,13 +544,12 @@ class _DeadlineCardState extends State<DeadlineCard> {
           ),
           padding: const EdgeInsets.symmetric(
             horizontal: 0,
-            vertical: 8,
+            vertical: 0,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildHeader(),
-              const SizedBox(height: 4),
               _buildFooter(),
             ],
           ),
@@ -596,7 +595,7 @@ class _DeadlineCardState extends State<DeadlineCard> {
     return Row(
       children: [
         Padding(
-          padding: const EdgeInsets.only(left: 12),
+          padding: const EdgeInsets.only(left: 10),
           child: Text(
             'Due ${DateFormat('M/d').format(widget.assignment.dueDate)} at ${DateFormat('h:mm a').format(widget.assignment.dueDate)}',
             style: TextStyle(
@@ -605,7 +604,7 @@ class _DeadlineCardState extends State<DeadlineCard> {
             ),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 4),
         StatusBadge.fromStatus(_status ?? widget.assignment.status),
         if (!_isCompleted && widget.assignment.attachments.isEmpty)
           _SubmitButton(
@@ -669,8 +668,8 @@ class _AttachmentIndicator extends StatelessWidget {
       return GestureDetector(
         onTap: onTap,
         child: Container(
-          margin: const EdgeInsets.only(left: 12),
-          padding: const EdgeInsets.all(8),
+        margin: const EdgeInsets.only(left: 8),
+          padding: const EdgeInsets.all(6),
           child: SvgPicture.asset(
             'assets/icons/ic_attachment.svg',
             width: 20,
@@ -688,7 +687,7 @@ class _AttachmentIndicator extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(left: 12),
+        margin: const EdgeInsets.only(left: 8),
         padding: const EdgeInsets.symmetric(
           horizontal: 12,
           vertical: 6,
@@ -728,7 +727,7 @@ class _SubmitButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(left: 16),
+      margin: const EdgeInsets.only(left: 8),
       child: OutlinedButton.icon(
         onPressed: onPressed,
         icon: const Icon(Icons.upload, size: 16),
@@ -738,7 +737,7 @@ class _SubmitButton extends StatelessWidget {
           side: const BorderSide(color: Colors.white54, width: 1),
           padding: const EdgeInsets.symmetric(
             horizontal: 12,
-            vertical: 6,
+            vertical: 2,
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
