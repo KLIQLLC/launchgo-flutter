@@ -376,7 +376,7 @@ class _WeekNavigator extends StatelessWidget {
       child: Row(
         children: [
           _NavigationButton(
-            icon: Icons.arrow_back_ios,
+            icon: Icons.arrow_back_ios_new,
             onPressed: onPreviousWeek,
           ),
           Expanded(
@@ -858,9 +858,16 @@ class _NavigationButton extends StatelessWidget {
           side: const BorderSide(color: Colors.white54),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         ),
-        child: Icon(
-          icon,
-          size: 18,
+        child: Padding(
+          padding: icon == Icons.arrow_back_ios_new 
+              ? const EdgeInsets.only(right: 4) 
+              : icon == Icons.arrow_forward_ios
+                  ? const EdgeInsets.only(left: 4)
+                  : EdgeInsets.zero,
+          child: Icon(
+            icon,
+            size: 18,
+          ),
         ),
       ),
     );
