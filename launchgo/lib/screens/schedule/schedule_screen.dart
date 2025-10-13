@@ -537,8 +537,8 @@ class _WeeklyScheduleViewState extends State<_WeeklyScheduleView> {
                     child: EventCard(
                       key: ValueKey('event_card_${event.id}'),
                       event: event,
-                      onEdit: widget.permissions.canEditEvents ? () => _editEvent(event) : null,
-                      onDelete: widget.permissions.canDeleteEvents ? () => _onEventDeleted(event) : null,
+                      onEdit: (widget.permissions.canEditEvents && event.type.toLowerCase() != 'assignment') ? () => _editEvent(event) : null,
+                      onDelete: (widget.permissions.canDeleteEvents && event.type.toLowerCase() != 'assignment') ? () => _onEventDeleted(event) : null,
                     ),
                   );
                 }),

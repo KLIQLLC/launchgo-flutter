@@ -69,6 +69,7 @@ class Event extends Equatable {
       case 'lg_session':
         return const Color(0xFFE97DE8); // Purple
       case 'class':
+      case 'assignment':
         return const Color(0xFFEB4748); // Red
       case 'homework':
         return const Color(0xFF7576F0); // Blue
