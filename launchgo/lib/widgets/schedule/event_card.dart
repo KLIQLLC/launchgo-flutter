@@ -173,7 +173,7 @@ class _EventTime extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(
-      event.timeRange,
+      event.displayTime,
       style: TextStyle(
         color: event.color.withValues(alpha: 0.8),
         fontSize: 14,

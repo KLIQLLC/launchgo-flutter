@@ -63,6 +63,20 @@ class Event extends Equatable {
     return '$startTime - $endTime';
   }
 
+  // Get formatted time for display based on event type
+  String get displayTime {
+    final startTime = _formatTime(startAt);
+    
+    // For assignment type events, show only start time
+    if (type.toLowerCase() == 'assignment') {
+      return startTime;
+    }
+    
+    // For all other events, show time range
+    final endTime = _formatTime(endAt);
+    return '$startTime - $endTime';
+  }
+
   // Get color based on event type
   Color get color {
     switch (type.toLowerCase()) {
