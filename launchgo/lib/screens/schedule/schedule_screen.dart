@@ -212,6 +212,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   Future<void> _handleRefresh() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    
+    // Refresh user info to get latest GPA and student data
+    await authService.refreshUserInfo();
+    
     await _loadDeadlines();
     // Also refresh events if the weekly view is available
     if (_selectedSegment == 0) {

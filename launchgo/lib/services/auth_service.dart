@@ -402,6 +402,43 @@ class AuthService extends ChangeNotifier {
     }
   }
   
+  /// Refresh user information to get latest data (like updated GPA)
+  Future<void> refreshUserInfo() async {
+    if (_apiService == null) {
+      _apiService = ApiServiceRetrofit(authService: this);
+    }
+    
+    try {
+      debugPrint('🔄 Refreshing user info...');
+      final userInfoData = await _apiService!.getUserInfo();
+      if (userInfoData != null) {
+        final currentSelectedStudentId = _selectedStudentId;
+        final currentSelectedSemesterId = _userInfo?.selectedSemesterId;
+        final currentSemesters = _userInfo?.semesters ?? [];
+        
+        _userInfo = UserModel.fromJson(userInfoData);
+        
+        // Preserve the current student selection after refresh
+        if (currentSelectedStudentId != null && 
+            _userInfo!.students.any((s) => s.id == currentSelectedStudentId)) {
+          _selectedStudentId = currentSelectedStudentId;
+        }
+        
+        // Preserve the current semester selection and semesters list
+        if (currentSemesters.isNotEmpty) {
+          _userInfo = _userInfo!.copyWith(
+            semesters: currentSemesters,
+            selectedSemesterId: currentSelectedSemesterId,
+          );
+        }
+        
+        debugPrint('✅ User info refreshed with latest data');
+      }
+    } catch (e) {
+      debugPrint('Failed to refresh user info: $e');
+    }
+  }
+  
   /// Load semesters from the API
   Future<void> loadSemesters() async {
     if (_apiService == null) {
@@ -505,6 +542,9 @@ class AuthService extends ChangeNotifier {
       
       // Persist the selection
       await PreferencesService.saveSelectedStudentId(studentId);
+      
+      // Refresh student data to get latest GPA and other info
+      await refreshUserInfo();
       
       // Handle Stream Chat presence switching immediately
       if (_streamChatService != null) {
