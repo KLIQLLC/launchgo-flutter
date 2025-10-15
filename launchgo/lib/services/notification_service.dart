@@ -163,24 +163,49 @@ class NotificationService extends ChangeNotifier {
   void _handleNotificationTap(RemoteMessage message) {
     final data = message.data;
     
+    debugPrint('🔔 Notification data: $data');
+    
+    // Handle Stream Chat notifications
+    if (data.containsKey('channel_id') || data.containsKey('channel_type')) {
+      debugPrint('🔔 Navigate to chat channel: ${data['channel_id']}');
+      // Navigate to chat screen - this will be handled by the router
+      _navigateToChat(data);
+      return;
+    }
+    
     // Navigate based on notification data
     if (data.containsKey('screen')) {
       final screen = data['screen'];
       debugPrint('🔔 Navigate to screen: $screen');
       
-      // Example navigation logic:
-      // switch (screen) {
-      //   case 'chat':
-      //     // Navigate to chat screen
-      //     break;
-      //   case 'schedule':
-      //     // Navigate to schedule screen
-      //     break;
-      //   case 'assignments':
-      //     // Navigate to assignments screen
-      //     break;
-      // }
+      switch (screen) {
+        case 'chat':
+          _navigateToChat(data);
+          break;
+        case 'schedule':
+          _navigateToSchedule();
+          break;
+        case 'assignments':
+          _navigateToSchedule(); // Assignments are on schedule screen
+          break;
+        default:
+          debugPrint('🔔 Unknown screen: $screen');
+      }
     }
+  }
+  
+  /// Navigate to chat screen
+  void _navigateToChat(Map<String, dynamic> data) {
+    debugPrint('🔔 Navigating to chat with data: $data');
+    // This would be implemented with your router
+    // Example: GoRouter.of(context).go('/chat', extra: data);
+  }
+  
+  /// Navigate to schedule screen
+  void _navigateToSchedule() {
+    debugPrint('🔔 Navigating to schedule');
+    // This would be implemented with your router
+    // Example: GoRouter.of(context).go('/schedule');
   }
   
   /// Subscribe to topic

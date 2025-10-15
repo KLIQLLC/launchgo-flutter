@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:stream_chat_flutter/stream_chat_flutter.dart';
+import '../notification_service.dart';
 
 class StreamChatService extends ChangeNotifier {
   static const String _apiKey = 'b2xg2crxdpft';
@@ -55,6 +56,8 @@ class StreamChatService extends ChangeNotifier {
       // Check if already connected with the same user
       if (_client.state.currentUser?.id == userId) {
         debugPrint('🟢 Stream Chat: User already connected');
+        // Still register FCM token in case it changed
+        await _registerPushToken();
         return;
       }
       
@@ -77,6 +80,10 @@ class StreamChatService extends ChangeNotifier {
       
       debugPrint('🟢 Stream Chat: User connected successfully - $userId (automatically online)');
       debugPrint('🔍 [DEBUG] connectUser called for user: $userId');
+      
+      // Register FCM token for push notifications
+      await _registerPushToken();
+      
       _isUserConnected = true;
       notifyListeners();
     } catch (e) {
@@ -85,6 +92,52 @@ class StreamChatService extends ChangeNotifier {
     }
   }
   
+  /// Register FCM token with Stream Chat for push notifications
+  Future<void> _registerPushToken() async {
+    try {
+      final notificationService = NotificationService.instance;
+      
+      // If notification service isn't initialized yet, wait for it
+      if (!notificationService.isInitialized) {
+        debugPrint('🔔 Stream Chat: Waiting for notification service to initialize...');
+        await notificationService.initialize();
+      }
+      
+      if (notificationService.fcmToken != null) {
+        debugPrint('🔔 Stream Chat: Registering FCM token: ${notificationService.fcmToken!.substring(0, 20)}...');
+        await _client.addDevice(notificationService.fcmToken!, PushProvider.firebase, 
+          pushProviderName: 'stage');
+        debugPrint('✅ Stream Chat: FCM token registered successfully for push notifications');
+        
+        // Verify registration by listing devices
+        final devicesResponse = await _client.getDevices();
+        debugPrint('📱 Stream Chat: Registered devices count: ${devicesResponse.devices.length}');
+        for (final device in devicesResponse.devices) {
+          debugPrint('📱 Device: ${device.id} - ${device.pushProvider}');
+        }
+      } else {
+        debugPrint('⚠️ Stream Chat: No FCM token available for registration');
+        debugPrint('⚠️ NotificationService initialized: ${notificationService.isInitialized}');
+        
+        // Retry after a short delay
+        debugPrint('🔄 Stream Chat: Retrying FCM token registration in 2 seconds...');
+        Future.delayed(const Duration(seconds: 2), () async {
+          if (notificationService.fcmToken != null) {
+            debugPrint('🔔 Stream Chat: Retry - Registering FCM token: ${notificationService.fcmToken!.substring(0, 20)}...');
+            await _client.addDevice(notificationService.fcmToken!, PushProvider.firebase, 
+          pushProviderName: 'stage');
+            debugPrint('✅ Stream Chat: FCM token registered successfully on retry');
+          } else {
+            debugPrint('❌ Stream Chat: FCM token still not available after retry');
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Stream Chat: Error registering FCM token - $e');
+      debugPrint('❌ Error details: ${e.toString()}');
+    }
+  }
+
   Future<void> disconnectUser() async {
     try {
       // Check if client is connected before attempting to disconnect
@@ -195,6 +248,11 @@ class StreamChatService extends ChangeNotifier {
       debugPrint('⚠️ Stream Chat: Error getting unread count for student $studentId: $e');
       return 0;
     }
+  }
+
+  /// Manually register FCM token (for testing)
+  Future<void> registerPushTokenManually() async {
+    await _registerPushToken();
   }
 
   /// Get a stream that emits whenever the unread count changes for a specific student
