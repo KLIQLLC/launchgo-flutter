@@ -1,8 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/theme_service.dart';
+import 'package:launchgo/services/notification_service.dart';
 import 'package:launchgo/utils/debug_utils.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_colors.dart';
@@ -186,6 +188,42 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Push Notifications',
+                    style: TextStyle(
+                      color: themeService.textSecondaryColor,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _FCMTokenDisplay(),
+                  const SizedBox(height: 8),
+                  _DebugButton(
+                    label: 'Init Notifications',
+                    onPressed: () async {
+                      try {
+                        await NotificationService.instance.initialize();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Notification service initialized'),
+                              backgroundColor: AppColors.success,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to initialize: $e'),
+                              backgroundColor: AppColors.error,
+                            ),
+                          );
+                        }
+                      }
+                    },
+                  ),
                 ],
               ),
             ),
@@ -223,6 +261,108 @@ class _DebugButton extends StatelessWidget {
       child: Text(
         label,
         style: const TextStyle(fontSize: 12),
+      ),
+    );
+  }
+}
+
+class _FCMTokenDisplay extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final notificationService = context.watch<NotificationService?>();
+    final themeService = context.watch<ThemeService>();
+    
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: themeService.cardColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: themeService.borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.notifications,
+                size: 16,
+                color: themeService.textSecondaryColor,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'FCM Token',
+                style: TextStyle(
+                  color: themeService.textSecondaryColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const Spacer(),
+              if (notificationService?.fcmToken != null)
+                IconButton(
+                  icon: Icon(
+                    Icons.copy,
+                    size: 16,
+                    color: themeService.textSecondaryColor,
+                  ),
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: notificationService?.fcmToken ?? ''));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('FCM Token copied to clipboard'),
+                        backgroundColor: AppColors.success,
+                      ),
+                    );
+                  },
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: themeService.backgroundColor,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              notificationService?.fcmToken ?? 'No token available',
+              style: TextStyle(
+                color: themeService.textColor,
+                fontSize: 10,
+                fontFamily: 'monospace',
+              ),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: (notificationService?.isInitialized ?? false)
+                      ? AppColors.success 
+                      : AppColors.error,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                (notificationService?.isInitialized ?? false)
+                    ? 'Notifications enabled' 
+                    : 'Notifications disabled',
+                style: TextStyle(
+                  color: themeService.textSecondaryColor,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
