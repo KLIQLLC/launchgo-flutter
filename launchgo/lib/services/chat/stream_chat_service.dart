@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:stream_chat_flutter/stream_chat_flutter.dart';
+import 'package:flutter_app_badger/flutter_app_badger.dart';
 import '../notification_service.dart';
 
 class StreamChatService extends ChangeNotifier {
@@ -83,6 +84,9 @@ class StreamChatService extends ChangeNotifier {
       
       // Register FCM token for push notifications
       await _registerPushToken();
+      
+      // Listen to unread count changes and update app badge
+      _setupBadgeListener();
       
       _isUserConnected = true;
       notifyListeners();
@@ -431,6 +435,35 @@ class StreamChatService extends ChangeNotifier {
       } catch (e) {
         debugPrint('⚠️ Stream Chat: Auto-connect failed (will retry when chat opens): $e');
       }
+    }
+  }
+
+  /// Set up listener to update app icon badge with unread count
+  void _setupBadgeListener() {
+    // Listen to current user changes to update app badge
+    // Works for both students and mentors (shows total unread count)
+    _client.state.currentUserStream.listen((user) {
+      if (user != null) {
+        final unreadCount = user.totalUnreadCount;
+        _updateAppBadge(unreadCount);
+      }
+    });
+  }
+
+  /// Update app icon badge with unread count
+  void _updateAppBadge(int count) async {
+    try {
+      if (await FlutterAppBadger.isAppBadgeSupported()) {
+        if (count > 0) {
+          await FlutterAppBadger.updateBadgeCount(count);
+          debugPrint('🔢 App badge updated: $count');
+        } else {
+          await FlutterAppBadger.removeBadge();
+          debugPrint('🔢 App badge removed');
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Error updating app badge: $e');
     }
   }
 

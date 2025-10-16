@@ -85,6 +85,9 @@ dependencies:
   ## User Preferences (UserDefaults for iOS, SharedPreferences for Android)
   shared_preferences: ^2.2.2
   stream_chat_flutter: ^8.3.0
+  
+  ## App Icon Badge
+  flutter_app_badger: ^1.5.0
 
 dev_dependencies:
   flutter_test:
