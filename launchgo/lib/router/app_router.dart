@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
-import 'package:stream_chat_flutter/stream_chat_flutter.dart' hide Event;
 import '../theme/app_colors.dart';
-import 'package:launchgo/services/chat/stream_chat_service.dart';
-import 'package:launchgo/widgets/badge_icon.dart';
+import 'package:launchgo/widgets/chat_badge_widget.dart';
 import 'package:launchgo/features/documents/domain/entities/document_entity.dart';
 import 'package:launchgo/features/documents/presentation/pages/documents_page.dart';
 import 'package:launchgo/screens/goals/goals_screen.dart';
@@ -364,83 +362,9 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
         centerTitle: true,
         actions: [
           // Chat icon with unread badge
-          Consumer2<StreamChatService, AuthService>(
-            builder: (context, streamChatService, authService, _) {
-              // Get unread count from Stream Chat
-              final client = streamChatService.client;
-              
-              // For mentors, we need to listen to both user stream and channel states
-              // For students, just listen to user stream
-              final isMentor = authService.userInfo?.isMentor == true;
-              final selectedStudentId = authService.selectedStudentId;
-              
-              // Use different StreamBuilder approach based on user type
-              if (isMentor && selectedStudentId != null) {
-                // For mentors, listen to specific student channel updates
-                return StreamBuilder<int>(
-                  stream: streamChatService.getUnreadCountStreamForStudent(selectedStudentId),
-                  builder: (context, snapshot) {
-                    final unreadCount = snapshot.data ?? 0;
-                    
-                    return Transform.translate(
-                      offset: const Offset(20, 0),
-                      child: IconButton(
-                        padding: const EdgeInsets.all(8.0),
-                        constraints: const BoxConstraints(),
-                        icon: BadgeIcon(
-                          icon: SvgPicture.asset(
-                            'assets/icons/ic_chat.svg',
-                            width: 20,
-                            height: 20,
-                            colorFilter: ColorFilter.mode(
-                              themeService.textColor,
-                              BlendMode.srcIn,
-                            ),
-                          ),
-                          count: unreadCount,
-                          showBadge: unreadCount > 0,
-                        ),
-                        onPressed: () {
-                          context.push('/chat');
-                        },
-                      ),
-                    );
-                  },
-                );
-              } else {
-                // For students, listen to user stream
-                return StreamBuilder<OwnUser?>(
-                  stream: client.state.currentUserStream,
-                  builder: (context, userSnapshot) {
-                    final currentUser = userSnapshot.data;
-                    final unreadCount = currentUser?.totalUnreadCount ?? 0;
-                    
-                    return Transform.translate(
-                      offset: const Offset(20, 0),
-                      child: IconButton(
-                        padding: const EdgeInsets.all(8.0),
-                        constraints: const BoxConstraints(),
-                        icon: BadgeIcon(
-                          icon: SvgPicture.asset(
-                            'assets/icons/ic_chat.svg',
-                            width: 20,
-                            height: 20,
-                            colorFilter: ColorFilter.mode(
-                              themeService.textColor,
-                              BlendMode.srcIn,
-                            ),
-                          ),
-                          count: unreadCount,
-                          showBadge: unreadCount > 0,
-                        ),
-                        onPressed: () {
-                          context.push('/chat');
-                        },
-                      ),
-                    );
-                  },
-                );
-              }
+          ChatBadgeWidget(
+            onPressed: () {
+              context.push('/chat');
             },
           ),
           Transform.translate(
