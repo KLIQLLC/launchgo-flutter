@@ -8,9 +8,11 @@ import 'package:launchgo/config/environment.dart';
 import 'package:launchgo/router/app_router.dart';
 import 'package:launchgo/services/api_service_retrofit.dart';
 import 'package:launchgo/services/auth_service.dart';
+import 'package:launchgo/services/api_service.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/services/chat/stream_chat_service.dart';
 import 'package:launchgo/services/notification_service.dart';
+import 'package:launchgo/services/notifications_api_service.dart';
 import 'package:launchgo/widgets/splash_screen.dart';
 import 'package:launchgo/features/recaps/presentation/bloc/recap_bloc.dart';
 import 'package:launchgo/features/recaps/data/recap_repository.dart';
@@ -66,6 +68,19 @@ void main() async {
             authService: context.read<AuthService>(),
           ),
         ),
+        Provider(
+          create: (context) => ApiService(
+            authService: context.read<AuthService>(),
+          ),
+        ),
+        ChangeNotifierProxyProvider<ApiService, NotificationsApiService>(
+          create: (context) => NotificationsApiService(
+            apiService: context.read<ApiService>(),
+          ),
+          update: (context, apiService, notificationsService) => notificationsService ?? NotificationsApiService(
+            apiService: apiService,
+          ),
+        ),
         ProxyProvider<ApiServiceRetrofit, RecapRepository>(
           update: (context, apiService, _) => RecapRepositoryImpl(apiService),
         ),
@@ -100,12 +115,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   bool _showSplash = true;
   late final AuthService _authService;
   late final StreamChatService _streamChatService;
+  late final NotificationsApiService _notificationsService;
 
   @override
   void initState() {
     super.initState();
     _authService = context.read<AuthService>();
     _streamChatService = context.read<StreamChatService>();
+    _notificationsService = context.read<NotificationsApiService>();
     _appRouter = AppRouter(_authService);
     
     // Set StreamChatService reference in AuthService for presence management
@@ -127,6 +144,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             userImage: _authService.userInfo!.avatarUrl,
           );
         }
+        
+        // Load notifications when user is authenticated (async to avoid framework lock)
+        Future.microtask(() => _notificationsService.fetchNotifications());
       }
     });
     
@@ -140,6 +160,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         userName: _authService.userInfo!.name,
         userImage: _authService.userInfo!.avatarUrl,
       );
+    }
+    
+    // Load notifications immediately if already authenticated (async to avoid framework lock)
+    if (_authService.userInfo != null) {
+      Future.microtask(() => _notificationsService.fetchNotifications());
     }
     
     // Show splash screen for 2 seconds

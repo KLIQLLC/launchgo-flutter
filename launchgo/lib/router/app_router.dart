@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/app_colors.dart';
 import 'package:launchgo/widgets/chat_badge_widget.dart';
@@ -18,6 +17,7 @@ import 'package:launchgo/features/recaps/presentation/pages/recap_form_page.dart
 import 'package:launchgo/models/recap_model.dart';
 import 'package:launchgo/screens/schedule/schedule_screen.dart';
 import 'package:launchgo/screens/settings_screen.dart';
+import 'package:launchgo/screens/notifications_screen.dart';
 import 'package:launchgo/screens/schedule/event_form_screen.dart';
 import 'package:launchgo/screens/schedule/recurring_event_form_screen.dart';
 import 'package:launchgo/models/event_model.dart';
@@ -25,6 +25,7 @@ import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/widgets/app_drawer.dart';
 import 'package:launchgo/widgets/custom_icon.dart';
+import 'package:launchgo/widgets/notification_badge_widget.dart';
 import 'package:provider/provider.dart';
 
 class AppRouter {
@@ -81,6 +82,11 @@ class AppRouter {
           path: '/settings',
           name: 'settings',
           builder: (context, state) => const SettingsScreen(),
+        ),
+        GoRoute(
+          path: '/notifications',
+          name: 'notifications',
+          builder: (context, state) => const NotificationsScreen(),
         ),
         GoRoute(
           path: '/chat',
@@ -367,24 +373,10 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
               context.push('/chat');
             },
           ),
-          Transform.translate(
-            offset: const Offset(6, 0),
-            child: IconButton(
-              padding: const EdgeInsets.all(8.0),
-              constraints: const BoxConstraints(),
-              icon: SvgPicture.asset(
-                'assets/icons/ic_alert.svg',
-                width: 20,
-                height: 20,
-                colorFilter: ColorFilter.mode(
-                  themeService.textColor,
-                  BlendMode.srcIn,
-                ),
-              ),
-              onPressed: () {
-                // TODO: Handle alert/notifications action
-              },
-            ),
+          NotificationBadgeWidget(
+            onPressed: () {
+              context.push('/notifications');
+            },
           ),
           const SizedBox(width: 8),
         ],
