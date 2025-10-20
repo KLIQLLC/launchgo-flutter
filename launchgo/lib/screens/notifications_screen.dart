@@ -88,7 +88,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 child: RefreshIndicator(
                   onRefresh: () => notificationsService.refresh(),
                   child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: notifications.length,
                     itemBuilder: (context, index) {
                       final notification = notifications[index];
@@ -138,7 +137,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
           ),
         ),
-        padding: const EdgeInsets.only(top: 16, bottom: 12),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -147,8 +146,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: AppColors.darkCard,
               borderRadius: BorderRadius.circular(24),
+              color: const Color(0xFF3E4653),
             ),
             child: Center(
               child: Stack(
@@ -162,19 +161,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       BlendMode.srcIn,
                     ),
                   ),
-                  if (!notification.isRead)
-                    Positioned(
-                      top: 0,
-                      right: 0,
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: AppColors.accent,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ),
                 ],
               ),
             ),
@@ -185,13 +171,28 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  notification.title,
-                  style: TextStyle(
-                    color: themeService.textColor,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      notification.title,
+                      style: TextStyle(
+                        color: themeService.textColor,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (!notification.isRead) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 4),
                 Text(
