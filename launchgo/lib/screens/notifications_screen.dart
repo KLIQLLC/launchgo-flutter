@@ -81,24 +81,27 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             return _buildEmptyState(themeService);
           }
 
-          return Column(
-            children: [
-              _buildHeader(notifications.length, themeService),
-              Expanded(
-                child: RefreshIndicator(
-                  onRefresh: () => notificationsService.refresh(),
-                  child: ListView.builder(
-                    itemCount: notifications.length,
-                    itemBuilder: (context, index) {
-                      final notification = notifications[index];
-                      return _buildNotificationTile(notification, themeService);
-                    },
+          return Scaffold(
+            body: Column(
+              children: [
+                _buildHeader(notifications.length, themeService),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: () => notificationsService.refresh(),
+                    child: ListView.builder(
+                      itemCount: notifications.length,
+                      itemBuilder: (context, index) {
+                        final notification = notifications[index];
+                        return _buildNotificationTile(notification, themeService);
+                      },
+                    ),
                   ),
                 ),
-              ),
-              if (notifications.where((n) => !n.isRead).isNotEmpty)
-                _buildMarkAllReadButton(themeService),
-            ],
+              ],
+            ),
+            bottomNavigationBar: notifications.where((n) => !n.isRead).isNotEmpty
+                ? _buildMarkAllReadButton(themeService)
+                : null,
           );
         },
       ),
@@ -248,7 +251,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             }
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.accent,
+            backgroundColor: const Color(0xFF101929),
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(
