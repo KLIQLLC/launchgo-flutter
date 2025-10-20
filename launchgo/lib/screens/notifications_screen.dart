@@ -386,13 +386,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   String _getNotificationIcon(String type) {
     switch (type) {
+      case 'create-document':
       case 'update-document':
         return 'assets/icons/ic_document.svg';
+      case 'create-event':
       case 'update-event':
         return 'assets/icons/ic_schedule.svg';
-      case 'upload':
-      case 'attachment':
+      case 'upload-attachment':
         return 'assets/icons/ic_upload.svg';
+      case 'create-assignment':
+      case 'update-assignment':
+      case 'create-course':
+        return 'assets/icons/ic_course.svg';
       default:
         return 'assets/icons/ic_alert.svg';
     }
