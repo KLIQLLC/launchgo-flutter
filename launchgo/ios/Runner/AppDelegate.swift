@@ -28,6 +28,51 @@ import FirebaseMessaging
   override func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
     Messaging.messaging().apnsToken = deviceToken
   }
+  
+  // Handle remote notifications for older iOS versions
+  override func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable : Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+    // Forward to Flutter via method channel
+    if let controller = window?.rootViewController as? FlutterViewController {
+      let methodChannel = FlutterMethodChannel(name: "push_notification_channel", binaryMessenger: controller.binaryMessenger)
+      methodChannel.invokeMethod("onForegroundMessage", arguments: userInfo)
+    }
+    
+    completionHandler(.newData)
+  }
+  
+  // Handle foreground notifications (iOS 10+)
+  override func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    willPresent notification: UNNotification,
+    withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+  ) {
+    let userInfo = notification.request.content.userInfo
+    
+    // Forward to Firebase Messaging to trigger Flutter handler
+    Messaging.messaging().appDidReceiveMessage(userInfo)
+    
+    // Forward to Flutter via method channel for badge updates
+    if let controller = window?.rootViewController as? FlutterViewController {
+      let methodChannel = FlutterMethodChannel(name: "push_notification_channel", binaryMessenger: controller.binaryMessenger)
+      methodChannel.invokeMethod("onForegroundMessage", arguments: userInfo)
+    }
+    
+    // Don't show notification in foreground (as per project requirements)
+    completionHandler([])
+  }
+  
+  override func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    didReceive response: UNNotificationResponse,
+    withCompletionHandler completionHandler: @escaping () -> Void
+  ) {
+    let userInfo = response.notification.request.content.userInfo
+    
+    // Handle notification tap - could add navigation logic here
+    Messaging.messaging().appDidReceiveMessage(userInfo)
+    
+    completionHandler()
+  }
 }
 
 // MARK: - MessagingDelegate
@@ -41,38 +86,5 @@ extension AppDelegate: MessagingDelegate {
       object: nil,
       userInfo: dataDict
     )
-  }
-}
-
-// MARK: - UNUserNotificationCenterDelegate
-@available(iOS 10, *)
-extension AppDelegate {
-  // Called when app is in foreground
-  override func userNotificationCenter(
-    _ center: UNUserNotificationCenter,
-    willPresent notification: UNNotification,
-    withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
-  ) {
-    let userInfo = notification.request.content.userInfo
-    
-    // Print message details for debugging
-    print("Foreground notification received: \(userInfo)")
-    
-    // Don't show notification in foreground
-    completionHandler([])
-  }
-  
-  // Called when user taps notification
-  override func userNotificationCenter(
-    _ center: UNUserNotificationCenter,
-    didReceive response: UNNotificationResponse,
-    withCompletionHandler completionHandler: @escaping () -> Void
-  ) {
-    let userInfo = response.notification.request.content.userInfo
-    
-    // Print message details for debugging
-    print("Notification tapped: \(userInfo)")
-    
-    completionHandler()
   }
 }

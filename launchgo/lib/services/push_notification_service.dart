@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'api_service_retrofit.dart';
+import 'notifications_api_service.dart';
 
 /// Service for handling FCM token lifecycle and device registration
 class PushNotificationService extends ChangeNotifier {
@@ -13,9 +15,16 @@ class PushNotificationService extends ChangeNotifier {
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   String? _fcmToken;
   bool _isInitialized = false;
+  NotificationsApiService? _notificationsService;
+  static const MethodChannel _channel = MethodChannel('push_notification_channel');
   
   String? get fcmToken => _fcmToken;
   bool get isInitialized => _isInitialized;
+  
+  /// Set notifications service for updating badge count
+  void setNotificationsService(NotificationsApiService notificationsService) {
+    _notificationsService = notificationsService;
+  }
   
   /// Initialize FCM for basic functionality (token retrieval, permissions)
   Future<void> initialize() async {
@@ -63,6 +72,15 @@ class PushNotificationService extends ChangeNotifier {
         
         // Handle foreground messages
         FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+        
+        // Set up method channel to receive notifications from native iOS
+        _channel.setMethodCallHandler((MethodCall call) async {
+          if (call.method == 'onForegroundMessage') {
+            if (_notificationsService != null) {
+              Future.microtask(() => _notificationsService!.fetchNotifications());
+            }
+          }
+        });
         
         // Handle message when app is opened from notification tap
         FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpenedApp);
@@ -149,8 +167,10 @@ class PushNotificationService extends ChangeNotifier {
   
   /// Handle foreground messages
   void _handleForegroundMessage(RemoteMessage message) {
-    debugPrint('🔔 Foreground message received: ${message.notification?.title}');
-    
+    // Update notification badge count when foreground notification received
+    if (_notificationsService != null) {
+      Future.microtask(() => _notificationsService!.fetchNotifications());
+    }
   }
   
   /// Handle message when app is opened from notification

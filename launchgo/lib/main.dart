@@ -128,6 +128,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // Set StreamChatService reference in AuthService for presence management
     _authService.setStreamChatService(_streamChatService);
     
+    // Set NotificationsApiService reference in PushNotificationService for badge updates
+    PushNotificationService.instance.setNotificationsService(_notificationsService);
+    
     // Add app lifecycle observer
     WidgetsBinding.instance.addObserver(this);
     
