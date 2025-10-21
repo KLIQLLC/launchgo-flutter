@@ -54,6 +54,32 @@ class ApiServiceRetrofit {
     }
   }
   
+  Future<Map<String, dynamic>?> registerFCMToken(String token) async {
+    try {
+      debugPrint('📱 Registering FCM token with backend...');
+      final response = await _retrofit.registerFCMToken({'token': token});
+      final data = response.data;
+      
+      final parsedData = _parseJsonResponse(data);
+      debugPrint('✅ FCM token registered successfully');
+      return parsedData is Map<String, dynamic> ? parsedData : null;
+    } catch (e) {
+      debugPrint('❌ Failed to register FCM token: $e');
+      rethrow;
+    }
+  }
+  
+  Future<void> deleteFCMToken(String token) async {
+    try {
+      debugPrint('🗑️ Deleting FCM token from backend...');
+      await _retrofit.deleteFCMToken(token);
+      debugPrint('✅ FCM token deleted successfully');
+    } catch (e) {
+      debugPrint('❌ Failed to delete FCM token: $e');
+      rethrow;
+    }
+  }
+  
   Future<Map<String, dynamic>?> updateStudentInfo(String studentId, Map<String, dynamic> studentData) async {
     try {
       debugPrint('📝 Updating student info for: $studentId');

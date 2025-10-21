@@ -1,13 +1,14 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'api_service_retrofit.dart';
 
-/// Service for handling Firebase Cloud Messaging push notifications
-class NotificationService extends ChangeNotifier {
-  static NotificationService? _instance;
-  static NotificationService get instance => _instance ??= NotificationService._();
+/// Service for handling FCM token lifecycle and device registration
+class PushNotificationService extends ChangeNotifier {
+  static PushNotificationService? _instance;
+  static PushNotificationService get instance => _instance ??= PushNotificationService._();
   
-  NotificationService._();
+  PushNotificationService._();
   
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   String? _fcmToken;
@@ -16,11 +17,14 @@ class NotificationService extends ChangeNotifier {
   String? get fcmToken => _fcmToken;
   bool get isInitialized => _isInitialized;
   
-  /// Initialize push notifications
+  /// Initialize FCM for basic functionality (token retrieval, permissions)
   Future<void> initialize() async {
-    if (_isInitialized) return;
+    if (_isInitialized) {
+      debugPrint('🔔 PushNotificationService already initialized, skipping...');
+      return;
+    }
     
-    debugPrint('🔔 Initializing notification service...');
+    debugPrint('🔔 Initializing PushNotificationService...');
     
     try {
       // Request notification permissions
@@ -45,20 +49,14 @@ class NotificationService extends ChangeNotifier {
         
         // Get FCM token
         _fcmToken = await _messaging.getToken();
-        debugPrint('🔔 FCM Token: $_fcmToken');
+        debugPrint('🔔 FCM Token retrieved: $_fcmToken');
         
         // Listen to token refresh
         _messaging.onTokenRefresh.listen((token) {
           _fcmToken = token;
           debugPrint('🔔 FCM Token refreshed: $token');
-          _sendTokenToServer(token);
           notifyListeners();
         });
-        
-        // Send initial token to server
-        if (_fcmToken != null) {
-          await _sendTokenToServer(_fcmToken!);
-        }
         
         // Handle background messages
         FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
@@ -78,16 +76,47 @@ class NotificationService extends ChangeNotifier {
         _isInitialized = true;
         notifyListeners();
         
-        debugPrint('✅ Notification service initialized successfully');
+        debugPrint('✅ PushNotificationService initialized successfully');
         debugPrint('🔔 FCM Token: $_fcmToken');
       } else {
         debugPrint('❌ Notification permission denied: ${settings.authorizationStatus}');
-        debugPrint('🔔 Alert: ${settings.alert}');
-        debugPrint('🔔 Badge: ${settings.badge}');
-        debugPrint('🔔 Sound: ${settings.sound}');
       }
     } catch (e) {
-      debugPrint('❌ Error initializing notifications: $e');
+      debugPrint('❌ Error initializing PushNotificationService: $e');
+      rethrow;
+    }
+  }
+  
+  /// Register device with backend using FCM token
+  Future<void> registerDevice(ApiServiceRetrofit apiService) async {
+    try {
+      if (_fcmToken == null) {
+        debugPrint('⚠️ No FCM token available for registration');
+        return;
+      }
+      
+      debugPrint('📱 Registering device with backend...');
+      await apiService.registerFCMToken(_fcmToken!);
+      debugPrint('✅ Device registered successfully with backend');
+    } catch (e) {
+      debugPrint('❌ Failed to register device with backend: $e');
+      rethrow;
+    }
+  }
+  
+  /// Unregister device from backend
+  Future<void> unregisterDevice(ApiServiceRetrofit apiService) async {
+    try {
+      if (_fcmToken == null) {
+        debugPrint('⚠️ No FCM token available for unregistration');
+        return;
+      }
+      
+      debugPrint('🗑️ Unregistering device from backend...');
+      await apiService.deleteFCMToken(_fcmToken!);
+      debugPrint('✅ Device unregistered successfully from backend');
+    } catch (e) {
+      debugPrint('❌ Failed to unregister device from backend: $e');
       rethrow;
     }
   }
@@ -115,20 +144,6 @@ class NotificationService extends ChangeNotifier {
       debugPrint('⚠️ APNS token not received after $maxAttempts attempts');
     } catch (e) {
       debugPrint('❌ Error waiting for APNS token: $e');
-    }
-  }
-  
-  /// Send FCM token to backend server
-  Future<void> _sendTokenToServer(String token) async {
-    try {
-      // You can implement this to send the token to your backend
-      // Example:
-      // final apiService = ApiServiceRetrofit(authService: AuthService.instance);
-      // await apiService.updateFCMToken(token);
-      
-      debugPrint('📤 FCM token would be sent to server: $token');
-    } catch (e) {
-      debugPrint('❌ Error sending FCM token to server: $e');
     }
   }
   
@@ -206,65 +221,6 @@ class NotificationService extends ChangeNotifier {
     debugPrint('🔔 Navigating to schedule');
     // This would be implemented with your router
     // Example: GoRouter.of(context).go('/schedule');
-  }
-  
-  /// Subscribe to topic
-  Future<void> subscribeToTopic(String topic) async {
-    try {
-      await _messaging.subscribeToTopic(topic);
-      debugPrint('✅ Subscribed to topic: $topic');
-    } catch (e) {
-      debugPrint('❌ Error subscribing to topic $topic: $e');
-    }
-  }
-  
-  /// Unsubscribe from topic
-  Future<void> unsubscribeFromTopic(String topic) async {
-    try {
-      await _messaging.unsubscribeFromTopic(topic);
-      debugPrint('✅ Unsubscribed from topic: $topic');
-    } catch (e) {
-      debugPrint('❌ Error unsubscribing from topic $topic: $e');
-    }
-  }
-  
-  /// Update user's notification preferences
-  Future<void> updateNotificationPreferences({
-    required bool enableAssignmentReminders,
-    required bool enableEventReminders,
-    required bool enableChatNotifications,
-    required bool enableGeneralUpdates,
-  }) async {
-    try {
-      // Subscribe/unsubscribe from topics based on preferences
-      if (enableAssignmentReminders) {
-        await subscribeToTopic('assignment_reminders');
-      } else {
-        await unsubscribeFromTopic('assignment_reminders');
-      }
-      
-      if (enableEventReminders) {
-        await subscribeToTopic('event_reminders');
-      } else {
-        await unsubscribeFromTopic('event_reminders');
-      }
-      
-      if (enableChatNotifications) {
-        await subscribeToTopic('chat_notifications');
-      } else {
-        await unsubscribeFromTopic('chat_notifications');
-      }
-      
-      if (enableGeneralUpdates) {
-        await subscribeToTopic('general_updates');
-      } else {
-        await unsubscribeFromTopic('general_updates');
-      }
-      
-      debugPrint('✅ Notification preferences updated');
-    } catch (e) {
-      debugPrint('❌ Error updating notification preferences: $e');
-    }
   }
 }
 

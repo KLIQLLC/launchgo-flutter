@@ -17,6 +17,16 @@ abstract class ApiService {
   @GET("/users/me")
   Future<HttpResponse<dynamic>> getUserInfo();
   
+  @POST("/users/me/devices")
+  Future<HttpResponse<dynamic>> registerFCMToken(
+    @Body() Map<String, dynamic> deviceData,
+  );
+  
+  @DELETE("/users/me/devices/{token}")
+  Future<HttpResponse<void>> deleteFCMToken(
+    @Path("token") String token,
+  );
+  
   @PATCH("/students/{studentId}")
   Future<HttpResponse<dynamic>> updateStudentInfo(
     @Path("studentId") String studentId,

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:stream_chat_flutter/stream_chat_flutter.dart';
 import 'package:flutter_app_badger/flutter_app_badger.dart';
-import '../notification_service.dart';
+import '../push_notification_service.dart';
 
 class StreamChatService extends ChangeNotifier {
   static const String _apiKey = 'b2xg2crxdpft';
@@ -99,17 +99,17 @@ class StreamChatService extends ChangeNotifier {
   /// Register FCM token with Stream Chat for push notifications
   Future<void> _registerPushToken() async {
     try {
-      final notificationService = NotificationService.instance;
+      final pushNotificationService = PushNotificationService.instance;
       
       // If notification service isn't initialized yet, wait for it
-      if (!notificationService.isInitialized) {
+      if (!pushNotificationService.isInitialized) {
         debugPrint('🔔 Stream Chat: Waiting for notification service to initialize...');
-        await notificationService.initialize();
+        await pushNotificationService.initialize();
       }
       
-      if (notificationService.fcmToken != null) {
-        debugPrint('🔔 Stream Chat: Registering FCM token: ${notificationService.fcmToken!.substring(0, 20)}...');
-        await _client.addDevice(notificationService.fcmToken!, PushProvider.firebase, 
+      if (pushNotificationService.fcmToken != null) {
+        debugPrint('🔔 Stream Chat: Registering FCM token: ${pushNotificationService.fcmToken!.substring(0, 20)}...');
+        await _client.addDevice(pushNotificationService.fcmToken!, PushProvider.firebase, 
           pushProviderName: 'stage');
         debugPrint('✅ Stream Chat: FCM token registered successfully for push notifications');
         
@@ -121,14 +121,14 @@ class StreamChatService extends ChangeNotifier {
         }
       } else {
         debugPrint('⚠️ Stream Chat: No FCM token available for registration');
-        debugPrint('⚠️ NotificationService initialized: ${notificationService.isInitialized}');
+        debugPrint('⚠️ NotificationService initialized: ${pushNotificationService.isInitialized}');
         
         // Retry after a short delay
         debugPrint('🔄 Stream Chat: Retrying FCM token registration in 2 seconds...');
         Future.delayed(const Duration(seconds: 2), () async {
-          if (notificationService.fcmToken != null) {
-            debugPrint('🔔 Stream Chat: Retry - Registering FCM token: ${notificationService.fcmToken!.substring(0, 20)}...');
-            await _client.addDevice(notificationService.fcmToken!, PushProvider.firebase, 
+          if (pushNotificationService.fcmToken != null) {
+            debugPrint('🔔 Stream Chat: Retry - Registering FCM token: ${pushNotificationService.fcmToken!.substring(0, 20)}...');
+            await _client.addDevice(pushNotificationService.fcmToken!, PushProvider.firebase, 
           pushProviderName: 'stage');
             debugPrint('✅ Stream Chat: FCM token registered successfully on retry');
           } else {

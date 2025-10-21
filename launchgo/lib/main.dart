@@ -11,7 +11,7 @@ import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/api_service.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/services/chat/stream_chat_service.dart';
-import 'package:launchgo/services/notification_service.dart';
+import 'package:launchgo/services/push_notification_service.dart';
 import 'package:launchgo/services/notifications_api_service.dart';
 import 'package:launchgo/widgets/splash_screen.dart';
 import 'package:launchgo/features/recaps/presentation/bloc/recap_bloc.dart';
@@ -29,8 +29,8 @@ void main() async {
   await Firebase.initializeApp();
   
   // Initialize push notifications lazily (won't block app startup)
-  NotificationService.instance.initialize().catchError((e) {
-    debugPrint('❌ Notification service initialization failed: $e');
+  PushNotificationService.instance.initialize().catchError((e) {
+    debugPrint('❌ Push notification service initialization failed: $e');
   });
   
   // Set up Crashlytics
@@ -62,7 +62,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => AuthService()..initialize()),
         ChangeNotifierProvider(create: (_) => ThemeService()),
         ChangeNotifierProvider(create: (_) => StreamChatService()),
-        ChangeNotifierProvider.value(value: NotificationService.instance),
+        ChangeNotifierProvider.value(value: PushNotificationService.instance),
         Provider(
           create: (context) => ApiServiceRetrofit(
             authService: context.read<AuthService>(),

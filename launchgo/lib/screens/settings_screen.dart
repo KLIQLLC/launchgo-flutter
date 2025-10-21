@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/theme_service.dart';
-import 'package:launchgo/services/notification_service.dart';
+import 'package:launchgo/services/push_notification_service.dart';
 import 'package:launchgo/utils/debug_utils.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_colors.dart';
@@ -203,7 +203,7 @@ class SettingsScreen extends StatelessWidget {
                     label: 'Init Notifications',
                     onPressed: () async {
                       try {
-                        await NotificationService.instance.initialize();
+                        await PushNotificationService.instance.initialize();
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
@@ -269,7 +269,7 @@ class _DebugButton extends StatelessWidget {
 class _FCMTokenDisplay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final notificationService = context.watch<NotificationService?>();
+    final pushNotificationService = context.watch<PushNotificationService?>();
     final themeService = context.watch<ThemeService>();
     
     return Container(
@@ -299,7 +299,7 @@ class _FCMTokenDisplay extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              if (notificationService?.fcmToken != null)
+              if (pushNotificationService?.fcmToken != null)
                 IconButton(
                   icon: Icon(
                     Icons.copy,
@@ -307,7 +307,7 @@ class _FCMTokenDisplay extends StatelessWidget {
                     color: themeService.textSecondaryColor,
                   ),
                   onPressed: () {
-                    Clipboard.setData(ClipboardData(text: notificationService?.fcmToken ?? ''));
+                    Clipboard.setData(ClipboardData(text: pushNotificationService?.fcmToken ?? ''));
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('FCM Token copied to clipboard'),
@@ -327,7 +327,7 @@ class _FCMTokenDisplay extends StatelessWidget {
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
-              notificationService?.fcmToken ?? 'No token available',
+              pushNotificationService?.fcmToken ?? 'No token available',
               style: TextStyle(
                 color: themeService.textColor,
                 fontSize: 10,
@@ -344,7 +344,7 @@ class _FCMTokenDisplay extends StatelessWidget {
                 width: 8,
                 height: 8,
                 decoration: BoxDecoration(
-                  color: (notificationService?.isInitialized ?? false)
+                  color: (pushNotificationService?.isInitialized ?? false)
                       ? AppColors.success 
                       : AppColors.error,
                   shape: BoxShape.circle,
@@ -352,7 +352,7 @@ class _FCMTokenDisplay extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                (notificationService?.isInitialized ?? false)
+                (pushNotificationService?.isInitialized ?? false)
                     ? 'Notifications enabled' 
                     : 'Notifications disabled',
                 style: TextStyle(

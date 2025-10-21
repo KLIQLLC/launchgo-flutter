@@ -12,6 +12,7 @@ import 'secure_storage_service.dart';
 import 'permissions_service.dart';
 import 'preferences_service.dart';
 import 'chat/stream_chat_service.dart';
+import 'push_notification_service.dart';
 
 /// Service for managing user authentication with Google Sign-In and backend JWT tokens
 class AuthService extends ChangeNotifier {
@@ -99,9 +100,21 @@ class AuthService extends ChangeNotifier {
       if (_accessToken != null && !JwtDecoder.isExpired(_accessToken!)) {
         
         // Load user info and semesters immediately for valid tokens
-        if (_accessToken != null) {
-          debugPrint('🔐 Loading user data during initialization...');
-          await loadUserInfo();
+        debugPrint('🔐 Loading user data during initialization...');
+        await loadUserInfo();
+        
+        // Register device for push notifications for existing authenticated users
+        try {
+          debugPrint('🔔 [FCM DEBUG] Registering device for existing authenticated user...');
+          if (_apiService != null) {
+            await PushNotificationService.instance.registerDevice(_apiService!);
+            debugPrint('✅ [FCM DEBUG] Device registered for existing user');
+          } else {
+            debugPrint('⚠️ [FCM DEBUG] No API service available for device registration');
+          }
+        } catch (e) {
+          debugPrint('❌ [FCM DEBUG] Failed to register device for existing user: $e');
+          // Don't fail the initialization if device registration fails
         }
       } else if (_accessToken != null && JwtDecoder.isExpired(_accessToken!)) {
         // Clear expired tokens
@@ -184,6 +197,18 @@ class AuthService extends ChangeNotifier {
   /// Sign out
   Future<void> signOut({StreamChatService? streamChatService}) async {
     try {
+      // Unregister device before logout
+      try {
+        debugPrint('🔔 Unregistering device during logout...');
+        if (_apiService != null) {
+          await PushNotificationService.instance.unregisterDevice(_apiService!);
+          debugPrint('✅ Device unregistered during logout');
+        }
+      } catch (e) {
+        debugPrint('❌ [AUTH] Error unregistering device during logout: $e');
+        // Don't fail logout if device unregistration fails
+      }
+      
       // Always try to disconnect from Stream Chat during logout
       // Try with provided service first, then try to get it from static instance
       StreamChatService? chatService = streamChatService ?? StreamChatService.instance;
@@ -260,7 +285,7 @@ class AuthService extends ChangeNotifier {
   /// Send auth code to backend for JWT token
   Future<void> _sendServerAuthCodeToBackend(String serverAuthCode) async {
     try {
-      debugPrint('🔐 Sending auth code to backend...');
+      debugPrint('🔐 [FCM DEBUG] Sending auth code to backend...');
       debugPrint('🔐 GET ${EnvironmentConfig.baseUrl}/users/auth/google/mobile?code=$serverAuthCode');
       
       // Use direct Dio call to get raw JSON response
@@ -304,6 +329,20 @@ class AuthService extends ChangeNotifier {
         // Load user info after successful token storage
         debugPrint('🔐 Loading user info...');
         await loadUserInfo();
+        
+        // Register device for push notifications after successful login
+        try {
+          debugPrint('🔔 [FCM DEBUG] Registering device after successful login...');
+          if (_apiService != null) {
+            await PushNotificationService.instance.registerDevice(_apiService!);
+            debugPrint('✅ [FCM DEBUG] Device registered after login');
+          } else {
+            debugPrint('⚠️ [FCM DEBUG] No API service available for device registration');
+          }
+        } catch (e) {
+          debugPrint('❌ [FCM DEBUG] Failed to register device after login: $e');
+          // Don't fail the login process if device registration fails
+        }
         
         // Set user online after successful authentication
         if (_streamChatService != null && _streamChatService!.isUserConnected) {
