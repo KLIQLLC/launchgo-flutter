@@ -58,12 +58,8 @@ extension AppDelegate {
     // Print message details for debugging
     print("Foreground notification received: \(userInfo)")
     
-    // Show notification in foreground
-    if #available(iOS 14.0, *) {
-      completionHandler([[.banner, .sound]])
-    } else {
-      completionHandler([[.alert, .sound]])
-    }
+    // Don't show notification in foreground
+    completionHandler([])
   }
   
   // Called when user taps notification

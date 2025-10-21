@@ -151,12 +151,6 @@ class PushNotificationService extends ChangeNotifier {
   void _handleForegroundMessage(RemoteMessage message) {
     debugPrint('🔔 Foreground message received: ${message.notification?.title}');
     
-    // You can show a custom in-app notification here
-    // Or update app state based on the message
-    
-    if (message.notification != null) {
-      _showLocalNotification(message);
-    }
   }
   
   /// Handle message when app is opened from notification
@@ -167,12 +161,6 @@ class PushNotificationService extends ChangeNotifier {
     _handleNotificationTap(message);
   }
   
-  /// Show local notification for foreground messages
-  void _showLocalNotification(RemoteMessage message) {
-    // This is handled by the native platform notification system
-    // The iOS and Android configurations already show notifications in foreground
-    debugPrint('🔔 Showing notification: ${message.notification!.title}');
-  }
   
   /// Handle notification tap navigation
   void _handleNotificationTap(RemoteMessage message) {
