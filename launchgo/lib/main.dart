@@ -162,11 +162,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       );
     }
     
-    // Load notifications immediately if already authenticated (async to avoid framework lock)
-    if (_authService.userInfo != null) {
-      Future.microtask(() => _notificationsService.fetchNotifications());
-    }
-    
     // Show splash screen for 2 seconds
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
