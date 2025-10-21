@@ -203,6 +203,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           debugPrint('🟡 App resumed - Mentor will connect when selecting student');
         }
       }
+      
+      Future.microtask(() => _notificationsService.fetchNotifications());
     }
     // Note: Stream Chat automatically sets users offline when WebSocket disconnects
     // No manual offline handling needed
