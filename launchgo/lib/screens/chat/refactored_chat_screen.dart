@@ -16,7 +16,6 @@ class RefactoredChatScreen extends StatefulWidget {
 class _RefactoredChatScreenState extends State<RefactoredChatScreen>
     with WidgetsBindingObserver {
   ChatChannelManager? _channelManager;
-  String? _previousSelectedStudentId;
   String? _errorMessage;
 
   @override
@@ -118,12 +117,7 @@ class _RefactoredChatScreenState extends State<RefactoredChatScreen>
   Widget build(BuildContext context) {
     return Consumer<AuthService>(
       builder: (context, authService, child) {
-        // Check for student changes (mentor switching students)
-        final currentStudentId = authService.selectedStudentId;
-
         // Presence switching is now handled in AuthService.selectStudent()
-        // Just track the current student for UI purposes
-        _previousSelectedStudentId = currentStudentId;
 
         if (_errorMessage != null) {
           return _buildErrorScreen(_getChatTitle(), _errorMessage!);
