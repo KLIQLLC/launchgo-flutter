@@ -18,12 +18,24 @@ class PushNotificationService extends ChangeNotifier {
   NotificationsApiService? _notificationsService;
   static const MethodChannel _channel = MethodChannel('push_notification_channel');
   
+  // Callback for when FCM token becomes available
+  VoidCallback? _onTokenAvailableCallback;
+  
   String? get fcmToken => _fcmToken;
   bool get isInitialized => _isInitialized;
   
   /// Set notifications service for updating badge count
   void setNotificationsService(NotificationsApiService notificationsService) {
     _notificationsService = notificationsService;
+  }
+  
+  /// Set callback to be called when FCM token becomes available
+  void setTokenAvailableCallback(VoidCallback callback) {
+    _onTokenAvailableCallback = callback;
+    // If token is already available, call the callback immediately
+    if (_fcmToken != null) {
+      Future.microtask(() => callback());
+    }
   }
   
   /// Initialize FCM for basic functionality (token retrieval, permissions)
@@ -60,11 +72,22 @@ class PushNotificationService extends ChangeNotifier {
         _fcmToken = await _messaging.getToken();
         debugPrint('🔔 FCM Token retrieved: $_fcmToken');
         
+        // Call callback if set (for backend registration)
+        if (_onTokenAvailableCallback != null) {
+          debugPrint('🔔 Calling token available callback...');
+          Future.microtask(() => _onTokenAvailableCallback!());
+        }
+        
         // Listen to token refresh
         _messaging.onTokenRefresh.listen((token) {
           _fcmToken = token;
           debugPrint('🔔 FCM Token refreshed: $token');
           notifyListeners();
+          
+          // Call callback for token refresh too
+          if (_onTokenAvailableCallback != null) {
+            Future.microtask(() => _onTokenAvailableCallback!());
+          }
         });
         
         // Handle background messages
@@ -154,7 +177,7 @@ class PushNotificationService extends ChangeNotifier {
           return;
         }
         
-        debugPrint('🔔 APNS token not available yet, waiting... (attempt ${attempts + 1}/$maxAttempts)');
+        if (attempts % 3 == 0) debugPrint('🔔 APNS token not available yet, waiting... (attempt ${attempts + 1}/$maxAttempts)');
         await Future.delayed(delay);
         attempts++;
       }
@@ -167,6 +190,14 @@ class PushNotificationService extends ChangeNotifier {
   
   /// Handle foreground messages
   void _handleForegroundMessage(RemoteMessage message) {
+    debugPrint('🔔 Foreground message received: ${message.notification?.title}');
+    debugPrint('🔔 Message data: ${message.data}');
+    debugPrint('🔔 Message body: ${message.notification?.body}');
+    
+    // Show the notification even when app is in foreground
+    // Note: For production, you might want to show a custom in-app notification instead
+    debugPrint('🔔 Showing notification in foreground');
+    
     // Update notification badge count when foreground notification received
     if (_notificationsService != null) {
       Future.microtask(() => _notificationsService!.fetchNotifications());
@@ -236,10 +267,16 @@ class PushNotificationService extends ChangeNotifier {
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint('🔔 Background message received: ${message.notification?.title}');
+  debugPrint('🔔 Background message data: ${message.data}');
+  debugPrint('🔔 Background message body: ${message.notification?.body}');
   
   // Handle background message
   // This runs when app is terminated or in background
   
-  // You can update local storage, show notifications, etc.
+  // Android automatically shows notifications when app is in background/terminated
+  // The system notification will appear in the notification tray
+  debugPrint('🔔 Background notification will be shown by system');
+  
+  // You can update local storage, sync data, etc.
   // But avoid heavy operations here
 }

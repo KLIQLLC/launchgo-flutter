@@ -103,19 +103,8 @@ class AuthService extends ChangeNotifier {
         debugPrint('🔐 Loading user data during initialization...');
         await loadUserInfo();
         
-        // Register device for push notifications for existing authenticated users
-        try {
-          debugPrint('🔔 [FCM DEBUG] Registering device for existing authenticated user...');
-          if (_apiService != null) {
-            await PushNotificationService.instance.registerDevice(_apiService!);
-            debugPrint('✅ [FCM DEBUG] Device registered for existing user');
-          } else {
-            debugPrint('⚠️ [FCM DEBUG] No API service available for device registration');
-          }
-        } catch (e) {
-          debugPrint('❌ [FCM DEBUG] Failed to register device for existing user: $e');
-          // Don't fail the initialization if device registration fails
-        }
+        // Set up device registration callback for push notifications
+        _setupFCMTokenCallback();
       } else if (_accessToken != null && JwtDecoder.isExpired(_accessToken!)) {
         // Clear expired tokens
         await SecureStorageService.clearAllAuthData();
@@ -330,19 +319,8 @@ class AuthService extends ChangeNotifier {
         debugPrint('🔐 Loading user info...');
         await loadUserInfo();
         
-        // Register device for push notifications after successful login
-        try {
-          debugPrint('🔔 [FCM DEBUG] Registering device after successful login...');
-          if (_apiService != null) {
-            await PushNotificationService.instance.registerDevice(_apiService!);
-            debugPrint('✅ [FCM DEBUG] Device registered after login');
-          } else {
-            debugPrint('⚠️ [FCM DEBUG] No API service available for device registration');
-          }
-        } catch (e) {
-          debugPrint('❌ [FCM DEBUG] Failed to register device after login: $e');
-          // Don't fail the login process if device registration fails
-        }
+        // Set up device registration callback for push notifications
+        _setupFCMTokenCallback();
         
         // Set user online after successful authentication
         if (_streamChatService != null && _streamChatService!.isUserConnected) {
@@ -692,6 +670,25 @@ class AuthService extends ChangeNotifier {
       debugPrint('🔍 getSelectedSemester: semester not found in list');
       return null;
     }
+  }
+  
+  /// Setup FCM token callback for device registration
+  void _setupFCMTokenCallback() {
+    if (_apiService == null) {
+      debugPrint('⚠️ [FCM DEBUG] No API service available for device registration');
+      return;
+    }
+    
+    debugPrint('🔔 [FCM DEBUG] Setting up FCM token callback...');
+    PushNotificationService.instance.setTokenAvailableCallback(() async {
+      try {
+        debugPrint('🔔 [FCM DEBUG] FCM token available, registering device...');
+        await PushNotificationService.instance.registerDevice(_apiService!);
+        debugPrint('✅ [FCM DEBUG] Device registered successfully with backend');
+      } catch (e) {
+        debugPrint('❌ [FCM DEBUG] Failed to register device with backend: $e');
+      }
+    });
   }
   
 }

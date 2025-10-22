@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:stream_chat_flutter/stream_chat_flutter.dart';
-import 'package:flutter_app_badger/flutter_app_badger.dart';
+import 'package:app_badge_plus/app_badge_plus.dart';
 import '../push_notification_service.dart';
 
 class StreamChatService extends ChangeNotifier {
@@ -80,7 +80,6 @@ class StreamChatService extends ChangeNotifier {
       );
       
       debugPrint('🟢 Stream Chat: User connected successfully - $userId (automatically online)');
-      debugPrint('🔍 [DEBUG] connectUser called for user: $userId');
       
       // Register FCM token for push notifications
       await _registerPushToken();
@@ -124,10 +123,8 @@ class StreamChatService extends ChangeNotifier {
         debugPrint('⚠️ NotificationService initialized: ${pushNotificationService.isInitialized}');
         
         // Retry after a short delay
-        debugPrint('🔄 Stream Chat: Retrying FCM token registration in 2 seconds...');
         Future.delayed(const Duration(seconds: 2), () async {
           if (pushNotificationService.fcmToken != null) {
-            debugPrint('🔔 Stream Chat: Retry - Registering FCM token: ${pushNotificationService.fcmToken!.substring(0, 20)}...');
             await _client.addDevice(pushNotificationService.fcmToken!, PushProvider.firebase, 
           pushProviderName: 'stage');
             debugPrint('✅ Stream Chat: FCM token registered successfully on retry');
@@ -138,7 +135,6 @@ class StreamChatService extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('❌ Stream Chat: Error registering FCM token - $e');
-      debugPrint('❌ Error details: ${e.toString()}');
     }
   }
 
@@ -275,7 +271,6 @@ class StreamChatService extends ChangeNotifier {
       void emitUnreadCount() {
         if (currentChannel != null && !controller.isClosed) {
           final unreadCount = currentChannel!.state?.unreadCount ?? 0;
-          debugPrint('📊 Badge: Emitting unread count: $unreadCount for channel ${currentChannel!.id}');
           controller.add(unreadCount);
         }
       }
@@ -453,14 +448,16 @@ class StreamChatService extends ChangeNotifier {
   /// Update app icon badge with unread count
   void _updateAppBadge(int count) async {
     try {
-      if (await FlutterAppBadger.isAppBadgeSupported()) {
+      if (await AppBadgePlus.isSupported()) {
         if (count > 0) {
-          await FlutterAppBadger.updateBadgeCount(count);
+          await AppBadgePlus.updateBadge(count);
           debugPrint('🔢 App badge updated: $count');
         } else {
-          await FlutterAppBadger.removeBadge();
+          await AppBadgePlus.updateBadge(0);
           debugPrint('🔢 App badge removed');
         }
+      } else {
+        debugPrint('🔢 App badge not supported on this platform');
       }
     } catch (e) {
       debugPrint('❌ Error updating app badge: $e');
