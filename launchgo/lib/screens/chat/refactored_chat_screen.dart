@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:stream_chat_flutter/stream_chat_flutter.dart';
+import 'package:go_router/go_router.dart';
 import '../../services/chat/stream_chat_service.dart';
 import '../../services/chat/chat_channel_manager.dart';
 import '../../services/auth_service.dart';
@@ -131,7 +132,13 @@ class _RefactoredChatScreenState extends State<RefactoredChatScreen>
           future: _initializeChannel(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return _buildLoadingScreen();
+              // Show minimal loading to avoid AppBar flickering
+              return const Scaffold(
+                backgroundColor: Color(0xFF020817),
+                body: Center(
+                  child: CircularProgressIndicator(color: Colors.white),
+                ),
+              );
             }
 
             if (snapshot.hasError) {
@@ -162,12 +169,18 @@ class _RefactoredChatScreenState extends State<RefactoredChatScreen>
       appBar: AppBar(
         backgroundColor: const Color(0xFF0F1828),
         title: const Text('Chat', style: TextStyle(color: Colors.white)),
-        leading: Navigator.of(context).canPop()
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => Navigator.of(context).pop(),
-              )
-            : null,
+        leading: IconButton(
+          icon: const Icon(Icons.close, color: Colors.white),
+          onPressed: () {
+            // Try to pop first, if not possible, navigate to schedule
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            } else {
+              // If no navigation stack (opened via push notification), go to schedule
+              context.go('/schedule');
+            }
+          },
+        ),
       ),
       body: const Center(
         child: CircularProgressIndicator(color: Colors.white),
@@ -181,12 +194,18 @@ class _RefactoredChatScreenState extends State<RefactoredChatScreen>
       appBar: AppBar(
         backgroundColor: const Color(0xFF0F1828),
         title: Text(title, style: const TextStyle(color: Colors.white)),
-        leading: Navigator.of(context).canPop()
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => Navigator.of(context).pop(),
-              )
-            : null,
+        leading: IconButton(
+          icon: const Icon(Icons.close, color: Colors.white),
+          onPressed: () {
+            // Try to pop first, if not possible, navigate to schedule
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            } else {
+              // If no navigation stack (opened via push notification), go to schedule
+              context.go('/schedule');
+            }
+          },
+        ),
       ),
       body: Center(
         child: Padding(

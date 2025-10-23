@@ -33,6 +33,9 @@ class AppRouter {
   final GlobalKey<NavigatorState> _shellNavigatorKey = GlobalKey<NavigatorState>();
   late final GoRouter router;
   
+  // Expose navigator key for push navigation
+  GlobalKey<NavigatorState> get navigatorKey => _rootNavigatorKey;
+  
   AppRouter(AuthService authService) {
     router = GoRouter(
       navigatorKey: _rootNavigatorKey,

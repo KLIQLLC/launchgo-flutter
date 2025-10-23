@@ -1,9 +1,12 @@
-import 'package:flutter/foundation.dart';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:path_provider/path_provider.dart';
 import 'api_service_retrofit.dart';
 import 'notifications_api_service.dart';
+import 'pending_navigation_service.dart';
+import 'package:go_router/go_router.dart';
 
 /// Service for handling FCM token lifecycle and device registration
 class PushNotificationService extends ChangeNotifier {
@@ -16,10 +19,25 @@ class PushNotificationService extends ChangeNotifier {
   String? _fcmToken;
   bool _isInitialized = false;
   NotificationsApiService? _notificationsService;
+  GoRouter? _router;
   static const MethodChannel _channel = MethodChannel('push_notification_channel');
   
   // Callback for when FCM token becomes available
   VoidCallback? _onTokenAvailableCallback;
+  
+  /// Log to file for debugging
+  Future<void> _logToFile(String message) async {
+    try {
+      // Get the app's documents directory
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File('${directory.path}/debug_logs.txt');
+      final timestamp = DateTime.now().toIso8601String();
+      await file.writeAsString('[$timestamp] $message\n', mode: FileMode.append);
+      debugPrint('✅ Logged to file: ${file.path}');
+    } catch (e) {
+      debugPrint('Failed to write to log file: $e');
+    }
+  }
   
   String? get fcmToken => _fcmToken;
   bool get isInitialized => _isInitialized;
@@ -27,6 +45,12 @@ class PushNotificationService extends ChangeNotifier {
   /// Set notifications service for updating badge count
   void setNotificationsService(NotificationsApiService notificationsService) {
     _notificationsService = notificationsService;
+  }
+  
+  /// Set router for direct navigation
+  void setRouter(GoRouter router) {
+    _router = router;
+    debugPrint('🔔 PushNotificationService: Router set for direct navigation');
   }
   
   /// Set callback to be called when FCM token becomes available
@@ -96,22 +120,33 @@ class PushNotificationService extends ChangeNotifier {
         // Handle foreground messages
         FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
         
-        // Set up method channel to receive notifications from native iOS
-        _channel.setMethodCallHandler((MethodCall call) async {
-          if (call.method == 'onForegroundMessage') {
-            if (_notificationsService != null) {
-              Future.microtask(() => _notificationsService!.fetchNotifications());
-            }
-          }
+        // Add global message listener for debugging
+        FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+          debugPrint('🔔 [GLOBAL] Foreground message: ${message.notification?.title}');
+          debugPrint('🔔 [GLOBAL] Message data: ${message.data}');
         });
         
+        // Method channel is no longer needed - Firebase handles everything
+        debugPrint('🔔 Using Firebase-only notification handling');
+        
         // Handle message when app is opened from notification tap
-        FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpenedApp);
+        debugPrint('🔔 Setting up onMessageOpenedApp listener...');
+        FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+          debugPrint('🔔 [LISTENER] onMessageOpenedApp triggered!');
+          _handleMessageOpenedApp(message);
+        });
         
         // Handle initial message if app was opened from notification
+        debugPrint('🔔 Checking for initial message...');
         RemoteMessage? initialMessage = await _messaging.getInitialMessage();
         if (initialMessage != null) {
-          _handleMessageOpenedApp(initialMessage);
+          debugPrint('🔔 [INITIAL] App opened from notification (terminated state)');
+          debugPrint('🔔 [INITIAL] Message data: ${initialMessage.data}');
+          debugPrint('🔔 [INITIAL] Screen value: ${initialMessage.data['screen']}');
+          // Store navigation - will be processed when router is ready
+          _storeNavigationFromMessage(initialMessage);
+        } else {
+          debugPrint('🔔 No initial message found');
         }
         
         _isInitialized = true;
@@ -119,6 +154,8 @@ class PushNotificationService extends ChangeNotifier {
         
         debugPrint('✅ PushNotificationService initialized successfully');
         debugPrint('🔔 FCM Token: $_fcmToken');
+        debugPrint('🔔 Method channel handler ready: ${_channel.name}');
+        _logToFile('PUSH_SERVICE_INITIALIZED: FCM Token received, method channel ready');
       } else {
         debugPrint('❌ Notification permission denied: ${settings.authorizationStatus}');
       }
@@ -206,61 +243,112 @@ class PushNotificationService extends ChangeNotifier {
   
   /// Handle message when app is opened from notification
   void _handleMessageOpenedApp(RemoteMessage message) {
-    debugPrint('🔔 Message opened app: ${message.notification?.title}');
+    final logMessage = '''
+============================================
+Message opened app: ${message.notification?.title}
+Message data: ${message.data}
+Data keys: ${message.data.keys.toList()}
+Screen value: ${message.data['screen']}
+============================================''';
     
-    // Navigate to specific screen based on message data
-    _handleNotificationTap(message);
+    debugPrint('🔔 $logMessage');
+    _logToFile('NOTIFICATION_OPENED: $logMessage');
+    
+    // Parse and store navigation
+    _storeNavigationFromMessage(message);
   }
   
-  
-  /// Handle notification tap navigation
-  void _handleNotificationTap(RemoteMessage message) {
+  /// Parse message and execute direct navigation
+  void _storeNavigationFromMessage(RemoteMessage message) {
     final data = message.data;
     
-    debugPrint('🔔 Notification data: $data');
+    // Determine target route
+    String? targetRoute;
+    Map<String, dynamic>? extra;
     
-    // Handle Stream Chat notifications
-    if (data.containsKey('channel_id') || data.containsKey('channel_type')) {
-      debugPrint('🔔 Navigate to chat channel: ${data['channel_id']}');
-      // Navigate to chat screen - this will be handled by the router
-      _navigateToChat(data);
-      return;
-    }
-    
-    // Navigate based on notification data
     if (data.containsKey('screen')) {
-      final screen = data['screen'];
-      debugPrint('🔔 Navigate to screen: $screen');
+      final screen = data['screen'] as String;
+      targetRoute = _getRouteFromScreen(screen);
       
-      switch (screen) {
-        case 'chat':
-          _navigateToChat(data);
-          break;
-        case 'schedule':
-          _navigateToSchedule();
-          break;
-        case 'assignments':
-          _navigateToSchedule(); // Assignments are on schedule screen
-          break;
-        default:
-          debugPrint('🔔 Unknown screen: $screen');
+      // Special handling for assignments with course_id
+      if (screen.toLowerCase() == 'assignments' && data.containsKey('course_id')) {
+        targetRoute = '/course/${data['course_id']}/assignments';
+      }
+    } else if (data.containsKey('route')) {
+      targetRoute = data['route'] as String;
+      if (data.containsKey('extra')) {
+        extra = data['extra'] as Map<String, dynamic>;
+      }
+    } else if (_isStreamChatNotification(data)) {
+      targetRoute = '/chat';
+      final channelId = data['channel_id'] ?? data['channel_cid'];
+      if (channelId != null) {
+        extra = {
+          'channelId': channelId,
+          'channelType': data['channel_type'] ?? 'messaging',
+        };
       }
     }
+    
+    if (targetRoute != null) {
+      if (_router != null) {
+        debugPrint('🔔 Executing direct navigation to: $targetRoute');
+        try {
+          if (extra != null && extra.isNotEmpty) {
+            _router!.go(targetRoute, extra: extra);
+          } else {
+            _router!.go(targetRoute);
+          }
+          debugPrint('🔔 Direct navigation executed successfully');
+        } catch (e) {
+          debugPrint('❌ Direct navigation failed: $e');
+          // Fallback to pending service
+          debugPrint('🔔 Falling back to pending navigation service');
+          PendingNavigationService.instance.setPendingNavigation(targetRoute, extra: extra);
+        }
+      } else {
+        debugPrint('🔔 Router not available, using pending navigation service');
+        PendingNavigationService.instance.setPendingNavigation(targetRoute, extra: extra);
+      }
+    } else {
+      debugPrint('🔔 No navigation target found in notification data');
+    }
   }
   
-  /// Navigate to chat screen
-  void _navigateToChat(Map<String, dynamic> data) {
-    debugPrint('🔔 Navigating to chat with data: $data');
-    // This would be implemented with your router
-    // Example: GoRouter.of(context).go('/chat', extra: data);
+  /// Get route from screen name
+  String _getRouteFromScreen(String screen) {
+    switch (screen.toLowerCase()) {
+      case 'chat':
+        return '/chat';
+      case 'schedule':
+        return '/schedule';
+      case 'courses':
+        return '/courses';
+      case 'documents':
+        return '/documents';
+      case 'recaps':
+        return '/recaps';
+      case 'notifications':
+        return '/notifications';
+      case 'settings':
+        return '/settings';
+      case 'assignments':
+        return '/courses'; // Default to courses, will be overridden if course_id is present
+      default:
+        debugPrint('🔔 Unknown screen: $screen, defaulting to /schedule');
+        return '/schedule';
+    }
   }
   
-  /// Navigate to schedule screen
-  void _navigateToSchedule() {
-    debugPrint('🔔 Navigating to schedule');
-    // This would be implemented with your router
-    // Example: GoRouter.of(context).go('/schedule');
+  /// Check if this is a Stream Chat notification
+  bool _isStreamChatNotification(Map<String, dynamic> data) {
+    return data.containsKey('channel_id') || 
+           data.containsKey('channel_type') ||
+           data.containsKey('channel_cid');
   }
+  
+  // iOS notification handler removed - Firebase handles everything now
+  
 }
 
 /// Background message handler (must be top-level function)

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'package:stream_chat_flutter/stream_chat_flutter.dart';
+import 'package:go_router/go_router.dart';
 import '../services/auth_service.dart';
 import 'chat/custom_attachment_handler.dart';
 import 'dart:async';
@@ -317,11 +318,18 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
               ],
             ),
             const Spacer(),
-            if (Navigator.of(context).canPop())
-              IconButton(
-                icon: const Icon(Icons.close, color: Colors.white),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.white),
+              onPressed: () {
+                // Try to pop first, if not possible, navigate to schedule
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                } else {
+                  // If no navigation stack (opened via push notification), go to schedule
+                  context.go('/schedule');
+                }
+              },
+            ),
           ],
         ),
       ),

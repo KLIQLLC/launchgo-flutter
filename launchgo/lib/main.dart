@@ -12,6 +12,7 @@ import 'package:launchgo/services/api_service.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/services/chat/stream_chat_service.dart';
 import 'package:launchgo/services/push_notification_service.dart';
+import 'package:launchgo/services/pending_navigation_service.dart';
 import 'package:launchgo/services/notifications_api_service.dart';
 import 'package:launchgo/widgets/splash_screen.dart';
 import 'package:launchgo/features/recaps/presentation/bloc/recap_bloc.dart';
@@ -28,10 +29,7 @@ void main() async {
   // Initialize Firebase
   await Firebase.initializeApp();
   
-  // Initialize push notifications lazily (won't block app startup)
-  PushNotificationService.instance.initialize().catchError((e) {
-    debugPrint('❌ Push notification service initialization failed: $e');
-  });
+  // Don't initialize push notifications here - will be done after router is ready
   
   // Set up Crashlytics
   FlutterError.onError = (errorDetails) {
@@ -63,6 +61,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => ThemeService()),
         ChangeNotifierProvider(create: (_) => StreamChatService()),
         ChangeNotifierProvider.value(value: PushNotificationService.instance),
+        ChangeNotifierProvider.value(value: PendingNavigationService.instance),
         Provider(
           create: (context) => ApiServiceRetrofit(
             authService: context.read<AuthService>(),
@@ -125,6 +124,18 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     _notificationsService = context.read<NotificationsApiService>();
     _appRouter = AppRouter(_authService);
     
+    // Reset navigation service for hot reload support, then set router
+    PendingNavigationService.resetInstance();
+    PendingNavigationService.instance.setRouter(_appRouter.router);
+    
+    // Set router in push notification service for direct navigation
+    PushNotificationService.instance.setRouter(_appRouter.router);
+    
+    // Now that router is ready, initialize push notifications
+    PushNotificationService.instance.initialize().catchError((e) {
+      debugPrint('❌ Push notification service initialization failed: $e');
+    });
+    
     // Set StreamChatService reference in AuthService for presence management
     _authService.setStreamChatService(_streamChatService);
     
@@ -146,6 +157,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             userName: _authService.userInfo!.name,
             userImage: _authService.userInfo!.avatarUrl,
           );
+        }
+        
+        // Process any pending navigation after auth is ready
+        if (PendingNavigationService.instance.hasPendingNavigation) {
+          debugPrint('🔄 Auth ready, processing pending navigation');
+          Future.delayed(const Duration(milliseconds: 500), () {
+            PendingNavigationService.instance.processPendingNavigation();
+          });
         }
         
         // Load notifications when user is authenticated (async to avoid framework lock)
@@ -205,6 +224,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       }
       
       Future.microtask(() => _notificationsService.fetchNotifications());
+      
+      // Check for pending navigation when app resumes
+      if (PendingNavigationService.instance.hasPendingNavigation) {
+        debugPrint('🔄 App resumed with pending navigation');
+        Future.delayed(const Duration(milliseconds: 800), () {
+          PendingNavigationService.instance.processPendingNavigation();
+        });
+      }
     }
     // Note: Stream Chat automatically sets users offline when WebSocket disconnects
     // No manual offline handling needed

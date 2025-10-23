@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import 'package:launchgo/models/notification_model.dart';
 import 'package:launchgo/services/notifications_api_service.dart';
 import 'package:launchgo/services/theme_service.dart';
@@ -14,27 +15,33 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  late NotificationsApiService _notificationsService;
+  NotificationsApiService? _notificationsService;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _notificationsService.fetchNotifications();
+      if (mounted && _notificationsService != null) {
+        _notificationsService!.fetchNotifications();
+      }
     });
   }
 
   @override
   void dispose() {
     // Refresh notifications when leaving the screen to update badge (async to avoid framework lock)
-    Future.microtask(() => _notificationsService.fetchNotifications());
+    if (_notificationsService != null) {
+      Future.microtask(() => _notificationsService!.fetchNotifications());
+    }
     super.dispose();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _notificationsService = context.read<NotificationsApiService>();
+    if (mounted) {
+      _notificationsService = context.read<NotificationsApiService>();
+    }
   }
 
   @override
@@ -48,10 +55,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         elevation: 0,
         leading: IconButton(
           icon: Icon(
-            Icons.arrow_back,
+            Icons.close,
             color: themeService.textColor,
           ),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            // Try to pop first, if not possible, navigate to schedule
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            } else {
+              // If no navigation stack (opened via push notification), go to schedule
+              context.go('/schedule');
+            }
+          },
         ),
         title: Text(
           'Notifications',
@@ -81,27 +96,25 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             return _buildEmptyState(themeService);
           }
 
-          return Scaffold(
-            body: Column(
-              children: [
-                _buildHeader(notifications.length, themeService),
-                Expanded(
-                  child: RefreshIndicator(
-                    onRefresh: () => notificationsService.refresh(),
-                    child: ListView.builder(
-                      itemCount: notifications.length,
-                      itemBuilder: (context, index) {
-                        final notification = notifications[index];
-                        return _buildNotificationTile(notification, themeService);
-                      },
-                    ),
+          return Column(
+            children: [
+              _buildHeader(notifications.length, themeService),
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: () => notificationsService.refresh(),
+                  child: ListView.builder(
+                    itemCount: notifications.length,
+                    itemBuilder: (context, index) {
+                      final notification = notifications[index];
+                      return _buildNotificationTile(notification, themeService);
+                    },
                   ),
                 ),
-              ],
-            ),
-            bottomNavigationBar: notifications.where((n) => !n.isRead).isNotEmpty
-                ? _buildMarkAllReadButton(themeService)
-                : null,
+              ),
+              // Mark all as read button - positioned like Add Course button
+              if (notifications.where((n) => !n.isRead).isNotEmpty)
+                _buildMarkAllReadButton(themeService),
+            ],
           );
         },
       ),
@@ -109,7 +122,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Widget _buildHeader(int notificationCount, ThemeService themeService) {
-    final unreadCount = _notificationsService.unreadCount;
+    final unreadCount = _notificationsService?.unreadCount ?? 0;
     
     return Container(
       padding: const EdgeInsets.all(16),
@@ -225,44 +238,56 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Widget _buildMarkAllReadButton(ThemeService themeService) {
     return Container(
       padding: const EdgeInsets.all(16),
-      child: SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-          onPressed: () async {
-            try {
-              await _notificationsService.markAllAsRead();
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('All notifications marked as read'),
-                    backgroundColor: AppColors.success,
-                  ),
-                );
-              }
-            } catch (e) {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error: ${e.toString()}'),
-                    backgroundColor: AppColors.error,
-                  ),
-                );
-              }
-            }
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF101929),
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
+      decoration: BoxDecoration(
+        color: themeService.backgroundColor,
+        border: Border(
+          top: BorderSide(
+            color: themeService.borderColor.withValues(alpha: 0.2),
+            width: 1,
           ),
-          child: const Text(
-            'Mark all as read',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: () async {
+              try {
+                await _notificationsService?.markAllAsRead();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('All notifications marked as read'),
+                      backgroundColor: AppColors.success,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: ${e.toString()}'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF101929),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Mark all as read',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ),
@@ -336,7 +361,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           ),
           const SizedBox(height: 16),
           ElevatedButton(
-            onPressed: () => _notificationsService.fetchNotifications(),
+            onPressed: () => _notificationsService?.fetchNotifications(),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.accent,
               foregroundColor: Colors.white,
@@ -352,7 +377,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     // Mark notification as read if it's unread
     if (!notification.isRead) {
       try {
-        await _notificationsService.markAsRead(notification.id);
+        await _notificationsService?.markAsRead(notification.id);
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
