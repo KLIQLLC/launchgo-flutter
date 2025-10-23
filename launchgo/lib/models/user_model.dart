@@ -84,6 +84,8 @@ class UserModel extends Equatable {
   final String? mentorEmail;
   final String? selectedStudentId; // Currently selected student for mentor
   final String? selectedSemesterId; // Currently selected semester
+  final double? gpa; // Student's GPA (for student users)
+  final String? academicYear; // Student's academic year (for student users)
 
   const UserModel({
     required this.id,
@@ -102,6 +104,8 @@ class UserModel extends Equatable {
     this.mentorEmail,
     this.selectedStudentId,
     this.selectedSemesterId,
+    this.gpa,
+    this.academicYear,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -173,6 +177,8 @@ class UserModel extends Equatable {
       mentorAvatar: userData['mentorAvatar'],
       mentorEmail: userData['mentorEmail'],
       selectedSemesterId: null, // Will be set when semesters are loaded
+      gpa: userData['gpa'] != null ? double.tryParse(userData['gpa'].toString()) : null,
+      academicYear: userData['academicYear'],
     );
   }
 
@@ -192,6 +198,8 @@ class UserModel extends Equatable {
     String? mentorEmail,
     String? selectedStudentId,
     String? selectedSemesterId,
+    double? gpa,
+    String? academicYear,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -209,6 +217,8 @@ class UserModel extends Equatable {
       mentorEmail: mentorEmail ?? this.mentorEmail,
       selectedStudentId: selectedStudentId ?? this.selectedStudentId,
       selectedSemesterId: selectedSemesterId ?? this.selectedSemesterId,
+      gpa: gpa ?? this.gpa,
+      academicYear: academicYear ?? this.academicYear,
     );
   }
 
@@ -217,5 +227,5 @@ class UserModel extends Equatable {
   bool get isCaseManager => role == UserRole.caseManager;
 
   @override
-  List<Object?> get props => [id, name, email, role, students, avatarUrl, getStreamToken, mentorId, mentorName, mentorAvatar, mentorEmail, selectedStudentId];
+  List<Object?> get props => [id, name, email, role, students, avatarUrl, getStreamToken, mentorId, mentorName, mentorAvatar, mentorEmail, selectedStudentId, gpa, academicYear];
 }

@@ -742,8 +742,14 @@ class _StudentInfo extends StatelessWidget {
     String? year;
     if (student is Student) {
       year = student.academicYear;
-    } else if (student is UserModel && student.students.isNotEmpty) {
-      year = student.students.first.academicYear;
+    } else if (student is UserModel) {
+      if (student.students.isNotEmpty) {
+        // For mentors viewing students
+        year = student.students.first.academicYear;
+      } else {
+        // For students viewing their own academic year
+        year = student.academicYear;
+      }
     }
     
     // Normalize the academic year (capitalize first letter)
@@ -758,14 +764,74 @@ class _StudentInfo extends StatelessWidget {
     double? gpaValue;
     if (student is Student) {
       gpaValue = student.gpa;
-    } else if (student is UserModel && student.students.isNotEmpty) {
-      gpaValue = student.students.first.gpa;
+    } else if (student is UserModel) {
+      if (student.students.isNotEmpty) {
+        // For mentors viewing students
+        gpaValue = student.students.first.gpa;
+      } else {
+        // For students viewing their own GPA
+        gpaValue = student.gpa;
+      }
     }
     return gpaValue != null ? gpaValue.toStringAsFixed(1) : 'N/A';
   }
 
   @override
   Widget build(BuildContext context) {
+    final authService = context.watch<AuthService>();
+    final permissions = PermissionsService(authService.userInfo);
+    
+    final infoRow = Row(
+      children: [
+        Text(
+          'Year: $academicYear',
+          style: TextStyle(
+            color: Colors.grey[400],
+            fontSize: 16,
+          ),
+        ),
+        const SizedBox(width: 16),
+        Text(
+          '•',
+          style: TextStyle(
+            color: Colors.grey[400],
+            fontSize: 16,
+          ),
+        ),
+        const SizedBox(width: 16),
+        Text(
+          'GPA: $gpa',
+          style: TextStyle(
+            color: Colors.grey[400],
+            fontSize: 16,
+          ),
+        ),
+        if (!permissions.isStudent) ...[
+          const SizedBox(width: 8),
+          Icon(
+            Icons.edit,
+            size: 16,
+            color: Colors.grey[600],
+          ),
+        ],
+      ],
+    );
+    
+    // Only allow editing for non-students
+    if (permissions.isStudent) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Expanded(child: infoRow),
+          ],
+        ),
+      );
+    }
+    
     return InkWell(
       onTap: () async {
         final result = await EditStudentInfoModal.show(context);
@@ -783,41 +849,7 @@ class _StudentInfo extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Expanded(
-              child: Row(
-                children: [
-                  Text(
-                    'Year: $academicYear',
-                    style: TextStyle(
-                      color: Colors.grey[400],
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Text(
-                    '•',
-                    style: TextStyle(
-                      color: Colors.grey[400],
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Text(
-                    'GPA: $gpa',
-                    style: TextStyle(
-                      color: Colors.grey[400],
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(
-                    Icons.edit,
-                    size: 16,
-                    color: Colors.grey[600],
-                  ),
-                ],
-              ),
-            ),
+            Expanded(child: infoRow),
           ],
         ),
       ),
