@@ -246,6 +246,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
                 themeService: themeService,
                 onTap: null, // Handled by SwipeableCard
                 onAssignmentsTap: () => _navigateToAssignments(course),
+                cardIndex: index,
               ),
             ),
           );

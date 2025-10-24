@@ -10,6 +10,7 @@ class CourseCard extends StatelessWidget {
   final ThemeService themeService;
   final VoidCallback? onTap;
   final VoidCallback? onAssignmentsTap;
+  final int cardIndex;
 
   const CourseCard({
     super.key,
@@ -17,7 +18,32 @@ class CourseCard extends StatelessWidget {
     required this.themeService,
     this.onTap,
     this.onAssignmentsTap,
+    required this.cardIndex,
   });
+
+  LinearGradient _getAssignmentButtonGradient() {
+    final gradients = [
+      // First card: Blue gradient (top to bottom)
+      const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFF4A8EF2), Color(0xFF0E4FD3)],
+      ),
+      // Second card: Purple gradient (top to bottom)  
+      const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFFB862E8), Color(0xFF9433C5)],
+      ),
+      // Third card: Green gradient (top to bottom)
+      const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFF5FD585), Color(0xFF27A353)],
+      ),
+    ];
+    return gradients[cardIndex % gradients.length];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,12 +60,18 @@ class CourseCard extends StatelessWidget {
           border: Border.all(color: themeService.borderColor),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.only(top: 16),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Course header
-              Row(
+              // Content with padding (all except assignments button)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Course header
+                    Row(
                 children: [
                   Expanded(
                     child: Column(
@@ -182,33 +214,38 @@ class CourseCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
+                  ],
+                ),
+              ),
               
               // Assignments section
               const SizedBox(height: 16),
               GestureDetector(
                 onTap: onAssignmentsTap,
                 child: Container(
-                  padding: const EdgeInsets.all(12),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: themeService.backgroundColor,
-                    borderRadius: BorderRadius.circular(8),
+                    gradient: _getAssignmentButtonGradient(),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Row(
-                    children: [
+                    child: Row(
+                      children: [
+                      const SizedBox(width: 10),
                       SvgPicture.asset(
                         'assets/icons/ic_course.svg',
                         width: 20,
                         height: 20,
-                        colorFilter: ColorFilter.mode(
-                           themeService.textColor,
+                        colorFilter: const ColorFilter.mode(
+                           Colors.white,
                           BlendMode.srcIn,
                         ),
                       ),
                       const SizedBox(width: 8),
                       Text(
                         'Assignments (${assignments.length})',
-                        style: TextStyle(
-                          color: themeService.textColor,
+                        style: const TextStyle(
+                          color: Colors.white,
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
                         ),
@@ -218,8 +255,8 @@ class CourseCard extends StatelessWidget {
                         'assets/icons/ic_arrow.svg',
                         width: 16,
                         height: 16,
-                        colorFilter: ColorFilter.mode(
-                          themeService.textSecondaryColor,
+                        colorFilter: const ColorFilter.mode(
+                          Colors.white,
                           BlendMode.srcIn,
                         ),
                       ),
