@@ -169,9 +169,9 @@ class _RecapFormScreenState extends State<RecapFormScreen> {
         }
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFF0F1419),
+        backgroundColor: themeService.backgroundColor,
         appBar: AppBar(
-          backgroundColor: const Color(0xFF0F1419),
+          backgroundColor: themeService.backgroundColor,
           elevation: 0,
           title: Text(
             isEditMode ? 'Edit Recap' : 'Create New Session Recap',
@@ -227,7 +227,7 @@ class _RecapFormScreenState extends State<RecapFormScreen> {
                 return Container(
                   padding: const EdgeInsets.all(16.0),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0F1419),
+                    color: themeService.backgroundColor,
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.1),
@@ -304,7 +304,7 @@ class _RecapFormScreenState extends State<RecapFormScreen> {
             hintText: hint,
             hintStyle: TextStyle(color: themeService.inputPlaceholderColor),
             filled: true,
-            fillColor: const Color(0xFF1A2332),
+            fillColor: themeService.cardColor,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey[600]!),

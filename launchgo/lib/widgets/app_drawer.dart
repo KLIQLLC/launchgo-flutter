@@ -37,7 +37,7 @@ class _AppDrawerState extends State<AppDrawer> {
     final currentRoute = GoRouterState.of(context).matchedLocation;
 
     return Drawer(
-      backgroundColor: AppColors.splashBackground,
+      backgroundColor: AppColors.darkCard,
       child: Column(
         children: [
           // Drawer Header with solid color
@@ -45,7 +45,7 @@ class _AppDrawerState extends State<AppDrawer> {
             height: _drawerHeaderHeight,
             width: double.infinity,
             decoration: const BoxDecoration(
-              color: AppColors.splashBackground,
+              color: AppColors.darkCard,
             ),
             child: SafeArea(
               child: Padding(

@@ -190,7 +190,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           _StudentHeader(authService: authService, themeService: themeService),
           Expanded(
             child: Container(
-              color: const Color(0xFF0F1419),
+              color: themeService.backgroundColor,
               child: Column(
                 children: [
                   _WeekNavigator(
@@ -670,6 +670,7 @@ class _UpcomingDeadlinesView extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 12),
                   child: DeadlineCard(
                     assignment: assignment,
+                    themeService: themeService,
                   ),
                 ),
               ],

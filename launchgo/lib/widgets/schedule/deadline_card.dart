@@ -7,16 +7,19 @@ import 'dart:io';
 
 import '../../models/deadline_model.dart';
 import '../../services/api_service_retrofit.dart';
+import '../../services/theme_service.dart';
 import '../../theme/app_colors.dart';
 import '../status_badge.dart';
 import '../documents/document_upload_widget.dart';
 
 class DeadlineCard extends StatefulWidget {
   final DeadlineAssignment assignment;
+  final ThemeService themeService;
 
   const DeadlineCard({
     super.key,
     required this.assignment,
+    required this.themeService,
   });
 
   @override
@@ -534,7 +537,7 @@ class _DeadlineCardState extends State<DeadlineCard> {
         borderRadius: BorderRadius.circular(12),
         child: Container(
           decoration: BoxDecoration(
-            color: const Color(0xFF1A2332), // Dark background for cards
+            color: widget.themeService.cardColor,
             border: Border(
               left: BorderSide(
                 color: _borderColor,

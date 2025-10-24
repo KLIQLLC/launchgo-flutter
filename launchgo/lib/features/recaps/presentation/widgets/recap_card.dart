@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../../models/recap_model.dart';
+import '../../../../theme/app_colors.dart';
 
 class RecapCard extends StatelessWidget {
   final Recap recap;
@@ -21,7 +22,7 @@ class RecapCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF1A2332),
+          color: AppColors.darkCard,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: const Color(0xFF2A3441),

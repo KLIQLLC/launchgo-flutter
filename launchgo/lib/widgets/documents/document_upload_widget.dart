@@ -80,7 +80,7 @@ class DocumentUploadWidget extends StatelessWidget {
               decoration: BoxDecoration(
                 color: deletingAttachmentIds.contains(attachment['id'])
                     ? cardColor.withValues(alpha: 0.3)
-                    : cardColor.withValues(alpha: 0.5),
+                    : cardColor,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                   color: deletingAttachmentIds.contains(attachment['id'])

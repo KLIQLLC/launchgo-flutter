@@ -8,8 +8,8 @@ class AppColors {
   AppColors._();
 
   // ===== Core Theme Colors =====
-  static const Color darkBackground = Color(0xFF0F1318);
-  static const Color darkCard = Color(0xFF1A1F2B);
+  static const Color darkBackground = Color(0xFF0B1222);
+  static const Color darkCard = Color(0xFF020817);
   static const Color darkBorder = Color(0xFF2A303E);
   static const Color accent = Color(0xFF7B8CDE);
   static const Color gradient1 = Color(0xFFFE3732);

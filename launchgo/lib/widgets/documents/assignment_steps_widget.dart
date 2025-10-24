@@ -124,8 +124,8 @@ class _AssignmentStepsWidgetState extends State<AssignmentStepsWidget> {
                     : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: widget.enabled && widget.stepControllers.length < AssignmentStepsWidget.maxSteps
-                      ? widget.themeService.backgroundColor
-                      : widget.themeService.backgroundColor.withValues(alpha: 0.5),
+                      ? widget.themeService.cardColor
+                      : widget.themeService.cardColor.withValues(alpha: 0.5),
                   foregroundColor: widget.enabled && widget.stepControllers.length < AssignmentStepsWidget.maxSteps
                       ? widget.themeService.textColor
                       : widget.themeService.textColor.withValues(alpha: 0.5),
