@@ -185,13 +185,13 @@ class CourseCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2), // Increased horizontal padding for better width
                     decoration: BoxDecoration(
-                      color: AppColors.getGradeBackground(course['grade']),
+                      gradient: _getAssignmentButtonGradient(),
                       borderRadius: BorderRadius.circular(12), // Slightly less rounded
                     ),
                     child: Text(
                       course['grade'] ?? 'N/A',
-                      style: TextStyle(
-                        color: AppColors.getGradeTextColor(course['grade']), // Dynamic text color based on background
+                      style: const TextStyle(
+                        color: Colors.white, // White text on gradient background
                         fontSize: 13, // Slightly smaller font
                         fontWeight: FontWeight.w600, // Semibold
                       ),
