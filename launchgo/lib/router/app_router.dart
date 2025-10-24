@@ -239,6 +239,8 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
   });
 
   final Widget child;
+  
+  static const Color _selectedTabColor = Color(0xFFB54209);
 
   @override
   Widget build(BuildContext context) {
@@ -275,7 +277,7 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
           activeIcon: CustomIcon(
             icon: CustomIconPath.schedule,
             size: const Size(24, 24),
-            color: AppColors.accent,
+            color: _selectedTabColor,
           ),
           label: 'Schedule',
         ),
@@ -288,7 +290,7 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
           activeIcon: CustomIcon(
             icon: CustomIconPath.course,
             size: const Size(24, 24),
-            color: AppColors.accent,
+            color: _selectedTabColor,
           ),
           label: 'Courses',
         ),
@@ -301,7 +303,7 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
           activeIcon: CustomIcon(
             icon: CustomIconPath.document,
             size: const Size(24, 24),
-            color: AppColors.accent,
+            color: _selectedTabColor,
           ),
           label: 'Documents',
         ),
@@ -319,7 +321,7 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
             activeIcon: CustomIcon(
               icon: CustomIconPath.recap,
               size: const Size(24, 24),
-              color: AppColors.accent,
+              color: _selectedTabColor,
             ),
             label: 'Recaps',
           ),
@@ -337,7 +339,7 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
           activeIcon: CustomIcon(
             icon: CustomIconPath.goal,
             size: const Size(24, 24),
-            color: AppColors.accent,
+            color: _selectedTabColor,
           ),
           label: 'Goals',
         ),
@@ -391,12 +393,14 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
         currentIndex: _calculateSelectedIndex(context, authService),
         onTap: (index) => _onItemTapped(index, context, authService),
         backgroundColor: AppColors.bottomNavBackground,
-        selectedItemColor: AppColors.bottomNavSelected,
+        selectedItemColor: _selectedTabColor,
         unselectedItemColor: AppColors.bottomNavUnselected,
         showSelectedLabels: true,
         showUnselectedLabels: true,
         selectedFontSize: 12,
         unselectedFontSize: 12,
+        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
+        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
         items: buildNavigationItems(),
       ),
     );

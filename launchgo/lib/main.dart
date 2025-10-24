@@ -124,8 +124,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     _notificationsService = context.read<NotificationsApiService>();
     _appRouter = AppRouter(_authService);
     
-    // Reset navigation service for hot reload support, then set router
-    PendingNavigationService.resetInstance();
+    // Set router in navigation service
     PendingNavigationService.instance.setRouter(_appRouter.router);
     
     // Set router in push notification service for direct navigation

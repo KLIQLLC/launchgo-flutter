@@ -9,11 +9,6 @@ class PendingNavigationService extends ChangeNotifier {
   static PendingNavigationService get instance => 
       _instance ??= PendingNavigationService._();
   
-  /// Reset the singleton instance (for hot reload support)
-  static void resetInstance() {
-    _instance?.dispose();
-    _instance = null;
-  }
   
   PendingNavigationService._();
   

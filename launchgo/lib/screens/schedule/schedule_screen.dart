@@ -702,32 +702,36 @@ class _StudentHeader extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A2332),
-        border: Border(
-          bottom: BorderSide(
-            color: themeService.borderColor.withValues(alpha: 0.1),
-            width: 1,
-          ),
+        gradient: const LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [
+            Color(0xFFB54209), // Left color
+            Color(0xFFDC8629), // Right color
+          ],
         ),
+        borderRadius: BorderRadius.circular(16),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            displayName,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              displayName,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          _StudentInfo(
-            student: displayedStudent ?? userInfo,
-          ),
-        ],
+            _StudentInfo(
+              student: displayedStudent ?? userInfo,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -785,33 +789,33 @@ class _StudentInfo extends StatelessWidget {
       children: [
         Text(
           'Year: $academicYear',
-          style: TextStyle(
-            color: Colors.grey[400],
+          style: const TextStyle(
+            color: Colors.white,
             fontSize: 16,
           ),
         ),
         const SizedBox(width: 16),
         Text(
           '•',
-          style: TextStyle(
-            color: Colors.grey[400],
+          style: const TextStyle(
+            color: Colors.white,
             fontSize: 16,
           ),
         ),
         const SizedBox(width: 16),
         Text(
           'GPA: $gpa',
-          style: TextStyle(
-            color: Colors.grey[400],
+          style: const TextStyle(
+            color: Colors.white,
             fontSize: 16,
           ),
         ),
         if (!permissions.isStudent) ...[
           const SizedBox(width: 8),
-          Icon(
+          const Icon(
             Icons.edit,
             size: 16,
-            color: Colors.grey[600],
+            color: Colors.white,
           ),
         ],
       ],
@@ -820,7 +824,7 @@ class _StudentInfo extends StatelessWidget {
     // Only allow editing for non-students
     if (permissions.isStudent) {
       return Container(
-        padding: const EdgeInsets.symmetric(vertical: 4),
+        padding: EdgeInsets.zero,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8),
         ),
@@ -843,7 +847,7 @@ class _StudentInfo extends StatelessWidget {
         }
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 4),
+        padding: EdgeInsets.zero,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8),
         ),
