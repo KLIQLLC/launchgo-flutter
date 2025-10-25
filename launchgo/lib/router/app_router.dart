@@ -240,7 +240,7 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
 
   final Widget child;
   
-  static const Color _selectedTabColor = Color(0xFFB54209);
+  static const Color _selectedTabColor = Color(0xFFDC8862);
 
   @override
   Widget build(BuildContext context) {

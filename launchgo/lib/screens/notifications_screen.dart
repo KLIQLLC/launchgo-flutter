@@ -144,11 +144,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return GestureDetector(
       onTap: () => _handleNotificationTap(notification),
       child: Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFF101929),
+        decoration: BoxDecoration(
+          color: themeService.cardColor,
           border: Border(
             top: BorderSide(
-              color: Color(0xFF374151),
+              color: themeService.borderColor,
               width: 1.0,
             ),
           ),
@@ -163,7 +163,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             height: 48,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(24),
-              color: const Color(0xFF3E4653),
+              color: const Color(0xFF3F4653),
             ),
             child: Center(
               child: Stack(
@@ -275,8 +275,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF101929),
-              foregroundColor: Colors.white,
+              backgroundColor: themeService.cardColor,
+              foregroundColor: themeService.textColor,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),

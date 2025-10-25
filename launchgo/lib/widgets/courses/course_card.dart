@@ -164,31 +164,40 @@ class CourseCard extends StatelessWidget {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(6),
-                    child: SvgPicture.asset(
-                      'assets/icons/ic_graduation_cap.svg',
-                      width: 18,
-                      height: 18,
-                      colorFilter: ColorFilter.mode(
-                        themeService.textColor,
-                        BlendMode.srcIn,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2), // Increased horizontal padding for better width
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       gradient: _getGradeGradient(),
-                      borderRadius: BorderRadius.circular(12), // Slightly less rounded
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(
-                      course['grade'] ?? 'N/A',
-                      style: const TextStyle(
-                        color: Colors.white, // White text on gradient background
-                        fontSize: 13, // Slightly smaller font
-                        fontWeight: FontWeight.w600, // Semibold
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SvgPicture.asset(
+                          'assets/icons/ic_graduation_cap.svg',
+                          width: 16,
+                          height: 16,
+                          colorFilter: const ColorFilter.mode(
+                            Colors.white,
+                            BlendMode.srcIn,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            course['grade'] ?? 'N/A',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],

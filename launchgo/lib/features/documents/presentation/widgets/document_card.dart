@@ -153,10 +153,10 @@ class DocumentCard extends StatelessWidget {
       child: GestureDetector(
         onTap: () => _openInGoogleDocs(document.link),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             gradient: gradient,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
