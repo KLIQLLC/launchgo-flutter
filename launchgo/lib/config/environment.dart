@@ -12,7 +12,7 @@ class EnvironmentConfig {
     switch (env) {
       case 'prod':
         _environment = Environment.prod;
-        _baseUrl = 'https://prod-api.launchgo.com/api/v1';
+        _baseUrl = 'https://api.launchgo.com/api/v1';
         break;
       case 'stage':
       default:
