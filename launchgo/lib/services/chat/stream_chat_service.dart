@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:stream_chat_flutter/stream_chat_flutter.dart';
 import 'package:app_badge_plus/app_badge_plus.dart';
 import '../push_notification_service.dart';
+import '../../config/environment.dart';
 
 class StreamChatService extends ChangeNotifier {
-  static const String _apiKey = 'b2xg2crxdpft';
+  static String get _apiKey => EnvironmentConfig.streamChatApiKey;
+  
   static StreamChatService? _instance;
   late final StreamChatClient _client;
   bool _isInitialized = false;
@@ -109,7 +111,7 @@ class StreamChatService extends ChangeNotifier {
       if (pushNotificationService.fcmToken != null) {
         debugPrint('🔔 Stream Chat: Registering FCM token: ${pushNotificationService.fcmToken!.substring(0, 20)}...');
         await _client.addDevice(pushNotificationService.fcmToken!, PushProvider.firebase, 
-          pushProviderName: 'stage');
+          pushProviderName: EnvironmentConfig.environmentName.toLowerCase());
         debugPrint('✅ Stream Chat: FCM token registered successfully for push notifications');
         
         // Verify registration by listing devices
@@ -126,7 +128,7 @@ class StreamChatService extends ChangeNotifier {
         Future.delayed(const Duration(seconds: 2), () async {
           if (pushNotificationService.fcmToken != null) {
             await _client.addDevice(pushNotificationService.fcmToken!, PushProvider.firebase, 
-          pushProviderName: 'stage');
+          pushProviderName: EnvironmentConfig.environmentName.toLowerCase());
             debugPrint('✅ Stream Chat: FCM token registered successfully on retry');
           } else {
             debugPrint('❌ Stream Chat: FCM token still not available after retry');
