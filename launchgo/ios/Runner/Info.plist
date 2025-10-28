@@ -51,6 +51,8 @@
 	<string>This app needs access to photo library to allow you to upload documents and images.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+    <string>We need to know your location to select an address.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

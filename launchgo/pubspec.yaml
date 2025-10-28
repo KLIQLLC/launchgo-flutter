@@ -74,6 +74,7 @@ dependencies:
   share_plus: ^10.1.2
   image_picker: ^1.2.0
   permission_handler: ^11.3.1
+  geolocator: ^10.1.0
   path_provider: ^2.1.0
   
   ## Dependency Injection
@@ -89,6 +90,10 @@ dependencies:
   
   ## App Icon Badge
   app_badge_plus: ^1.1.5
+
+  ## Google Maps & Geocoding
+  google_maps_flutter: ^2.10.1
+  geocoding: ^4.0.0
 
 dev_dependencies:
   flutter_test:
