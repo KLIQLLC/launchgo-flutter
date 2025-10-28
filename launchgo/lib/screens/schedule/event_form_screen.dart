@@ -201,8 +201,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
         if (_locationAddress != (widget.event!.location ?? '')) {
           eventData['addressLocation'] = _locationAddress;
         }
-        eventData['latLocation'] = _locationLatLng?.latitude;
-        eventData['longLocation'] = _locationLatLng?.longitude;
+        eventData['latLocation'] = _locationLatLng != null ? _locationLatLng!.latitude.toString() : '';
+        eventData['longLocation'] = _locationLatLng != null ? _locationLatLng!.longitude.toString() : '';
         
         if (_selectedType != widget.event!.type) {
           eventData['type'] = _selectedType;
@@ -238,8 +238,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
           'name': _nameController.text.trim(),
           'description': _descriptionController.text.trim(),
           'addressLocation': _locationAddress ?? '',
-          'latLocation': _locationLatLng?.latitude,
-          'longLocation': _locationLatLng?.longitude,
+          'latLocation': _locationLatLng != null ? _locationLatLng!.latitude.toString() : '',
+          'longLocation': _locationLatLng != null ? _locationLatLng!.longitude.toString() : '',
           'type': _selectedType,
           'startAt': _startDateTime.toUtc().toIso8601String(),
           'endAt': _endDateTime.toUtc().toIso8601String(),
