@@ -62,17 +62,17 @@ class _LocationEditScreenState extends State<LocationEditScreen> {
   Future<void> _getSuggestions(String input) async {
     setState(() => _isLoading = true);
     final url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${Uri.encodeComponent(input)}&key=$kGoogleApiKey&language=ru&types=address';
-    print('[PlacesAPI] GET: $url');
+    // print('[PlacesAPI] GET: $url');
     final resp = await http.get(Uri.parse(url));
-    print('[PlacesAPI] Status: ${resp.statusCode}');
-    print('[PlacesAPI] body: ${resp.body}');
+    // print('[PlacesAPI] Status: ${resp.statusCode}');
+    // print('[PlacesAPI] body: ${resp.body}');
     if (resp.statusCode == 200) {
       final obj = json.decode(resp.body);
       setState(() {
         _suggestions = obj['predictions'] ?? [];
         _isLoading = false;
       });
-      print('[PlacesAPI] suggestions: ${_suggestions.length}');
+      // print('[PlacesAPI] suggestions: ${_suggestions.length}');
     } else {
       setState(() { _suggestions = []; _isLoading = false; });
       print('[PlacesAPI][ERROR]');
@@ -89,10 +89,10 @@ class _LocationEditScreenState extends State<LocationEditScreen> {
 
   Future<void> _getPlaceDetails(String placeId) async {
     final detailsUrl = 'https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&key=$kGoogleApiKey&language=ru';
-    print('[PlaceDetails] GET: $detailsUrl');
+    // print('[PlaceDetails] GET: $detailsUrl');
     final resp = await http.get(Uri.parse(detailsUrl));
-    print('[PlaceDetails] Status: ${resp.statusCode}');
-    print('[PlaceDetails] body: ${resp.body}');
+    // print('[PlaceDetails] Status: ${resp.statusCode}');
+    // print('[PlaceDetails] body: ${resp.body}');
     if (resp.statusCode == 200) {
       final details = json.decode(resp.body);
       final loc = details['result']['geometry']['location'];
@@ -169,10 +169,10 @@ class _LocationEditScreenState extends State<LocationEditScreen> {
           onPressed: _close,
         ),
         title: const Text(
-          'Event location',
+          'Event Location',
           style: TextStyle(color: Colors.white),
         ),
-        centerTitle: false,
+        centerTitle: true, // Center the title
       ),
       body: Column(
         children: [
@@ -318,7 +318,7 @@ class _LocationEditScreenState extends State<LocationEditScreen> {
                     elevation: 0,
                   ),
                   child: const Text(
-                    'Add Location',
+                    'Save Location',
                     style: TextStyle(
                       color: Color(0xFF1A1F2B),
                       fontSize: 17,
