@@ -83,7 +83,7 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     
     <!-- Record audio permission for videos with sound -->
-    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- <uses-permission android:name="android.permission.RECORD_AUDIO"/> -->
     
     <!-- Push notification permissions -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
