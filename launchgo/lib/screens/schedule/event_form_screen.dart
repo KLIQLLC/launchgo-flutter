@@ -343,7 +343,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    _locationAddress?.isNotEmpty == true ? _locationAddress! : 'Enter event locationn',
+                                    _locationAddress?.isNotEmpty == true ? _locationAddress! : 'Enter event location',
                                     style: TextStyle(
                                       color: _locationAddress?.isNotEmpty == true ? Colors.white : Colors.white54,
                                       fontSize: 15,
@@ -639,7 +639,22 @@ class _EventFormScreenState extends State<EventFormScreen> {
     String? suggestAddress;
     LatLng? suggestCoords;
 
-    final status = await Permission.location.request();
+    // Ensure Location Services are enabled
+    final servicesEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!servicesEnabled) {
+      await Geolocator.openLocationSettings();
+    }
+
+    // Request app-level permission explicitly for iOS
+    var status = await Permission.locationWhenInUse.status;
+    if (status.isDenied) {
+      status = await Permission.locationWhenInUse.request();
+    }
+
+    if (status.isPermanentlyDenied || status.isRestricted) {
+      await openAppSettings();
+    }
+
     if (status.isGranted) {
       try {
         Position pos = await Geolocator.getCurrentPosition();
