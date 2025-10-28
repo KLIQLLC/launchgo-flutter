@@ -62,17 +62,17 @@ class _LocationEditScreenState extends State<LocationEditScreen> {
   Future<void> _getSuggestions(String input) async {
     setState(() => _isLoading = true);
     final url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${Uri.encodeComponent(input)}&key=$kGoogleApiKey&language=ru&types=address';
-    print('[PlacesAPI] GET: $url');
+    // print('[PlacesAPI] GET: $url');
     final resp = await http.get(Uri.parse(url));
-    print('[PlacesAPI] Status: ${resp.statusCode}');
-    print('[PlacesAPI] body: ${resp.body}');
+    // print('[PlacesAPI] Status: ${resp.statusCode}');
+    // print('[PlacesAPI] body: ${resp.body}');
     if (resp.statusCode == 200) {
       final obj = json.decode(resp.body);
       setState(() {
         _suggestions = obj['predictions'] ?? [];
         _isLoading = false;
       });
-      print('[PlacesAPI] suggestions: ${_suggestions.length}');
+      // print('[PlacesAPI] suggestions: ${_suggestions.length}');
     } else {
       setState(() { _suggestions = []; _isLoading = false; });
       print('[PlacesAPI][ERROR]');
@@ -89,10 +89,10 @@ class _LocationEditScreenState extends State<LocationEditScreen> {
 
   Future<void> _getPlaceDetails(String placeId) async {
     final detailsUrl = 'https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&key=$kGoogleApiKey&language=ru';
-    print('[PlaceDetails] GET: $detailsUrl');
+    // print('[PlaceDetails] GET: $detailsUrl');
     final resp = await http.get(Uri.parse(detailsUrl));
-    print('[PlaceDetails] Status: ${resp.statusCode}');
-    print('[PlaceDetails] body: ${resp.body}');
+    // print('[PlaceDetails] Status: ${resp.statusCode}');
+    // print('[PlaceDetails] body: ${resp.body}');
     if (resp.statusCode == 200) {
       final details = json.decode(resp.body);
       final loc = details['result']['geometry']['location'];
@@ -168,8 +168,11 @@ class _LocationEditScreenState extends State<LocationEditScreen> {
           icon: const Icon(Icons.close, color: Colors.white),
           onPressed: _close,
         ),
-        title: null,
-        centerTitle: false,
+        title: const Text(
+          'Event Location',
+          style: TextStyle(color: Colors.white),
+        ),
+        centerTitle: true, // Center the title
       ),
       body: Column(
         children: [
@@ -188,7 +191,7 @@ class _LocationEditScreenState extends State<LocationEditScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  // Поисковое поле
+                  // Search field
                   TextField(
                     controller: _controller,
                     focusNode: _focusNode,
@@ -235,7 +238,7 @@ class _LocationEditScreenState extends State<LocationEditScreen> {
                     ),
                     autofocus: true,
                   ),
-                  // Подсказки
+                  // Suggestions
                   if (_suggestions.isNotEmpty)
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxHeight: 200),
@@ -256,7 +259,7 @@ class _LocationEditScreenState extends State<LocationEditScreen> {
                         ),
                       ),
                     ),
-                  // Если есть координаты — карта (но строк с адресом/координатами уже нет)
+                  // If there are coordinates — show the map (without address/coordinates row)
                   if (_latLng != null)
                     Expanded(
                       child: Padding(
@@ -286,7 +289,7 @@ class _LocationEditScreenState extends State<LocationEditScreen> {
               ),
             ),
           ),
-          // Нижняя кнопка сохраняется всегда
+          // The bottom button is always visible
           Container(
             padding: const EdgeInsets.all(16.0),
             decoration: const BoxDecoration(
@@ -315,7 +318,7 @@ class _LocationEditScreenState extends State<LocationEditScreen> {
                     elevation: 0,
                   ),
                   child: const Text(
-                    'Add Location',
+                    'Save Location',
                     style: TextStyle(
                       color: Color(0xFF1A1F2B),
                       fontSize: 17,
