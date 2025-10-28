@@ -3,7 +3,10 @@ import 'package:provider/provider.dart';
 
 import '../../models/event_model.dart';
 import '../../services/api_service_retrofit.dart';
+import '../../services/auth_service.dart';
 import '../swipeable_card.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:geolocator/geolocator.dart';
 
 class EventCard extends StatelessWidget {
   final Event event;
@@ -111,8 +114,50 @@ class _EventCardContent extends StatelessWidget {
 
   const _EventCardContent({required this.event});
 
+  Future<void> _handleCheckIn(BuildContext context) async {
+    // 1. Check if location services are enabled
+    final servicesEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!servicesEnabled) {
+      await Geolocator.openLocationSettings();
+    }
+
+    // 2. Permission
+    var status = await Permission.locationWhenInUse.status;
+    if (status.isDenied) {
+      status = await Permission.locationWhenInUse.request();
+    }
+    if (status.isPermanentlyDenied || status.isRestricted) {
+      await openAppSettings();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Location access permission denied. Enable access manually in app settings.'),
+        backgroundColor: Colors.red,
+      ));
+      return;
+    }
+    if (status.isGranted) {
+      try {
+        Position pos = await Geolocator.getCurrentPosition();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+            'Your coordinates: ${pos.latitude}, ${pos.longitude}'
+          ),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 1),
+        ));
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Unable to get location: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 1),
+        ));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isStudent = context.watch<AuthService>().isStudent;
+    final checkInColor = event.color; // use this color for text and icon
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -127,6 +172,24 @@ class _EventCardContent extends StatelessWidget {
             const SizedBox(height: 4),
             _EventLocation(event: event),
           ],
+          if (isStudent)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => _handleCheckIn(context),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle_outline, color: checkInColor),
+                      const SizedBox(width: 12),
+                      Text('Check In', style: TextStyle(color: checkInColor)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
