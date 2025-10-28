@@ -168,7 +168,10 @@ class _LocationEditScreenState extends State<LocationEditScreen> {
           icon: const Icon(Icons.close, color: Colors.white),
           onPressed: _close,
         ),
-        title: null,
+        title: const Text(
+          'Event location',
+          style: TextStyle(color: Colors.white),
+        ),
         centerTitle: false,
       ),
       body: Column(
@@ -188,7 +191,7 @@ class _LocationEditScreenState extends State<LocationEditScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  // Поисковое поле
+                  // Search field
                   TextField(
                     controller: _controller,
                     focusNode: _focusNode,
@@ -235,7 +238,7 @@ class _LocationEditScreenState extends State<LocationEditScreen> {
                     ),
                     autofocus: true,
                   ),
-                  // Подсказки
+                  // Suggestions
                   if (_suggestions.isNotEmpty)
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxHeight: 200),
@@ -256,7 +259,7 @@ class _LocationEditScreenState extends State<LocationEditScreen> {
                         ),
                       ),
                     ),
-                  // Если есть координаты — карта (но строк с адресом/координатами уже нет)
+                  // If there are coordinates — show the map (without address/coordinates row)
                   if (_latLng != null)
                     Expanded(
                       child: Padding(
@@ -286,7 +289,7 @@ class _LocationEditScreenState extends State<LocationEditScreen> {
               ),
             ),
           ),
-          // Нижняя кнопка сохраняется всегда
+          // The bottom button is always visible
           Container(
             padding: const EdgeInsets.all(16.0),
             decoration: const BoxDecoration(
