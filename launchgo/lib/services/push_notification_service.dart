@@ -6,7 +6,9 @@ import 'package:path_provider/path_provider.dart';
 import 'api_service_retrofit.dart';
 import 'notifications_api_service.dart';
 import 'pending_navigation_service.dart';
+import 'auth_service.dart';
 import 'package:go_router/go_router.dart';
+import 'notification_navigation_service.dart';
 
 /// Service for handling FCM token lifecycle and device registration
 class PushNotificationService extends ChangeNotifier {
@@ -21,6 +23,9 @@ class PushNotificationService extends ChangeNotifier {
   NotificationsApiService? _notificationsService;
   GoRouter? _router;
   static const MethodChannel _channel = MethodChannel('push_notification_channel');
+  
+  // Add auth service for semester switching
+  AuthService? _authService;
   
   // Callback for when FCM token becomes available
   VoidCallback? _onTokenAvailableCallback;
@@ -51,6 +56,16 @@ class PushNotificationService extends ChangeNotifier {
   void setRouter(GoRouter router) {
     _router = router;
     debugPrint('🔔 PushNotificationService: Router set for direct navigation');
+  }
+  
+  /// Set auth service for semester switching
+  void setAuthService(AuthService authService) {
+    _authService = authService;
+    // Initialize the notification navigation service
+    if (_router != null) {
+      NotificationNavigationService.instance.initialize(_router!, authService);
+    }
+    debugPrint('🔔 PushNotificationService: AuthService set for semester switching');
   }
   
   /// Set callback to be called when FCM token becomes available
@@ -227,6 +242,7 @@ class PushNotificationService extends ChangeNotifier {
   
   /// Handle foreground messages
   void _handleForegroundMessage(RemoteMessage message) {
+    // 🛑 BREAKPOINT: Set breakpoint here to inspect message data
     debugPrint('🔔 Foreground message received: ${message.notification?.title}');
     debugPrint('🔔 Message data: ${message.data}');
     debugPrint('🔔 Message body: ${message.notification?.body}');
@@ -243,6 +259,7 @@ class PushNotificationService extends ChangeNotifier {
   
   /// Handle message when app is opened from notification
   void _handleMessageOpenedApp(RemoteMessage message) {
+    // 🛑 BREAKPOINT: Set breakpoint here to inspect notification tap data
     final logMessage = '''
 ============================================
 Message opened app: ${message.notification?.title}
@@ -266,7 +283,33 @@ Screen value: ${message.data['screen']}
     String? targetRoute;
     Map<String, dynamic>? extra;
     
-    if (data.containsKey('screen')) {
+    // Handle update-document notification type using specialized service
+    if (data.containsKey('eventType') && data['eventType'] == 'update-document') {
+      debugPrint('🔔 Using NotificationNavigationService for update-document');
+      
+      // Use the specialized navigation service for complex handling
+      NotificationNavigationService.instance.handleUpdateDocument(
+        semesterId: data['semesterId'],
+        documentId: data['documentId'],
+      );
+      
+      // Return early since navigation is handled by the service
+      return;
+    }
+    // Handle update-event notification type using specialized service
+    else if (data.containsKey('eventType') && data['eventType'] == 'update-event') {
+      debugPrint('🔔 Using NotificationNavigationService for update-event');
+      debugPrint('🔔 Event data: semesterId=${data['semesterId']}, eventId=${data['eventId']}');
+      
+      // Use the specialized navigation service for complex handling
+      NotificationNavigationService.instance.handleUpdateEvent(
+        semesterId: data['semesterId'],
+        eventId: data['eventId'],
+      );
+      
+      // Return early since navigation is handled by the service
+      return;
+    } else if (data.containsKey('screen')) {
       final screen = data['screen'] as String;
       targetRoute = _getRouteFromScreen(screen);
       
@@ -280,14 +323,17 @@ Screen value: ${message.data['screen']}
         extra = data['extra'] as Map<String, dynamic>;
       }
     } else if (_isStreamChatNotification(data)) {
-      targetRoute = '/chat';
-      final channelId = data['channel_id'] ?? data['channel_cid'];
-      if (channelId != null) {
-        extra = {
-          'channelId': channelId,
-          'channelType': data['channel_type'] ?? 'messaging',
-        };
-      }
+      debugPrint('🔔 Using NotificationNavigationService for chat notification');
+      
+      // Use the specialized navigation service for chat handling
+      NotificationNavigationService.instance.handleChatNotification(
+        receiverId: data['receiver_id'],
+        channelId: data['channel_id'] ?? data['channel_cid'],
+        channelType: data['channel_type'],
+      );
+      
+      // Return early since navigation is handled by the service
+      return;
     }
     
     if (targetRoute != null) {
@@ -354,6 +400,7 @@ Screen value: ${message.data['screen']}
 /// Background message handler (must be top-level function)
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // 🛑 BREAKPOINT: Set breakpoint here to inspect background notifications
   debugPrint('🔔 Background message received: ${message.notification?.title}');
   debugPrint('🔔 Background message data: ${message.data}');
   debugPrint('🔔 Background message body: ${message.notification?.body}');

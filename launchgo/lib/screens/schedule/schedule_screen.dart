@@ -31,12 +31,31 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   final GlobalKey<_WeeklyScheduleViewState> _weeklyViewKey = GlobalKey<_WeeklyScheduleViewState>();
   String? _lastSelectedStudentId; // Track current student to detect changes
   int _selectedSegment = 0; // 0 = Weekly Schedule, 1 = Upcoming Deadlines
+  String? _targetEventId;
 
   @override
   void initState() {
     super.initState();
     _initializeWeekStart();
     _loadDeadlines();
+    
+    // Check for scroll target from navigation
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final extra = GoRouterState.of(context).extra as Map<String, dynamic>?;
+      if (extra != null && extra['scrollToEventId'] != null) {
+        _targetEventId = extra['scrollToEventId'] as String;
+        // Force to Weekly Schedule tab to show events
+        _selectedSegment = 0;
+        debugPrint('🔔 Schedule: Target event ID set: $_targetEventId');
+        
+        // Wait a bit longer for semester changes to propagate before searching for event
+        Future.delayed(const Duration(milliseconds: 800), () {
+          if (mounted && _targetEventId != null) {
+            _navigateToEventWeek(_targetEventId!);
+          }
+        });
+      }
+    });
   }
 
   @override
@@ -139,6 +158,79 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       );
     });
     _loadDeadlines();
+  }
+
+  /// Navigate to the week containing a specific event
+  Future<void> _navigateToEventWeek(String eventId) async {
+    if (!mounted) return;
+    
+    try {
+      debugPrint('🔔 Finding event with ID: $eventId');
+      final apiService = context.read<ApiServiceRetrofit>();
+      
+      // Search for the event in a very broad date range (e.g., 1 year)
+      final searchStart = DateTime.now().subtract(const Duration(days: 180));
+      final searchEnd = DateTime.now().add(const Duration(days: 365));
+      
+      final eventsData = await apiService.getEvents(
+        startAt: searchStart,
+        endAt: searchEnd,
+      );
+      
+      if (!mounted) return;
+      
+      final events = eventsData.map((eventData) => Event.fromJson(eventData)).toList();
+      
+      // Find the target event
+      final targetEvent = events.firstWhere(
+        (event) => event.id == eventId,
+        orElse: () => throw Exception('Event not found'),
+      );
+      
+      debugPrint('🔔 Event found: ${targetEvent.name} on ${targetEvent.startAt}');
+      
+      // Calculate the week that contains this event
+      final eventDate = targetEvent.startAt;
+      final eventWeekday = eventDate.weekday % 7; // Sunday = 0
+      final eventWeekStart = DateTime(
+        eventDate.year,
+        eventDate.month,
+        eventDate.day - eventWeekday,
+        0, 0, 0, 0, 0
+      );
+      final eventWeekEnd = DateTime(
+        eventWeekStart.year,
+        eventWeekStart.month,
+        eventWeekStart.day + 7,
+        0, 0, 0, 0, 0
+      );
+      
+      // Check if we need to navigate to a different week
+      if (!mounted) return;
+      
+      if (_currentWeekStart != eventWeekStart) {
+        debugPrint('🔔 Navigating to event week: $eventWeekStart - $eventWeekEnd');
+        setState(() {
+          _currentWeekStart = eventWeekStart;
+          _currentWeekEnd = eventWeekEnd;
+        });
+        await _loadDeadlines();
+      } else {
+        debugPrint('🔔 Event is already in current week');
+      }
+      
+      // Trigger rebuild to show events for the correct week
+      if (mounted) {
+        setState(() {});
+      }
+      
+    } catch (e) {
+      debugPrint('❌ Error finding event: $e');
+      // If we can't find the event, just proceed with current week
+      if (mounted) {
+        setState(() {});
+      }
+    }
   }
 
   List<DeadlineAssignment> _getSortedAssignments() {
@@ -261,6 +353,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                     weekEnd: _currentWeekEnd,
                     themeService: themeService,
                     permissions: permissions,
+                    targetEventId: _targetEventId,
+                    onEventHighlighted: () {
+                      // Clear target after highlighting
+                      setState(() {
+                        _targetEventId = null;
+                      });
+                    },
                   )
                 : _UpcomingDeadlinesView(
                     assignments: _getSortedAssignments(),
@@ -411,6 +510,8 @@ class _WeeklyScheduleView extends StatefulWidget {
   final DateTime weekEnd;
   final ThemeService themeService;
   final PermissionsService permissions;
+  final String? targetEventId;
+  final VoidCallback? onEventHighlighted;
 
   const _WeeklyScheduleView({
     super.key,
@@ -418,6 +519,8 @@ class _WeeklyScheduleView extends StatefulWidget {
     required this.weekEnd,
     required this.themeService,
     required this.permissions,
+    this.targetEventId,
+    this.onEventHighlighted,
   });
 
   @override
@@ -427,6 +530,8 @@ class _WeeklyScheduleView extends StatefulWidget {
 class _WeeklyScheduleViewState extends State<_WeeklyScheduleView> {
   List<Event> _events = [];
   bool _isLoadingEvents = false;
+  final ScrollController _scrollController = ScrollController();
+  bool _hasScrolledToTarget = false;
 
   @override
   void initState() {
@@ -440,10 +545,73 @@ class _WeeklyScheduleViewState extends State<_WeeklyScheduleView> {
     if (oldWidget.weekStart != widget.weekStart || oldWidget.weekEnd != widget.weekEnd) {
       _loadEvents();
     }
+    
+    // Reset scroll flag if target event changed
+    if (oldWidget.targetEventId != widget.targetEventId) {
+      _hasScrolledToTarget = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   void reloadEvents() {
     _loadEvents();
+  }
+
+  /// Scroll to a specific event card and highlight it
+  void _scrollToAndHighlightEvent(GlobalKey key) {
+    // Prevent multiple scroll attempts for the same target
+    if (_hasScrolledToTarget) return;
+    
+    try {
+      // Wait a bit longer to ensure widget is fully rendered
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (!mounted) return;
+        
+        final context = key.currentContext;
+        if (context != null) {
+          final renderBox = context.findRenderObject() as RenderBox?;
+          if (renderBox != null && renderBox.hasSize) {
+            final position = renderBox.localToGlobal(Offset.zero);
+            final scrollPosition = _scrollController.offset + position.dy - 150; // Better offset calculation
+            
+            debugPrint('🔔 Scrolling to event at position: $scrollPosition');
+            
+            _scrollController.animateTo(
+              scrollPosition.clamp(0.0, _scrollController.position.maxScrollExtent),
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeInOut,
+            );
+            
+            _hasScrolledToTarget = true; // Mark as scrolled to prevent multiple attempts
+            
+            // Notify parent and clear the highlight after 3 seconds
+            Future.delayed(const Duration(seconds: 3), () {
+              if (mounted && widget.onEventHighlighted != null) {
+                widget.onEventHighlighted!();
+                _hasScrolledToTarget = false; // Reset for next target
+                debugPrint('🔔 Event highlight cleared');
+              }
+            });
+          } else {
+            debugPrint('⚠️ RenderBox not ready, retrying...');
+            // Retry once if renderBox isn't ready
+            Future.delayed(const Duration(milliseconds: 200), () {
+              if (mounted && !_hasScrolledToTarget) {
+                _scrollToAndHighlightEvent(key);
+              }
+            });
+          }
+        }
+      });
+    } catch (e) {
+      debugPrint('❌ Error scrolling to event: $e');
+      _hasScrolledToTarget = false; // Reset on error
+    }
   }
 
   Future<void> _loadEvents() async {
@@ -513,6 +681,7 @@ class _WeeklyScheduleViewState extends State<_WeeklyScheduleView> {
     final eventsByDay = _groupEventsByDay(_events);
     
     return SingleChildScrollView(
+      controller: _scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 12.0),
       child: Column(
@@ -536,9 +705,35 @@ class _WeeklyScheduleViewState extends State<_WeeklyScheduleView> {
                   ),
                 ),
                 ...dayEntry.value.map((event) {
-                  return Padding(
-                    key: ValueKey(event.id),
-                    padding: const EdgeInsets.only(bottom: 12),
+                  final key = GlobalKey();
+                  final isTargetEvent = widget.targetEventId != null && event.id == widget.targetEventId;
+                  
+                  // Check if this is the target event to scroll to
+                  if (isTargetEvent && !_hasScrolledToTarget) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      _scrollToAndHighlightEvent(key);
+                    });
+                  }
+                  
+                  return AnimatedContainer(
+                    key: key,
+                    duration: const Duration(milliseconds: 500),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: isTargetEvent
+                          ? Border.all(color: Colors.orange, width: 2)
+                          : null,
+                      boxShadow: isTargetEvent
+                          ? [
+                              BoxShadow(
+                                color: Colors.orange.withValues(alpha: 0.3),
+                                blurRadius: 8,
+                                spreadRadius: 2,
+                              )
+                            ]
+                          : null,
+                    ),
                     child: EventCard(
                       key: ValueKey('event_card_${event.id}'),
                       event: event,

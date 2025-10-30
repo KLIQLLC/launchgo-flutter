@@ -1,0 +1,226 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'auth_service.dart';
+
+/// Service for handling complex navigation scenarios from push notifications
+class NotificationNavigationService {
+  static NotificationNavigationService? _instance;
+  static NotificationNavigationService get instance => _instance ??= NotificationNavigationService._();
+  
+  NotificationNavigationService._();
+
+  GoRouter? _router;
+  AuthService? _authService;
+
+  /// Initialize with router and auth service
+  void initialize(GoRouter router, AuthService authService) {
+    _router = router;
+    _authService = authService;
+    debugPrint('🔔 NotificationNavigationService initialized');
+  }
+
+  /// Handle update-document notification
+  /// 1. Switch to specified semester globally
+  /// 2. Navigate to documents screen  
+  /// 3. Scroll to specific document
+  Future<void> handleUpdateDocument({
+    String? semesterId,
+    String? documentId,
+  }) async {
+    debugPrint('🔔 Handling update-document notification');
+    debugPrint('🔔 SemesterId: $semesterId, DocumentId: $documentId');
+
+    try {
+      // Step 1: Switch semester globally if provided
+      if (semesterId != null && _authService != null) {
+        debugPrint('🔔 Switching to semester: $semesterId');
+        await _authService!.selectSemester(semesterId);
+        debugPrint('✅ Semester switched successfully');
+        
+        // Small delay to allow semester change to propagate
+        await Future.delayed(const Duration(milliseconds: 300));
+      }
+
+      // Step 2: Navigate to documents screen with scroll target
+      if (_router != null) {
+        final extra = <String, dynamic>{};
+        if (documentId != null) {
+          extra['scrollToDocumentId'] = documentId;
+        }
+        
+        debugPrint('🔔 Navigating to documents with extra: $extra');
+        if (extra.isNotEmpty) {
+          _router!.go('/documents', extra: extra);
+        } else {
+          _router!.go('/documents');
+        }
+        debugPrint('✅ Navigation completed');
+      } else {
+        debugPrint('❌ Router not available for navigation');
+      }
+    } catch (e) {
+      debugPrint('❌ Error handling update-document notification: $e');
+    }
+  }
+
+  /// Handle update-event notification
+  /// 1. Switch to specified semester globally if provided
+  /// 2. Navigate to schedule screen (weekly schedule tab)
+  /// 3. Scroll to specific event
+  Future<void> handleUpdateEvent({
+    String? semesterId,
+    String? eventId,
+  }) async {
+    debugPrint('🔔 [TERMINATED] Handling update-event notification');
+    debugPrint('🔔 [TERMINATED] SemesterId: $semesterId, EventId: $eventId');
+    debugPrint('🔔 [TERMINATED] Router available: ${_router != null}');
+    debugPrint('🔔 [TERMINATED] AuthService available: ${_authService != null}');
+
+    try {
+      // Wait longer for app to fully initialize when coming from terminated state
+      debugPrint('🔔 [TERMINATED] Waiting for app initialization...');
+      await Future.delayed(const Duration(milliseconds: 1500));
+      
+      // Check if services are ready
+      if (_router == null || _authService == null) {
+        debugPrint('❌ [TERMINATED] Services not ready, retrying...');
+        await Future.delayed(const Duration(milliseconds: 1000));
+      }
+
+      // Step 1: Switch semester globally if provided
+      if (semesterId != null && _authService != null) {
+        debugPrint('🔔 [TERMINATED] Switching to semester: $semesterId');
+        await _authService!.selectSemester(semesterId);
+        debugPrint('✅ [TERMINATED] Semester switched successfully');
+        
+        // Small delay to allow semester change to propagate
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+
+      // Step 2: Navigate to schedule screen with scroll target
+      if (_router != null) {
+        try {
+          final currentLocation = _router!.routerDelegate.currentConfiguration.last.matchedLocation;
+          debugPrint('🔔 [TERMINATED] Current route: $currentLocation');
+          
+          if (currentLocation == '/schedule') {
+            // Already on schedule screen - need to force navigation with different approach
+            debugPrint('🔔 [TERMINATED] Already on schedule screen, using replacement navigation');
+            if (eventId != null) {
+              // First navigate away briefly, then back with the extra data
+              _router!.go('/courses'); // Navigate away
+              await Future.delayed(const Duration(milliseconds: 200));
+              _router!.go('/schedule', extra: {'scrollToEventId': eventId});
+            }
+          } else {
+            // Not on schedule screen - normal navigation
+            final extra = <String, dynamic>{};
+            if (eventId != null) {
+              extra['scrollToEventId'] = eventId;
+            }
+            
+            debugPrint('🔔 [TERMINATED] Navigating to schedule with extra: $extra');
+            if (extra.isNotEmpty) {
+              _router!.go('/schedule', extra: extra);
+            } else {
+              _router!.go('/schedule');
+            }
+          }
+          debugPrint('✅ [TERMINATED] Navigation completed');
+        } catch (e) {
+          debugPrint('❌ [TERMINATED] Router error: $e, falling back to simple navigation');
+          // Fallback to simple navigation if router state is not ready
+          _router!.go('/schedule', extra: eventId != null ? {'scrollToEventId': eventId} : null);
+        }
+      } else {
+        debugPrint('❌ [TERMINATED] Router not available for navigation');
+      }
+    } catch (e) {
+      debugPrint('❌ [TERMINATED] Error handling update-event notification: $e');
+    }
+  }
+
+  /// Handle chat notification (Stream Chat)
+  /// 1. Switch to the correct student based on receiver_id
+  /// 2. Navigate to chat screen with channel info
+  Future<void> handleChatNotification({
+    String? receiverId,
+    String? channelId,
+    String? channelType,
+  }) async {
+    debugPrint('🔔 Handling chat notification');
+    debugPrint('🔔 ReceiverId: $receiverId, ChannelId: $channelId');
+
+    try {
+      // Step 1: Switch to the correct student if receiverId is provided
+      if (receiverId != null && _authService != null) {
+        debugPrint('🔔 Switching to student with ID: $receiverId');
+        await _authService!.selectStudent(receiverId);
+        debugPrint('✅ Student switched successfully');
+        
+        // Small delay to allow student change to propagate
+        await Future.delayed(const Duration(milliseconds: 300));
+      }
+
+      // Step 2: Navigate to chat screen with channel info
+      if (_router != null) {
+        final extra = <String, dynamic>{};
+        if (channelId != null) {
+          extra['channelId'] = channelId;
+          extra['channelType'] = channelType ?? 'messaging';
+        }
+        
+        debugPrint('🔔 Navigating to chat with extra: $extra');
+        if (extra.isNotEmpty) {
+          _router!.go('/chat', extra: extra);
+        } else {
+          _router!.go('/chat');
+        }
+        debugPrint('✅ Chat navigation completed');
+      } else {
+        debugPrint('❌ Router not available for navigation');
+      }
+    } catch (e) {
+      debugPrint('❌ Error handling chat notification: $e');
+    }
+  }
+
+  /// Handle other notification types (expandable)
+  Future<void> handleNotification({
+    required String eventType,
+    required Map<String, dynamic> data,
+  }) async {
+    debugPrint('🔔 Handling notification type: $eventType');
+    
+    switch (eventType) {
+      case 'update-document':
+        await handleUpdateDocument(
+          semesterId: data['semesterId'],
+          documentId: data['documentId'],
+        );
+        break;
+      
+      case 'update-event':
+        await handleUpdateEvent(
+          semesterId: data['semesterId'],
+          eventId: data['eventId'],
+        );
+        break;
+      
+      case 'create-document':
+        // Navigate to documents screen
+        _router?.go('/documents');
+        break;
+        
+      case 'update-assignment':
+        // Navigate to specific course assignments
+        if (data['courseId'] != null) {
+          _router?.go('/course/${data['courseId']}/assignments');
+        }
+        break;
+        
+      default:
+        debugPrint('🔔 Unknown notification type: $eventType');
+    }
+  }
+}

@@ -130,6 +130,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // Set router in push notification service for direct navigation
     PushNotificationService.instance.setRouter(_appRouter.router);
     
+    // Set auth service for semester switching
+    PushNotificationService.instance.setAuthService(_authService);
+    
     // Now that router is ready, initialize push notifications
     PushNotificationService.instance.initialize().catchError((e) {
       debugPrint('❌ Push notification service initialization failed: $e');
