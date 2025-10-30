@@ -154,10 +154,29 @@ class _EventCardContent extends StatelessWidget {
     }
   }
 
+  BoxDecoration _buildCardDecoration() {
+    // вынес формулу цвета карточки и возвращаю наружу для использования и в кнопке
+    return BoxDecoration(
+      color: Color.alphaBlend(
+        event.color.withOpacity(0.15),
+        const Color(0xFF1A2332),
+      ),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: event.color.withOpacity(0.4),
+        width: 1.0,
+      ),
+    );
+  }
+
+  Color get _cardFillColor => Color.alphaBlend(event.color.withOpacity(0.15), const Color(0xFF1A2332));
+
   @override
   Widget build(BuildContext context) {
     final isStudent = context.watch<AuthService>().isStudent;
-    final checkInColor = event.color; // use this color for text and icon
+    final checkInColor = event.color;
+    // TODO: Включи свою бизнес-логику для включения checkInEnabled
+    final bool checkInEnabled = false; // На время теста, потом подставь свою проверку
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -177,34 +196,46 @@ class _EventCardContent extends StatelessWidget {
               padding: const EdgeInsets.only(top: 12),
               child: SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => _handleCheckIn(context),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.check_circle_outline, color: checkInColor),
-                      const SizedBox(width: 12),
-                      Text('Check In', style: TextStyle(color: checkInColor)),
-                    ],
-                  ),
-                ),
+                child: checkInEnabled
+                  ? ElevatedButton(
+                      onPressed: () => _handleCheckIn(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1A2332),
+                        side: BorderSide(color: event.color.withOpacity(0.4), width: 0.5),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.check_circle_outline, color: checkInColor),
+                          const SizedBox(width: 12),
+                          Text('Check In', style: TextStyle(color: checkInColor, fontSize: 16, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    )
+                  : Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: _cardFillColor,
+                        border: Border.all(color: event.color.withOpacity(0.4), width: 0.5),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.check_circle_outline, color: checkInColor.withOpacity(0.5)),
+                          const SizedBox(width: 12),
+                          Text('Check In', style: TextStyle(color: checkInColor.withOpacity(0.5), fontSize: 16, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    ),
               ),
             ),
         ],
-      ),
-    );
-  }
-
-  BoxDecoration _buildCardDecoration() {
-    return BoxDecoration(
-      color: Color.alphaBlend(
-        event.color.withValues(alpha: 0.15),
-        const Color(0xFF1A2332),
-      ),
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(
-        color: event.color.withValues(alpha: 0.4),
-        width: 1.0,
       ),
     );
   }
