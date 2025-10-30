@@ -894,7 +894,7 @@ class _StudentHeader extends StatelessWidget {
     final displayedStudent = authService.getSelectedStudent();
     final displayName = userInfo?.isMentor == true && displayedStudent != null
         ? displayedStudent.name
-        : userInfo?.name ?? 'Student';
+        : userInfo?.name ?? 'User';
 
     return Container(
       width: double.infinity,

@@ -101,7 +101,7 @@ class PermissionsService {
   
   /// Get display name for current user role
   String get roleDisplayName {
-    if (isStudent) return 'Student';
+    if (isStudent) return 'User';
     if (isMentor) return 'Mentor';
     if (isCaseManager) return 'Case Manager';
     return 'Unknown';

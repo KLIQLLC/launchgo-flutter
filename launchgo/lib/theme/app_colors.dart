@@ -52,7 +52,7 @@ class AppColors {
   static Color bottomNavUnselected = Colors.white.withValues(alpha: 0.5);
   
   // ===== Special UI Colors =====
-  static const Color logoutColor = Color(0xFF7F1E1D); // Dark red
+  static const Color logoutColor = Color(0xFFE53E3E); // Bright red
   static const Color dividerColor = darkBorder;
   
   // ===== Grade Colors System =====
