@@ -141,25 +141,37 @@ class NotificationNavigationService {
   }
 
   /// Handle chat notification (Stream Chat)
-  /// 1. Switch to the correct student based on receiver_id
+  /// 1. Switch to the correct student based on channel_id (student ID)
   /// 2. Navigate to chat screen with channel info
+  /// 
+  /// Note: For Stream Chat, receiver_id is the mentor ID, channel_id is the student ID
   Future<void> handleChatNotification({
     String? receiverId,
     String? channelId,
     String? channelType,
   }) async {
-    debugPrint('🔔 Handling chat notification');
-    debugPrint('🔔 ReceiverId: $receiverId, ChannelId: $channelId');
+    debugPrint('🔔 [CHAT] ReceiverId (mentor): $receiverId, ChannelId (student): $channelId');
 
     try {
-      // Step 1: Switch to the correct student if receiverId is provided
-      if (receiverId != null && _authService != null) {
-        debugPrint('🔔 Switching to student with ID: $receiverId');
-        await _authService!.selectStudent(receiverId);
-        debugPrint('✅ Student switched successfully');
+      // Wait for app to fully initialize when coming from terminated state
+      debugPrint('🔔 [CHAT] Waiting for app initialization...');
+      await Future.delayed(const Duration(milliseconds: 1500));
+      
+      // Check if services are ready
+      if (_router == null || _authService == null) {
+        debugPrint('❌ [CHAT] Services not ready, retrying...');
+        await Future.delayed(const Duration(milliseconds: 1000));
+      }
+
+      // Step 1: Switch to the correct student if channelId is provided
+      // For Stream Chat, channel_id contains the student ID who sent the message
+      if (channelId != null && _authService != null) {
+        debugPrint('🔔 [CHAT] Switching to student with ID: $channelId');
+        await _authService!.selectStudent(channelId);
+        debugPrint('✅ [CHAT] Student switched successfully');
         
         // Small delay to allow student change to propagate
-        await Future.delayed(const Duration(milliseconds: 300));
+        await Future.delayed(const Duration(milliseconds: 500));
       }
 
       // Step 2: Navigate to chat screen with channel info
@@ -170,18 +182,22 @@ class NotificationNavigationService {
           extra['channelType'] = channelType ?? 'messaging';
         }
         
-        debugPrint('🔔 Navigating to chat with extra: $extra');
-        if (extra.isNotEmpty) {
-          _router!.go('/chat', extra: extra);
-        } else {
+        debugPrint('🔔 [CHAT] Navigating to chat with extra: $extra');
+        try {
+          if (extra.isNotEmpty) {
+            _router!.go('/chat', extra: extra);
+          } else {
+            _router!.go('/chat');
+          }
+        } catch (e) {
+          // Fallback to simple navigation if router state is not ready
           _router!.go('/chat');
         }
-        debugPrint('✅ Chat navigation completed');
       } else {
-        debugPrint('❌ Router not available for navigation');
+        debugPrint('❌ [CHAT] Router not available for navigation');
       }
     } catch (e) {
-      debugPrint('❌ Error handling chat notification: $e');
+      debugPrint('❌ [CHAT] Error handling chat notification: $e');
     }
   }
 
