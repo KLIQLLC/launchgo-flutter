@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:path_provider/path_provider.dart';
 import 'api_service_retrofit.dart';
@@ -22,7 +21,6 @@ class PushNotificationService extends ChangeNotifier {
   bool _isInitialized = false;
   NotificationsApiService? _notificationsService;
   GoRouter? _router;
-  static const MethodChannel _channel = MethodChannel('push_notification_channel');
   
   // Add auth service for semester switching
   AuthService? _authService;
@@ -77,7 +75,7 @@ class PushNotificationService extends ChangeNotifier {
     }
   }
   
-  /// Initialize FCM for basic functionality (token retrieval, permissions)
+  /// Initialize FCM for basic functionality (without requesting permissions)
   Future<void> initialize() async {
     if (_isInitialized) {
       debugPrint('🔔 PushNotificationService already initialized, skipping...');
@@ -85,6 +83,55 @@ class PushNotificationService extends ChangeNotifier {
     }
     
     debugPrint('🔔 Initializing PushNotificationService...');
+    
+    try {
+      // Setup message handlers without requesting permissions
+      // Handle background messages
+      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+      
+      // Handle foreground messages
+      FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+      
+      // Add global message listener for debugging
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        debugPrint('🔔 [GLOBAL] Foreground message: ${message.notification?.title}');
+        debugPrint('🔔 [GLOBAL] Message data: ${message.data}');
+      });
+      
+      // Handle message when app is opened from notification tap
+      debugPrint('🔔 Setting up onMessageOpenedApp listener...');
+      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+        debugPrint('🔔 [LISTENER] onMessageOpenedApp triggered!');
+        _handleMessageOpenedApp(message);
+      });
+      
+      // Handle initial message if app was opened from notification
+      debugPrint('🔔 Checking for initial message...');
+      RemoteMessage? initialMessage = await _messaging.getInitialMessage();
+      if (initialMessage != null) {
+        debugPrint('🔔 [INITIAL] App opened from notification (terminated state)');
+        debugPrint('🔔 [INITIAL] Message data: ${initialMessage.data}');
+        debugPrint('🔔 [INITIAL] Screen value: ${initialMessage.data['screen']}');
+        // Store navigation - will be processed when router is ready
+        _storeNavigationFromMessage(initialMessage);
+      } else {
+        debugPrint('🔔 No initial message found');
+      }
+      
+      _isInitialized = true;
+      notifyListeners();
+      
+      debugPrint('✅ PushNotificationService initialized successfully (no permissions requested yet)');
+      _logToFile('PUSH_SERVICE_INITIALIZED: Message handlers ready, awaiting permissions');
+    } catch (e) {
+      debugPrint('❌ Error initializing PushNotificationService: $e');
+      rethrow;
+    }
+  }
+  
+  /// Request notification permissions and setup FCM token
+  Future<bool> requestPermissionsAndSetupToken() async {
+    debugPrint('🔔 Requesting notification permissions...');
     
     try {
       // Request notification permissions
@@ -129,54 +176,19 @@ class PushNotificationService extends ChangeNotifier {
           }
         });
         
-        // Handle background messages
-        FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-        
-        // Handle foreground messages
-        FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-        
-        // Add global message listener for debugging
-        FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-          debugPrint('🔔 [GLOBAL] Foreground message: ${message.notification?.title}');
-          debugPrint('🔔 [GLOBAL] Message data: ${message.data}');
-        });
-        
-        // Method channel is no longer needed - Firebase handles everything
-        debugPrint('🔔 Using Firebase-only notification handling');
-        
-        // Handle message when app is opened from notification tap
-        debugPrint('🔔 Setting up onMessageOpenedApp listener...');
-        FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-          debugPrint('🔔 [LISTENER] onMessageOpenedApp triggered!');
-          _handleMessageOpenedApp(message);
-        });
-        
-        // Handle initial message if app was opened from notification
-        debugPrint('🔔 Checking for initial message...');
-        RemoteMessage? initialMessage = await _messaging.getInitialMessage();
-        if (initialMessage != null) {
-          debugPrint('🔔 [INITIAL] App opened from notification (terminated state)');
-          debugPrint('🔔 [INITIAL] Message data: ${initialMessage.data}');
-          debugPrint('🔔 [INITIAL] Screen value: ${initialMessage.data['screen']}');
-          // Store navigation - will be processed when router is ready
-          _storeNavigationFromMessage(initialMessage);
-        } else {
-          debugPrint('🔔 No initial message found');
-        }
-        
-        _isInitialized = true;
-        notifyListeners();
-        
-        debugPrint('✅ PushNotificationService initialized successfully');
+        debugPrint('✅ Push notifications fully enabled with FCM token');
         debugPrint('🔔 FCM Token: $_fcmToken');
-        debugPrint('🔔 Method channel handler ready: ${_channel.name}');
-        _logToFile('PUSH_SERVICE_INITIALIZED: FCM Token received, method channel ready');
+        _logToFile('PUSH_NOTIFICATIONS_ENABLED: FCM Token received, ready for notifications');
+        
+        notifyListeners();
+        return true;
       } else {
         debugPrint('❌ Notification permission denied: ${settings.authorizationStatus}');
+        return false;
       }
     } catch (e) {
-      debugPrint('❌ Error initializing PushNotificationService: $e');
-      rethrow;
+      debugPrint('❌ Error requesting notification permissions: $e');
+      return false;
     }
   }
   

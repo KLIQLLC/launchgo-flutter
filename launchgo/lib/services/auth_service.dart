@@ -322,6 +322,9 @@ class AuthService extends ChangeNotifier {
         // Set up device registration callback for push notifications
         _setupFCMTokenCallback();
         
+        // Request push notification permissions after successful login
+        _requestPushNotificationPermissions();
+        
         // Set user online after successful authentication
         if (_streamChatService != null && _streamChatService!.isUserConnected) {
           await _streamChatService!.setUserOnline();
@@ -687,6 +690,23 @@ class AuthService extends ChangeNotifier {
         debugPrint('✅ [FCM DEBUG] Device registered successfully with backend');
       } catch (e) {
         debugPrint('❌ [FCM DEBUG] Failed to register device with backend: $e');
+      }
+    });
+  }
+  
+  /// Request push notification permissions after successful login
+  void _requestPushNotificationPermissions() {
+    debugPrint('🔔 [AUTH] Requesting push notification permissions after login...');
+    Future.microtask(() async {
+      try {
+        final permissionGranted = await PushNotificationService.instance.requestPermissionsAndSetupToken();
+        if (permissionGranted) {
+          debugPrint('✅ [AUTH] Push notification permissions granted');
+        } else {
+          debugPrint('❌ [AUTH] Push notification permissions denied');
+        }
+      } catch (e) {
+        debugPrint('❌ [AUTH] Error requesting push notification permissions: $e');
       }
     });
   }
