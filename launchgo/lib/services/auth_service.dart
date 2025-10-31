@@ -543,7 +543,7 @@ class AuthService extends ChangeNotifier {
           channelType: 'messaging',
           members: [_userInfo!.id, studentId],
           extraData: {
-            'name': 'Chat with ${getSelectedStudent()?.name ?? 'User'}',
+            'name': 'Chat with ${getSelectedStudent()?.name ?? 'Client'}',
             'studentId': studentId,
             'mentorId': _userInfo!.id,
           },
@@ -603,7 +603,7 @@ class AuthService extends ChangeNotifier {
             channelType: 'messaging',
             members: [_userInfo!.id, studentId],
             extraData: {
-              'name': 'Chat with ${getSelectedStudent()?.name ?? 'User'}',
+              'name': 'Chat with ${getSelectedStudent()?.name ?? 'Client'}',
               'studentId': studentId,
               'mentorId': _userInfo!.id,
             },

@@ -148,7 +148,7 @@ class _AppDrawerState extends State<AppDrawer> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(32, _horizontalPadding, _horizontalPadding, 8),
                     child: Text(
-                      'User',
+                      'Client',
                       style: TextStyle(
                         color: themeService.textTertiaryColor,
                         fontSize: 14,
@@ -165,7 +165,7 @@ class _AppDrawerState extends State<AppDrawer> {
                         return CupertinoDropdown(
                           value: selectedStudent?.name, // No default to first student
                           items: authService.students.map((student) => student.name).toList(),
-                          hintText: selectedStudent == null ? 'Select user' : 'Select user',
+                          hintText: selectedStudent == null ? 'Select client' : 'Select client',
                           onChanged: (studentName) {
                             if (studentName != null) {
                               // Find student by name and select them

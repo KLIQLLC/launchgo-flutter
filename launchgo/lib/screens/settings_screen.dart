@@ -57,7 +57,7 @@ class SettingsScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        authService.currentUser?.displayName ?? 'User',
+                        authService.currentUser?.displayName ?? 'Client',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w600,
