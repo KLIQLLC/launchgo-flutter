@@ -169,8 +169,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           });
         }
         
-        // Load notifications when user is authenticated (async to avoid framework lock)
-        Future.microtask(() => _notificationsService.fetchNotifications());
+        // Load notifications when user is authenticated and has valid token
+        if (_authService.isAuthenticated) {
+          Future.microtask(() => _notificationsService.fetchNotifications());
+        }
       }
     });
     
@@ -225,7 +227,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         }
       }
       
-      Future.microtask(() => _notificationsService.fetchNotifications());
+      // Only fetch notifications if user is authenticated
+      if (_authService.isAuthenticated) {
+        Future.microtask(() => _notificationsService.fetchNotifications());
+      }
       
       // Check for pending navigation when app resumes
       if (PendingNavigationService.instance.hasPendingNavigation) {

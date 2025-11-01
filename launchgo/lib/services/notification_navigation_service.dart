@@ -224,19 +224,117 @@ class NotificationNavigationService {
         break;
       
       case 'create-document':
-        // Navigate to documents screen
-        _router?.go('/documents');
+        // Use same navigation as update-document (semester switching + documents screen)
+        await handleUpdateDocument(
+          semesterId: data['semesterId'],
+          documentId: data['documentId'],
+        );
         break;
         
       case 'update-assignment':
+      case 'create-assignment':
         // Navigate to specific course assignments
         if (data['courseId'] != null) {
           _router?.go('/course/${data['courseId']}/assignments');
         }
         break;
         
+      case 'upload-attachment':
+        // Navigate to course assignments and scroll to specific assignment
+        if (data['assignmentId'] != null && data['courseId'] != null) {
+          // Switch context if needed
+          if (data['semesterId'] != null || data['studentId'] != null) {
+            await _switchContextIfNeeded(data['semesterId'], data['studentId']);
+          }
+          
+          // Build URL with query parameters for scroll-to-assignment
+          String url = '/course/${data['courseId']}/assignments?scrollToAssignmentId=${data['assignmentId']}';
+          List<String> queryParams = ['scrollToAssignmentId=${data['assignmentId']}'];
+          
+          // Add cell/line/section parameters if available
+          if (data['cellId'] != null) {
+            queryParams.add('cellId=${data['cellId']}');
+          }
+          if (data['lineNumber'] != null) {
+            queryParams.add('line=${data['lineNumber']}');
+          }
+          if (data['sectionId'] != null) {
+            queryParams.add('section=${data['sectionId']}');
+          }
+          
+          url = '/course/${data['courseId']}/assignments?${queryParams.join('&')}';
+          _router?.go(url);
+        } else {
+          // Fallback to courses if no specific assignment/course data
+          _router?.go('/courses');
+        }
+        break;
+        
+      case 'create-course':
+        // Navigate to courses screen
+        _router?.go('/courses');
+        break;
+        
+      case 'create-event':
+        // Navigate to schedule screen
+        _router?.go('/schedule');
+        break;
+        
       default:
         debugPrint('🔔 Unknown notification type: $eventType');
+    }
+  }
+
+  /// Switch semester and student context if needed before navigation
+  Future<void> _switchContextIfNeeded(String? semesterId, String? studentId) async {
+    if (_authService == null) return;
+    
+    bool contextChanged = false;
+    
+    try {
+      // Switch student if needed (for mentors)
+      if (studentId != null && 
+          _authService!.isMentor && 
+          _authService!.selectedStudentId != studentId) {
+        debugPrint('🔄 Switching to student: $studentId');
+        await _authService!.selectStudent(studentId);
+        contextChanged = true;
+      }
+      
+      // Switch semester if needed
+      if (semesterId != null && 
+          _authService!.selectedSemesterId != semesterId) {
+        debugPrint('🔄 Switching to semester: $semesterId');
+        await _authService!.selectSemester(semesterId);
+        contextChanged = true;
+      }
+      
+      // Wait for auth service state to propagate if context changed
+      if (contextChanged) {
+        debugPrint('📍 Context switched, waiting for state propagation...');
+        // Wait for the next frame to ensure notifyListeners() has been processed
+        await Future.delayed(const Duration(milliseconds: 100));
+        
+        // Verify the context has actually changed
+        bool contextApplied = true;
+        if (studentId != null && _authService!.isMentor) {
+          contextApplied = contextApplied && _authService!.selectedStudentId == studentId;
+        }
+        if (semesterId != null) {
+          contextApplied = contextApplied && _authService!.selectedSemesterId == semesterId;
+        }
+        
+        if (!contextApplied) {
+          debugPrint('⚠️ Context change not fully applied, waiting longer...');
+          // Fallback: wait a bit longer if state hasn't propagated
+          await Future.delayed(const Duration(milliseconds: 200));
+        }
+        
+        debugPrint('✅ Context switching complete');
+      }
+    } catch (e) {
+      debugPrint('❌ Error switching context: $e');
+      // Continue with navigation even if context switch fails
     }
   }
 }

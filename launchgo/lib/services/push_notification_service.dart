@@ -291,37 +291,41 @@ Screen value: ${message.data['screen']}
   void _storeNavigationFromMessage(RemoteMessage message) {
     final data = message.data;
     
-    // Determine target route
-    String? targetRoute;
-    Map<String, dynamic>? extra;
-    
-    // Handle update-document notification type using specialized service
-    if (data.containsKey('eventType') && data['eventType'] == 'update-document') {
-      debugPrint('🔔 Using NotificationNavigationService for update-document');
+    // First try to handle via NotificationNavigationService for structured notifications
+    if (data.containsKey('eventType')) {
+      final eventType = data['eventType'] as String;
+      debugPrint('🔔 Using NotificationNavigationService for eventType: $eventType');
       
-      // Use the specialized navigation service for complex handling
-      NotificationNavigationService.instance.handleUpdateDocument(
-        semesterId: data['semesterId'],
-        documentId: data['documentId'],
+      // Use the centralized navigation service for all eventType notifications
+      NotificationNavigationService.instance.handleNotification(
+        eventType: eventType,
+        data: data,
       );
       
       // Return early since navigation is handled by the service
       return;
     }
-    // Handle update-event notification type using specialized service
-    else if (data.containsKey('eventType') && data['eventType'] == 'update-event') {
-      debugPrint('🔔 Using NotificationNavigationService for update-event');
-      debugPrint('🔔 Event data: semesterId=${data['semesterId']}, eventId=${data['eventId']}');
+    
+    // Handle Stream Chat notifications
+    if (_isStreamChatNotification(data)) {
+      debugPrint('🔔 Using NotificationNavigationService for chat notification');
       
-      // Use the specialized navigation service for complex handling
-      NotificationNavigationService.instance.handleUpdateEvent(
-        semesterId: data['semesterId'],
-        eventId: data['eventId'],
+      // Use the specialized navigation service for chat handling
+      NotificationNavigationService.instance.handleChatNotification(
+        receiverId: data['receiver_id'],
+        channelId: data['channel_id'] ?? data['channel_cid'],
+        channelType: data['channel_type'],
       );
       
       // Return early since navigation is handled by the service
       return;
-    } else if (data.containsKey('screen')) {
+    }
+    
+    // Fallback to legacy handling for backward compatibility
+    String? targetRoute;
+    Map<String, dynamic>? extra;
+    
+    if (data.containsKey('screen')) {
       final screen = data['screen'] as String;
       targetRoute = _getRouteFromScreen(screen);
       
@@ -334,18 +338,6 @@ Screen value: ${message.data['screen']}
       if (data.containsKey('extra')) {
         extra = data['extra'] as Map<String, dynamic>;
       }
-    } else if (_isStreamChatNotification(data)) {
-      debugPrint('🔔 Using NotificationNavigationService for chat notification');
-      
-      // Use the specialized navigation service for chat handling
-      NotificationNavigationService.instance.handleChatNotification(
-        receiverId: data['receiver_id'],
-        channelId: data['channel_id'] ?? data['channel_cid'],
-        channelType: data['channel_type'],
-      );
-      
-      // Return early since navigation is handled by the service
-      return;
     }
     
     if (targetRoute != null) {

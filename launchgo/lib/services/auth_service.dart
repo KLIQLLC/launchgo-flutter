@@ -96,15 +96,22 @@ class AuthService extends ChangeNotifier {
       // Listen for authentication events
       signIn.authenticationEvents.listen(_handleAuthenticationEvent);
       
-      // If we have a valid token, skip Google Sign-In and use stored credentials
+      // If we have a valid token, attempt to load user info
       if (_accessToken != null && !JwtDecoder.isExpired(_accessToken!)) {
         
-        // Load user info and semesters immediately for valid tokens
-        debugPrint('🔐 Loading user data during initialization...');
-        await loadUserInfo();
-        
-        // Set up device registration callback for push notifications
-        _setupFCMTokenCallback();
+        // Try to load user info - if it fails, the token is invalid
+        debugPrint('🔐 Found stored token, attempting to load user data...');
+        try {
+          await loadUserInfo();
+          debugPrint('✅ Token valid, user data loaded successfully');
+          
+          // Set up device registration callback for push notifications
+          _setupFCMTokenCallback();
+        } catch (e) {
+          debugPrint('❌ Token invalid or expired, clearing stored token: $e');
+          _accessToken = null;
+          await SecureStorageService.clearAllAuthData();
+        }
       } else if (_accessToken != null && JwtDecoder.isExpired(_accessToken!)) {
         // Clear expired tokens
         await SecureStorageService.clearAllAuthData();
@@ -368,6 +375,37 @@ class AuthService extends ChangeNotifier {
   /// Set StreamChat service for presence management
   void setStreamChatService(StreamChatService streamChatService) {
     _streamChatService = streamChatService;
+  }
+  
+  /// Handle authentication failures and attempt automatic recovery
+  Future<bool> handleAuthFailure() async {
+    debugPrint('🔐 [AUTH] Handling authentication failure, attempting recovery...');
+    
+    try {
+      // Clear the current invalid token
+      _accessToken = null;
+      await SecureStorageService.clearAllAuthData();
+      notifyListeners();
+      
+      // Try to restore authentication silently if user is still signed in with Google
+      if (_currentUser != null) {
+        debugPrint('🔐 [AUTH] User still signed in with Google, attempting token refresh...');
+        await requestServerAuthorization();
+        
+        if (_accessToken != null) {
+          debugPrint('✅ [AUTH] Authentication recovered successfully');
+          // Reload user info with new token
+          await loadUserInfo();
+          return true;
+        }
+      }
+      
+      debugPrint('❌ [AUTH] Authentication recovery failed - user needs to sign in manually');
+      return false;
+    } catch (e) {
+      debugPrint('❌ [AUTH] Error during authentication recovery: $e');
+      return false;
+    }
   }
   
   /// Load user information including role and students

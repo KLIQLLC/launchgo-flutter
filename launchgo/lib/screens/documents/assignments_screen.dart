@@ -26,12 +26,55 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
   Map<String, dynamic> _currentCourse = {};
   bool _hasChanges = false; // Track if any assignments were modified
   String? _lastSelectedStudentId; // Track current student to detect changes
+  final ScrollController _scrollController = ScrollController();
+  String? _targetAssignmentId;
+  bool _hasScrolledToTarget = false;
+  
+  // Cell/line/section parameters for enhanced highlighting
+  String? _targetCellId;
+  int? _targetLineNumber;
+  String? _targetSectionId;
 
   @override
   void initState() {
     super.initState();
     _currentCourse = widget.course;
     _loadAssignments();
+    
+    // Check for scroll target from navigation
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      
+      // Check both extra data and query parameters
+      final routerState = GoRouterState.of(context);
+      final extra = routerState.extra as Map<String, dynamic>?;
+      String? targetAssignmentId;
+      
+      // First try extra data (for programmatic navigation)
+      if (extra != null && extra['scrollToAssignmentId'] != null) {
+        targetAssignmentId = extra['scrollToAssignmentId'] as String;
+      }
+      // Then try query parameters (for URL-based navigation)
+      else if (routerState.uri.queryParameters['scrollToAssignmentId'] != null) {
+        targetAssignmentId = routerState.uri.queryParameters['scrollToAssignmentId'];
+        
+        // Also extract cell/line/section parameters
+        _targetCellId = routerState.uri.queryParameters['cellId'];
+        _targetLineNumber = int.tryParse(routerState.uri.queryParameters['line'] ?? '');
+        _targetSectionId = routerState.uri.queryParameters['section'];
+      }
+      
+      if (targetAssignmentId != null) {
+        _targetAssignmentId = targetAssignmentId;
+        _hasScrolledToTarget = false; // Reset scroll flag for new target
+        
+        String debugMessage = '🔔 Assignments: Target assignment ID set: $_targetAssignmentId';
+        if (_targetCellId != null) debugMessage += ', cellId: $_targetCellId';
+        if (_targetLineNumber != null) debugMessage += ', line: $_targetLineNumber';
+        if (_targetSectionId != null) debugMessage += ', section: $_targetSectionId';
+        debugPrint(debugMessage);
+      }
+    });
   }
 
   @override
@@ -50,6 +93,96 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
         debugPrint('🔄 Selected student changed to: $currentStudentId - reloading assignments');
         _loadAssignments();
       }
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  /// Scroll to a specific assignment card and highlight it
+  void _scrollToAndHighlightAssignment(GlobalKey key) {
+    // Prevent multiple scroll attempts for the same target
+    if (_hasScrolledToTarget) return;
+    
+    try {
+      // Wait a bit longer to ensure widget is fully rendered
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (!mounted) return;
+        
+        final keyContext = key.currentContext;
+        if (keyContext != null) {
+          final renderBox = keyContext.findRenderObject() as RenderBox?;
+          if (renderBox != null && renderBox.hasSize) {
+            final position = renderBox.localToGlobal(Offset.zero);
+            final scrollPosition = _scrollController.offset + position.dy - 150; // Better offset calculation
+            
+            debugPrint('🔔 Scrolling to assignment at position: $scrollPosition');
+            
+            _scrollController.animateTo(
+              scrollPosition.clamp(0.0, _scrollController.position.maxScrollExtent),
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeInOut,
+            );
+            
+            _hasScrolledToTarget = true; // Mark as scrolled to prevent multiple attempts
+            
+            // Show cell/line/section information if available
+            if (_targetCellId != null || _targetLineNumber != null || _targetSectionId != null) {
+              String message = 'Assignment located';
+              if (_targetCellId != null) {
+                message += ' • Cell: $_targetCellId';
+              }
+              if (_targetLineNumber != null) {
+                message += ' • Line: $_targetLineNumber';
+              }
+              if (_targetSectionId != null) {
+                message += ' • Section: $_targetSectionId';
+              }
+              
+              Future.delayed(const Duration(milliseconds: 800), () {
+                if (mounted) {
+                  final scaffoldMessenger = ScaffoldMessenger.of(context);
+                  scaffoldMessenger.showSnackBar(
+                    SnackBar(
+                      content: Text(message),
+                      backgroundColor: const Color(0xFF4CAF50), // Success green
+                      duration: const Duration(seconds: 4),
+                    ),
+                  );
+                }
+              });
+            }
+            
+            // Clear the highlight after 3 seconds
+            Future.delayed(const Duration(seconds: 3), () {
+              if (mounted) {
+                setState(() {
+                  _targetAssignmentId = null;
+                  _targetCellId = null;
+                  _targetLineNumber = null;
+                  _targetSectionId = null;
+                  _hasScrolledToTarget = false; // Reset for next target
+                });
+                debugPrint('🔔 Assignment highlight cleared');
+              }
+            });
+          } else {
+            debugPrint('⚠️ RenderBox not ready, retrying...');
+            // Retry once if renderBox isn't ready
+            Future.delayed(const Duration(milliseconds: 200), () {
+              if (mounted && !_hasScrolledToTarget) {
+                _scrollToAndHighlightAssignment(key);
+              }
+            });
+          }
+        }
+      });
+    } catch (e) {
+      debugPrint('❌ Error scrolling to assignment: $e');
+      _hasScrolledToTarget = false; // Reset on error
     }
   }
 
@@ -153,7 +286,15 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
         ),
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: themeService.textColor),
-          onPressed: () => Navigator.of(context).pop(_hasChanges), // Return true only if changes were made
+          onPressed: () {
+            // Check if we can pop the navigation stack
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop(_hasChanges); // Return true only if changes were made
+            } else {
+              // If no navigation stack (opened via notification), go to courses
+              context.go('/courses');
+            }
+          },
         ),
       ),
       floatingActionButton: authService.permissions.canCreateDocuments 
@@ -224,6 +365,7 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
       color: ThemeService.accent,
       backgroundColor: themeService.cardColor,
       child: ListView.builder(
+        controller: _scrollController,
         padding: const EdgeInsets.all(16),
         itemCount: _assignments.length,
         itemBuilder: (context, index) {
@@ -236,9 +378,35 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
 
   Widget _buildAssignmentCard(Map<String, dynamic> assignment, ThemeService themeService) {
     final authService = context.watch<AuthService>();
+    final key = GlobalKey();
+    final isTargetAssignment = _targetAssignmentId != null && assignment['id'] == _targetAssignmentId;
     
-    return Container(
+    // Check if this is the target assignment to scroll to
+    if (isTargetAssignment && !_hasScrolledToTarget) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToAndHighlightAssignment(key);
+      });
+    }
+    
+    return AnimatedContainer(
+      key: key,
+      duration: const Duration(milliseconds: 500),
       margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: isTargetAssignment
+            ? Border.all(color: Colors.orange, width: 2)
+            : null,
+        boxShadow: isTargetAssignment
+            ? [
+                BoxShadow(
+                  color: Colors.orange.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  spreadRadius: 2,
+                )
+              ]
+            : null,
+      ),
       child: SwipeableCard(
         canSwipe: authService.permissions.canDeleteDocuments,
         canTap: true, // Allow all users to open assignments

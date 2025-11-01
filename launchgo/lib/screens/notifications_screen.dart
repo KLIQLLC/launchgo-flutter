@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:launchgo/models/notification_model.dart';
 import 'package:launchgo/services/notifications_api_service.dart';
 import 'package:launchgo/services/theme_service.dart';
+import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/theme/app_colors.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -390,8 +391,138 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       }
     }
     
-    // TODO: Add navigation based on notification type/metadata
-    // For now, just mark as read
+    // Navigate based on notification type and metadata
+    if (mounted) {
+      await _navigateBasedOnNotification(notification);
+    }
+  }
+
+  Future<void> _navigateBasedOnNotification(NotificationModel notification) async {
+    try {
+      switch (notification.type) {
+        case 'update-document':
+        case 'create-document':
+          // Extract document ID and optional cell reference from metadata
+          final documentId = notification.metadata?['documentId'] as String?;
+          final cellId = notification.metadata?['cellId'] as String?;
+          final lineNumber = notification.metadata?['lineNumber'] as int?;
+          final sectionId = notification.metadata?['sectionId'] as String?;
+          final semesterId = notification.metadata?['semesterId'] as String?;
+          final studentId = notification.metadata?['studentId'] as String?;
+          
+          if (documentId != null) {
+            // Switch semester and student if needed before navigation
+            await _switchContextIfNeeded(semesterId, studentId);
+            
+            // Always navigate to documents list and scroll to specific document
+            String url = '/documents?scrollToDocumentId=$documentId';
+            List<String> queryParams = ['scrollToDocumentId=$documentId'];
+            
+            // Add cell/line/section parameters for highlighting
+            if (cellId != null) {
+              queryParams.add('cellId=$cellId');
+            }
+            if (lineNumber != null) {
+              queryParams.add('line=$lineNumber');
+            }
+            if (sectionId != null) {
+              queryParams.add('section=$sectionId');
+            }
+            
+            url = '/documents?${queryParams.join('&')}';
+            if (mounted) {
+              context.go(url);
+            }
+          } else {
+            // Fallback to documents list if no specific document ID
+            if (mounted) {
+              context.go('/documents');
+            }
+          }
+          break;
+          
+        case 'create-assignment':
+        case 'update-assignment':
+          // Navigate to schedule screen where assignments are displayed
+          context.go('/schedule');
+          break;
+          
+        case 'create-event':
+        case 'update-event':
+          // Navigate to schedule screen where events are displayed
+          context.go('/schedule');
+          break;
+          
+        case 'upload-attachment':
+          // Extract assignment and course information from metadata
+          final assignmentId = notification.metadata?['assignmentId'] as String?;
+          final courseId = notification.metadata?['courseId'] as String?;
+          final semesterId = notification.metadata?['semesterId'] as String?;
+          final studentId = notification.metadata?['studentId'] as String?;
+          final cellId = notification.metadata?['cellId'] as String?;
+          final lineNumber = notification.metadata?['lineNumber'] as int?;
+          final sectionId = notification.metadata?['sectionId'] as String?;
+          
+          if (assignmentId != null && courseId != null) {
+            // Switch semester and student if needed before navigation
+            await _switchContextIfNeeded(semesterId, studentId);
+            
+            // Navigate to course assignments and scroll to specific assignment
+            String url = '/course/$courseId/assignments?scrollToAssignmentId=$assignmentId';
+            List<String> queryParams = ['scrollToAssignmentId=$assignmentId'];
+            
+            // Add cell/line/section parameters for highlighting
+            if (cellId != null) {
+              queryParams.add('cellId=$cellId');
+            }
+            if (lineNumber != null) {
+              queryParams.add('line=$lineNumber');
+            }
+            if (sectionId != null) {
+              queryParams.add('section=$sectionId');
+            }
+            
+            url = '/course/$courseId/assignments?${queryParams.join('&')}';
+            if (mounted) {
+              context.go(url);
+            }
+          } else {
+            // Fallback: try document navigation or just go to courses
+            final documentId = notification.metadata?['documentId'] as String?;
+            if (documentId != null) {
+              // Switch context if needed before document navigation
+              await _switchContextIfNeeded(semesterId, studentId);
+              if (mounted) {
+                context.go('/documents?scrollToDocumentId=$documentId');
+              }
+            } else if (mounted) {
+              context.go('/courses');
+            }
+          }
+          break;
+          
+        case 'create-course':
+          // Navigate to courses screen
+          context.go('/courses');
+          break;
+          
+        default:
+          // For unknown notification types, stay on notifications screen
+          // or navigate to a default screen
+          break;
+      }
+    } catch (e) {
+      debugPrint('Error navigating from notification: $e');
+      // If navigation fails, show error but don't crash
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Unable to navigate to content'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 
   String _formatTimeAgo(DateTime dateTime) {
@@ -425,6 +556,59 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return 'assets/icons/ic_course.svg';
       default:
         return 'assets/icons/ic_alert.svg';
+    }
+  }
+
+  /// Switch semester and student context if needed before navigation
+  Future<void> _switchContextIfNeeded(String? semesterId, String? studentId) async {
+    final authService = context.read<AuthService>();
+    
+    bool contextChanged = false;
+    
+    try {
+      // Switch student if needed (for mentors)
+      if (studentId != null && 
+          authService.isMentor && 
+          authService.selectedStudentId != studentId) {
+        debugPrint('🔄 Switching to student: $studentId');
+        await authService.selectStudent(studentId);
+        contextChanged = true;
+      }
+      
+      // Switch semester if needed
+      if (semesterId != null && 
+          authService.selectedSemesterId != semesterId) {
+        debugPrint('🔄 Switching to semester: $semesterId');
+        await authService.selectSemester(semesterId);
+        contextChanged = true;
+      }
+      
+      // Wait for auth service state to propagate if context changed
+      if (contextChanged) {
+        debugPrint('📍 Context switched, waiting for state propagation...');
+        // Wait for the next frame to ensure notifyListeners() has been processed
+        await Future.delayed(const Duration(milliseconds: 100));
+        
+        // Verify the context has actually changed
+        bool contextApplied = true;
+        if (studentId != null && authService.isMentor) {
+          contextApplied = contextApplied && authService.selectedStudentId == studentId;
+        }
+        if (semesterId != null) {
+          contextApplied = contextApplied && authService.selectedSemesterId == semesterId;
+        }
+        
+        if (!contextApplied) {
+          debugPrint('⚠️ Context change not fully applied, waiting longer...');
+          // Fallback: wait a bit longer if state hasn't propagated
+          await Future.delayed(const Duration(milliseconds: 200));
+        }
+        
+        debugPrint('✅ Context switching complete');
+      }
+    } catch (e) {
+      debugPrint('❌ Error switching context: $e');
+      // Continue with navigation even if context switch fails
     }
   }
 }
