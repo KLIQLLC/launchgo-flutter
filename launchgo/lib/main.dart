@@ -12,6 +12,7 @@ import 'package:launchgo/services/api_service.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/services/chat/stream_chat_service.dart';
 import 'package:launchgo/services/push_notification_service.dart';
+import 'package:launchgo/services/android_notification_display_service.dart';
 import 'package:launchgo/services/pending_navigation_service.dart';
 import 'package:launchgo/services/notifications_api_service.dart';
 import 'package:launchgo/widgets/splash_screen.dart';
@@ -144,6 +145,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // Set NotificationsApiService reference in PushNotificationService for badge updates
     PushNotificationService.instance.setNotificationsService(_notificationsService);
     
+    // Set router and auth service for AndroidNotificationDisplayService for tap navigation
+    AndroidNotificationDisplayService.instance.setRouter(_appRouter.router);
+    AndroidNotificationDisplayService.instance.setAuthService(_authService);
+    
     // Add app lifecycle observer
     WidgetsBinding.instance.addObserver(this);
     
@@ -169,9 +174,22 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           });
         }
         
-        // Load notifications when user is authenticated and has valid token
+        // Request FCM permissions and setup token for push notifications
         if (_authService.isAuthenticated) {
-          Future.microtask(() => _notificationsService.fetchNotifications());
+          Future.microtask(() async {
+            // Request FCM permissions and setup token
+            final success = await PushNotificationService.instance.requestPermissionsAndSetupToken();
+            if (success) {
+              debugPrint('✅ FCM token setup successful');
+              // Manually trigger Stream Chat FCM registration
+              await _streamChatService.registerPushTokenManually();
+            } else {
+              debugPrint('❌ FCM token setup failed');
+            }
+            
+            // Load notifications
+            _notificationsService.fetchNotifications();
+          });
         }
       }
     });
@@ -186,6 +204,20 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         userName: _authService.userInfo!.name,
         userImage: _authService.userInfo!.avatarUrl,
       );
+    }
+    
+    // Setup FCM token if already authenticated
+    if (_authService.isAuthenticated) {
+      Future.microtask(() async {
+        final success = await PushNotificationService.instance.requestPermissionsAndSetupToken();
+        if (success) {
+          debugPrint('✅ FCM token setup successful (initial)');
+          await _streamChatService.registerPushTokenManually();
+        } else {
+          debugPrint('❌ FCM token setup failed (initial)');
+        }
+        _notificationsService.fetchNotifications();
+      });
     }
     
     // Show splash screen for 2 seconds

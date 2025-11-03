@@ -8,6 +8,8 @@ import 'pending_navigation_service.dart';
 import 'auth_service.dart';
 import 'package:go_router/go_router.dart';
 import 'notification_navigation_service.dart';
+import 'android_notification_display_service.dart';
+import 'notification_parser.dart';
 
 /// Service for handling FCM token lifecycle and device registration
 class PushNotificationService extends ChangeNotifier {
@@ -129,11 +131,17 @@ class PushNotificationService extends ChangeNotifier {
     }
   }
   
+
   /// Request notification permissions and setup FCM token
   Future<bool> requestPermissionsAndSetupToken() async {
     debugPrint('🔔 Requesting notification permissions...');
     
     try {
+      // Initialize notification display service (Android only)
+      if (Platform.isAndroid) {
+        await AndroidNotificationDisplayService.instance.initialize();
+      }
+      
       // Request notification permissions
       NotificationSettings settings = await _messaging.requestPermission(
         alert: true,
@@ -260,8 +268,18 @@ class PushNotificationService extends ChangeNotifier {
     debugPrint('🔔 Message body: ${message.notification?.body}');
     
     // Show the notification even when app is in foreground
-    // Note: For production, you might want to show a custom in-app notification instead
-    debugPrint('🔔 Showing notification in foreground');
+    // For Stream Chat data-only notifications, show them manually
+    if (NotificationParser.isStreamChatMessage(message.data)) {
+      final chatData = NotificationParser.parseStreamChatData(message.data);
+      AndroidNotificationDisplayService.instance.showStreamChatNotification(
+        title: chatData.title,
+        body: chatData.body,
+        channelId: chatData.channelId,
+        senderId: chatData.senderId,
+      );
+    } else {
+      debugPrint('🔔 Non-Stream Chat foreground notification');
+    }
     
     // Update notification badge count when foreground notification received
     if (_notificationsService != null) {
@@ -412,10 +430,20 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // Handle background message
   // This runs when app is terminated or in background
   
-  // Android automatically shows notifications when app is in background/terminated
-  // The system notification will appear in the notification tray
-  debugPrint('🔔 Background notification will be shown by system');
-  
-  // You can update local storage, sync data, etc.
-  // But avoid heavy operations here
+  // For Stream Chat data-only notifications, we need to show them manually
+  if (NotificationParser.isStreamChatMessage(message.data)) {
+    final chatData = NotificationParser.parseStreamChatData(message.data);
+    await AndroidNotificationDisplayService.instance.showStreamChatNotification(
+      title: chatData.title,
+      body: chatData.body,
+      channelId: chatData.channelId,
+      senderId: chatData.senderId,
+    );
+  } else if (message.notification != null) {
+    // Android automatically shows notifications when app is in background/terminated
+    // The system notification will appear in the notification tray
+    debugPrint('🔔 Background notification will be shown by system');
+  } else {
+    debugPrint('🔔 Data-only notification received, no automatic display');
+  }
 }
