@@ -7,6 +7,11 @@ import '../../services/theme_service.dart';
 import '../../models/event_model.dart';
 import '../../widgets/cupertino_dropdown.dart';
 import '../../utils/time_utils.dart';
+import 'location_edit_screen.dart'; // Added import for LocationEditScreen
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart' as geocoding;
 
 class EventFormScreen extends StatefulWidget {
   final Event? event;
@@ -33,6 +38,9 @@ class _EventFormScreenState extends State<EventFormScreen> {
 
   late String _selectedType;
   bool _isLoading = false;
+
+  String? _locationAddress;
+  LatLng? _locationLatLng;
 
   final List<String> _eventTypes = [
     'lg_session',
@@ -65,6 +73,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
       _endTime = TimeOfDay.fromDateTime(localEndAt);
       
       _selectedType = widget.event!.type;
+      _locationAddress = widget.event!.location ?? '';
+      _locationLatLng = null;
     } else {
       // Add mode - initialize with defaults
       _nameController = TextEditingController();
@@ -77,6 +87,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
       _endTime = const TimeOfDay(hour: 12, minute: 0); // 12:00 PM
       
       _selectedType = 'lg_session';
+      _locationAddress = '';
+      _locationLatLng = null;
     }
   }
 
@@ -186,9 +198,11 @@ class _EventFormScreenState extends State<EventFormScreen> {
           eventData['description'] = _descriptionController.text.trim();
         }
         
-        if (_locationController.text.trim() != (widget.event!.location ?? '')) {
-          eventData['location'] = _locationController.text.trim();
+        if (_locationAddress != (widget.event!.location ?? '')) {
+          eventData['addressLocation'] = _locationAddress;
         }
+        eventData['latLocation'] = _locationLatLng != null ? _locationLatLng!.latitude.toString() : '';
+        eventData['longLocation'] = _locationLatLng != null ? _locationLatLng!.longitude.toString() : '';
         
         if (_selectedType != widget.event!.type) {
           eventData['type'] = _selectedType;
@@ -223,7 +237,9 @@ class _EventFormScreenState extends State<EventFormScreen> {
         final eventData = {
           'name': _nameController.text.trim(),
           'description': _descriptionController.text.trim(),
-          'location': _locationController.text.trim(),
+          'addressLocation': _locationAddress ?? '',
+          'latLocation': _locationLatLng != null ? _locationLatLng!.latitude.toString() : '',
+          'longLocation': _locationLatLng != null ? _locationLatLng!.longitude.toString() : '',
           'type': _selectedType,
           'startAt': _startDateTime.toUtc().toIso8601String(),
           'endAt': _endDateTime.toUtc().toIso8601String(),
@@ -299,11 +315,51 @@ class _EventFormScreenState extends State<EventFormScreen> {
                     const SizedBox(height: 20),
                     _buildTypeDropdown(),
                     const SizedBox(height: 20),
-                    _buildTextField(
-                      controller: _locationController,
-                      label: 'Location',
-                      hint: 'Enter event location',
-                      themeService: themeService,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Location',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () => _openLocationEditScreen(context),
+                          child: Container(
+                            height: 52,
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1A2332),
+                              border: Border.all(color: Colors.grey[600]!),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    _locationAddress?.isNotEmpty == true ? _locationAddress! : 'Enter event location',
+                                    style: TextStyle(
+                                      color: _locationAddress?.isNotEmpty == true ? Colors.white : Colors.white54,
+                                      fontSize: 15,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Icon(
+                                  _locationAddress?.isNotEmpty == true ? Icons.edit_location_alt : Icons.add_location_alt,
+                                  color: Colors.white,
+                                )
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 20),
                     _buildTextField(
@@ -578,4 +634,63 @@ class _EventFormScreenState extends State<EventFormScreen> {
     );
   }
 
+  void _openLocationEditScreen(BuildContext context) async {
+    String? suggestAddress;
+    LatLng? suggestCoords;
+
+    // Ensure Location Services are enabled
+    final servicesEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!servicesEnabled) {
+      await Geolocator.openLocationSettings();
+    }
+
+    // Request app-level permission explicitly for iOS
+    var status = await Permission.locationWhenInUse.status;
+    if (status.isDenied) {
+      status = await Permission.locationWhenInUse.request();
+    }
+
+    if (status.isPermanentlyDenied || status.isRestricted) {
+      await openAppSettings();
+    }
+
+    if (status.isGranted) {
+      try {
+        Position pos = await Geolocator.getCurrentPosition();
+        suggestCoords = LatLng(pos.latitude, pos.longitude);
+        List<geocoding.Placemark> placemarks = await geocoding.placemarkFromCoordinates(pos.latitude, pos.longitude);
+        if (placemarks.isNotEmpty) {
+          final place = placemarks.first;
+          final address = [
+            if (place.street != null) place.street,
+            if (place.subLocality != null) place.subLocality,
+            if (place.locality != null) place.locality,
+            if (place.administrativeArea != null) place.administrativeArea,
+            if (place.country != null) place.country,
+          ].where((e) => e != null && e.toString().trim().isNotEmpty).join(', ');
+          suggestAddress = address;
+        }
+      } catch (e) {
+        // fallback: не удалось определить координаты/адрес
+      }
+    }
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => LocationEditScreen(
+          initialLocation: suggestAddress ?? _locationAddress ?? '',
+          initialCoords: suggestCoords ?? _locationLatLng,
+        ),
+      ),
+    );
+    if (result is Map && result['address'] is String) {
+      setState(() {
+        _locationAddress = result['address'] ?? '';
+        if (result['lat'] is double && result['lng'] is double) {
+          _locationLatLng = LatLng(result['lat'], result['lng']);
+        } else {
+          _locationLatLng = null;
+        }
+      });
+    }
+  }
 }
