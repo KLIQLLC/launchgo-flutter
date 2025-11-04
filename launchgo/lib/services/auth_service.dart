@@ -13,6 +13,7 @@ import 'permissions_service.dart';
 import 'preferences_service.dart';
 import 'chat/stream_chat_service.dart';
 import 'push_notification_service.dart';
+import 'weekly_notification_service.dart';
 
 /// Service for managing user authentication with Google Sign-In and backend JWT tokens
 class AuthService extends ChangeNotifier {
@@ -230,6 +231,15 @@ class AuthService extends ChangeNotifier {
       await SecureStorageService.clearAllAuthData();
       await PreferencesService.clearAllPreferences();
       
+      // Cancel weekly notifications
+      try {
+        await WeeklyNotificationService.instance.cancelWeeklyRecapNotification();
+        debugPrint('✅ [AUTH] Weekly notifications cancelled during logout');
+      } catch (e) {
+        debugPrint('❌ [AUTH] Error cancelling weekly notifications: $e');
+        // Don't fail logout if notification cancellation fails
+      }
+      
       notifyListeners();
     } catch (error) {
       // Handle sign out error
@@ -331,6 +341,9 @@ class AuthService extends ChangeNotifier {
         
         // Request push notification permissions after successful login
         _requestPushNotificationPermissions();
+        
+        // Schedule weekly notifications for mentors after successful login
+        _scheduleWeeklyNotifications();
         
         // Set user online after successful authentication
         if (_streamChatService != null && _streamChatService!.isUserConnected) {
@@ -745,6 +758,21 @@ class AuthService extends ChangeNotifier {
         }
       } catch (e) {
         debugPrint('❌ [AUTH] Error requesting push notification permissions: $e');
+      }
+    });
+  }
+  
+  /// Schedule weekly notifications for mentors after successful login
+  void _scheduleWeeklyNotifications() {
+    debugPrint('📅 [AUTH] Scheduling weekly notifications after login...');
+    Future.microtask(() async {
+      try {
+        await WeeklyNotificationService.instance.initialize();
+        await WeeklyNotificationService.instance.scheduleWeeklyRecapNotification(_userInfo);
+        debugPrint('✅ [AUTH] Weekly notifications scheduled successfully');
+      } catch (e) {
+        debugPrint('❌ [AUTH] Error scheduling weekly notifications: $e');
+        // Don't fail login if notification scheduling fails
       }
     });
   }
