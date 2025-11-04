@@ -21,21 +21,21 @@ class CourseCard extends StatelessWidget {
     required this.cardIndex,
   });
 
-  LinearGradient _getAssignmentButtonGradient() {
+  LinearGradient _getGradeGradient() {
     final gradients = [
-      // First card: Blue gradient (top to bottom)
+      // First card: Blue gradient
       const LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [Color(0xFF4A8EF2), Color(0xFF0E4FD3)],
       ),
-      // Second card: Purple gradient (top to bottom)  
+      // Second card: Purple gradient  
       const LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [Color(0xFFB862E8), Color(0xFF9433C5)],
       ),
-      // Third card: Green gradient (top to bottom)
+      // Third card: Green gradient
       const LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
@@ -60,18 +60,12 @@ class CourseCard extends StatelessWidget {
           border: Border.all(color: themeService.borderColor),
         ),
         child: Padding(
-          padding: const EdgeInsets.only(top: 16),
+          padding: const EdgeInsets.all(16),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Content with padding (all except assignments button)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Course header
-                    Row(
+              // Course header
+              Row(
                 children: [
                   Expanded(
                     child: Column(
@@ -170,31 +164,40 @@ class CourseCard extends StatelessWidget {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(6),
-                    child: SvgPicture.asset(
-                      'assets/icons/ic_graduation_cap.svg',
-                      width: 18,
-                      height: 18,
-                      colorFilter: ColorFilter.mode(
-                        themeService.textColor,
-                        BlendMode.srcIn,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2), // Increased horizontal padding for better width
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: AppColors.getGradeBackground(course['grade']),
-                      borderRadius: BorderRadius.circular(12), // Slightly less rounded
+                      gradient: _getGradeGradient(),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(
-                      course['grade'] ?? 'N/A',
-                      style: TextStyle(
-                        color: AppColors.getGradeTextColor(course['grade']), // Dynamic text color based on background
-                        fontSize: 13, // Slightly smaller font
-                        fontWeight: FontWeight.w600, // Semibold
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SvgPicture.asset(
+                          'assets/icons/ic_graduation_cap.svg',
+                          width: 16,
+                          height: 16,
+                          colorFilter: const ColorFilter.mode(
+                            Colors.white,
+                            BlendMode.srcIn,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            course['grade'] ?? 'N/A',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -214,24 +217,19 @@ class CourseCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
-                  ],
-                ),
-              ),
               
               // Assignments section
               const SizedBox(height: 16),
               GestureDetector(
                 onTap: onAssignmentsTap,
                 child: Container(
-                  width: double.infinity,
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    gradient: _getAssignmentButtonGradient(),
+                    gradient: _getGradeGradient(),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                    child: Row(
-                      children: [
-                      const SizedBox(width: 10),
+                  child: Row(
+                    children: [
                       SvgPicture.asset(
                         'assets/icons/ic_course.svg',
                         width: 20,

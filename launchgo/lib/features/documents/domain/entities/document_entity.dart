@@ -4,7 +4,6 @@ enum DocumentType {
   studyGuide,
   assignment,
   notes,
-  other,
 }
 
 class DocumentEntity extends Equatable {
@@ -41,7 +40,7 @@ class DocumentEntity extends Equatable {
       case 'notes':
         return DocumentType.notes;
       default:
-        return DocumentType.other;
+        return DocumentType.notes; // Default to notes for unknown categories
     }
   }
 
@@ -53,8 +52,6 @@ class DocumentEntity extends Equatable {
         return 'assignment';
       case DocumentType.notes:
         return 'notes';
-      case DocumentType.other:
-        return 'other';
     }
   }
 

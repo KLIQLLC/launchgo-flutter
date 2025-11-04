@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
@@ -97,7 +98,7 @@ class _AppDrawerState extends State<AppDrawer> {
                   child: Divider(color: themeService.borderColor, height: 1),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(_horizontalPadding, _horizontalPadding, _horizontalPadding, 8),
+                  padding: const EdgeInsets.fromLTRB(32, _horizontalPadding, _horizontalPadding, 8),
                   child: Text(
                     'Semester',
                     style: TextStyle(
@@ -145,9 +146,9 @@ class _AppDrawerState extends State<AppDrawer> {
                 if (authService.permissions.canShowStudentSelection) ...[
                   const SizedBox(height: 8),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(_horizontalPadding, _horizontalPadding, _horizontalPadding, 8),
+                    padding: const EdgeInsets.fromLTRB(32, _horizontalPadding, _horizontalPadding, 8),
                     child: Text(
-                      'Student',
+                      'Client',
                       style: TextStyle(
                         color: themeService.textTertiaryColor,
                         fontSize: 14,
@@ -164,7 +165,7 @@ class _AppDrawerState extends State<AppDrawer> {
                         return CupertinoDropdown(
                           value: selectedStudent?.name, // No default to first student
                           items: authService.students.map((student) => student.name).toList(),
-                          hintText: selectedStudent == null ? 'Select student' : 'Select student',
+                          hintText: selectedStudent == null ? 'Select client' : 'Select client',
                           onChanged: (studentName) {
                             if (studentName != null) {
                               // Find student by name and select them
@@ -183,33 +184,21 @@ class _AppDrawerState extends State<AppDrawer> {
                 ],
                 
                 const SizedBox(height: 8),
-                // Navigation label
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(_horizontalPadding, _horizontalPadding, _horizontalPadding, 8),
-                  child: Text(
-                    'Navigation',
-                    style: TextStyle(
-                      color: themeService.textTertiaryColor,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.5,
+                // Settings with indent (only in debug mode)
+                if (kDebugMode)
+                  Padding(
+                    padding: const EdgeInsets.only(left: _itemIndentPadding),
+                    child: _buildDrawerItem(
+                      context: context,
+                      title: 'Settings',
+                      isSelected: currentRoute == '/settings',
+                      svgPath: 'assets/icons/ic_settings.svg',
+                      onTap: () {
+                        Navigator.pop(context); // Close drawer
+                        context.push('/settings');
+                      },
                     ),
                   ),
-                ),
-                // Settings with indent
-                Padding(
-                  padding: const EdgeInsets.only(left: _itemIndentPadding),
-                  child: _buildDrawerItem(
-                    context: context,
-                    title: 'Settings',
-                    isSelected: currentRoute == '/settings',
-                    svgPath: 'assets/icons/ic_settings.svg',
-                    onTap: () {
-                      Navigator.pop(context); // Close drawer
-                      context.push('/settings');
-                    },
-                  ),
-                ),
                 // Logout Button with indent
                 Padding(
                   padding: const EdgeInsets.only(left: _itemIndentPadding),

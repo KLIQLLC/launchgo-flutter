@@ -211,7 +211,15 @@ class DocumentUploadWidget extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'PDF, Word, Images',
+                          'Maximum 1 file, 30MB',
+                          style: TextStyle(
+                            color: textSecondaryColor,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Supports PDF, Word, Images, and Text files',
                           style: TextStyle(
                             color: textSecondaryColor,
                             fontSize: 13,

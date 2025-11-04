@@ -68,18 +68,42 @@ class DocumentCard extends StatelessWidget {
   }
 
   Widget _buildTypeTag(ThemeService themeService) {
-    final tagColors = _getTagColors(themeService, document.type);
+    LinearGradient gradient;
+    
+    switch (document.type) {
+      case DocumentType.notes:
+        gradient = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF5FD585), Color(0xFF27A353)], // Green gradient
+        );
+        break;
+      case DocumentType.assignment:
+        gradient = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFB862E8), Color(0xFF9433C5)], // Purple gradient
+        );
+        break;
+      case DocumentType.studyGuide:
+        gradient = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF4A8EF2), Color(0xFF0E4FD3)], // Blue gradient
+        );
+        break;
+    }
     
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: tagColors.backgroundColor,
+        gradient: gradient,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
         document.typeLabel,
-        style: TextStyle(
-          color: tagColors.textColor,
+        style: const TextStyle(
+          color: Colors.white,
           fontSize: 12,
           fontWeight: FontWeight.w600,
         ),
@@ -98,27 +122,60 @@ class DocumentCard extends StatelessWidget {
   }
 
   Widget _buildOpenButton(ThemeService themeService) {
+    LinearGradient gradient;
+    
+    switch (document.type) {
+      case DocumentType.notes:
+        gradient = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF5FD585), Color(0xFF27A353)], // Green gradient
+        );
+        break;
+      case DocumentType.assignment:
+        gradient = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFB862E8), Color(0xFF9433C5)], // Purple gradient
+        );
+        break;
+      case DocumentType.studyGuide:
+        gradient = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF4A8EF2), Color(0xFF0E4FD3)], // Blue gradient
+        );
+        break;
+    }
+    
     return SizedBox(
       width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: () => _openInGoogleDocs(document.link),
-        icon: Icon(
-          Icons.open_in_new,
-          size: 18,
-          color: themeService.textColor,
-        ),
-        label: Text(
-          'Open in Google Docs',
-          style: TextStyle(color: themeService.textColor),
-        ),
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          side: BorderSide(
-            color: themeService.borderColor,
-            width: 1,
+      child: GestureDetector(
+        onTap: () => _openInGoogleDocs(document.link),
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            gradient: gradient,
+            borderRadius: BorderRadius.circular(10),
           ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.open_in_new,
+                size: 18,
+                color: Colors.white,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Open in Google Docs',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
         ),
       ),

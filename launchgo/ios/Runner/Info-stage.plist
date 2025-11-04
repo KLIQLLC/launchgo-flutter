@@ -29,14 +29,14 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.481027521494-mu6kimtm49dj6cmgjvdjjckcc6j9rees</string>
+				<string>com.googleusercontent.apps.481027521494-m3ttqvnu1bakqlu9gldt6ujgbvfobbg0</string>
 			</array>
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>GIDClientID</key>
-	<string>481027521494-mu6kimtm49dj6cmgjvdjjckcc6j9rees.apps.googleusercontent.com</string>
+	<string>481027521494-m3ttqvnu1bakqlu9gldt6ujgbvfobbg0.apps.googleusercontent.com</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
@@ -51,8 +51,6 @@
 	<string>This app needs access to photo library to allow you to upload documents and images.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
-	<key>NSLocationWhenInUseUsageDescription</key>
-    <string>We need to know your location to select an address.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

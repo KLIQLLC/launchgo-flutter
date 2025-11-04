@@ -26,21 +26,21 @@ echo -e "${YELLOW}📦 Cleaning and updating dependencies...${NC}"
 fvm flutter clean
 fvm flutter pub get
 
-# Build iOS with Flutter using stage flavor but production environment
-echo -e "${YELLOW}🏗️ Building iOS for TestFlight (stage bundle ID + prod env)...${NC}"
-fvm flutter build ios --flavor stage --dart-define=ENV=prod
+# Build iOS with Flutter using production configuration
+echo -e "${YELLOW}🏗️ Building iOS for TestFlight (production bundle ID + prod env)...${NC}"
+fvm flutter build ios --flavor prod --dart-define=ENV=prod
 
 # iOS specific setup
 echo -e "${YELLOW}🍎 Setting up iOS dependencies...${NC}"
 cd ios
 pod install
 
-# Build archive with Release-stage configuration
+# Build archive with Release-prod configuration
 echo -e "${YELLOW}🏗️ Building iOS archive for TestFlight...${NC}"
 xcodebuild -workspace Runner.xcworkspace \
   -scheme Runner \
-  -configuration Release-stage \
-  -archivePath build/Runner-stage.xcarchive \
+  -configuration Release-prod \
+  -archivePath build/Runner-prod.xcarchive \
   -destination 'generic/platform=iOS' \
   clean archive
 
@@ -50,9 +50,9 @@ if [ $? -eq 0 ]; then
     # Export IPA
     echo -e "${YELLOW}📦 Exporting IPA...${NC}"
     xcodebuild -exportArchive \
-      -archivePath build/Runner-stage.xcarchive \
+      -archivePath build/Runner-prod.xcarchive \
       -exportPath build/testflight-ipa \
-      -exportOptionsPlist ExportOptions-stage.plist
+      -exportOptionsPlist ExportOptions-prod.plist
     
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}✅ IPA exported successfully!${NC}"
@@ -67,7 +67,7 @@ if [ $? -eq 0 ]; then
         echo ""
         echo "Or use Xcode Organizer:"
         echo "1. Open Xcode → Window → Organizer"
-        echo "2. Find the Runner-stage archive"
+        echo "2. Find the Runner-prod archive"
         echo "3. Click Distribute App"
     else
         echo -e "${RED}❌ IPA export failed!${NC}"

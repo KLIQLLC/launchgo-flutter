@@ -20,7 +20,7 @@ class _FormConstants {
   static const double horizontalPadding = 12.0;
   static const double spacingMedium = 16.0;
   static const double spacingLarge = 24.0;
-  static const int maxFileSize = 10485760; // 10MB
+  static const int maxFileSize = 31457280; // 30MB
   static const Duration defaultDueDateOffset = Duration(days: 7);
 }
 
@@ -867,7 +867,7 @@ class _AssignmentFormScreenState extends State<AssignmentFormScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('File "${file.name}" exceeds 5MB limit'),
+                content: Text('File "${file.name}" exceeds 30MB limit'),
                 backgroundColor: AppColors.error,
               ),
             );

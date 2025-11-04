@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_colors.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -13,7 +15,22 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  bool _isAgeConsentChecked = false;
+  bool _isPrivacyPolicyChecked = false;
+
+  bool get _canSignIn => _isAgeConsentChecked && _isPrivacyPolicyChecked;
+
   Future<void> _handleSignIn() async {
+    // Check if both checkboxes are checked
+    if (!_canSignIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please agree to both terms before signing in'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
     final authService = context.read<AuthService>();
     
     final success = await authService.signIn();
@@ -42,6 +59,20 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleSignOut() async {
     final authService = context.read<AuthService>();
     await authService.signOut();
+  }
+
+  Future<void> _launchPrivacyPolicy() async {
+    final uri = Uri.parse('https://app.termly.io/policy-viewer/policy.html?policyUUID=f251ca64-f15f-4f59-aefd-be8ffe01c6b6');
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not open privacy policy'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -73,6 +104,70 @@ class _LoginScreenState extends State<LoginScreen> {
                     // 1. User is not signed in with Google at all, OR
                     // 2. User is signed in with Google but doesn't have backend access token
                     if (authService.currentUser == null || !authService.hasAccessToken) ...[
+                      // Age consent checkbox
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          maxWidth: 320,
+                        ),
+                        child: CheckboxListTile(
+                          value: _isAgeConsentChecked,
+                          onChanged: (value) {
+                            setState(() {
+                              _isAgeConsentChecked = value ?? false;
+                            });
+                          },
+                          title: const Text(
+                            'I am over 13 years old and/or have my parent or guardians permission to use this application.',
+                            style: TextStyle(
+                              color: AppColors.textWhite70,
+                              fontSize: 14,
+                            ),
+                          ),
+                          controlAffinity: ListTileControlAffinity.leading,
+                          contentPadding: EdgeInsets.zero,
+                          activeColor: AppColors.accent,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Privacy policy checkbox
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          maxWidth: 320,
+                        ),
+                        child: CheckboxListTile(
+                          value: _isPrivacyPolicyChecked,
+                          onChanged: (value) {
+                            setState(() {
+                              _isPrivacyPolicyChecked = value ?? false;
+                            });
+                          },
+                          title: RichText(
+                            text: TextSpan(
+                              style: const TextStyle(
+                                color: AppColors.textWhite70,
+                                fontSize: 14,
+                              ),
+                              children: [
+                                const TextSpan(text: 'I have read and agree to the '),
+                                TextSpan(
+                                  text: 'privacy policy and terms of use',
+                                  style: const TextStyle(
+                                    color: AppColors.accent,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                  recognizer: TapGestureRecognizer()
+                                    ..onTap = _launchPrivacyPolicy,
+                                ),
+                              ],
+                            ),
+                          ),
+                          controlAffinity: ListTileControlAffinity.leading,
+                          contentPadding: EdgeInsets.zero,
+                          activeColor: AppColors.accent,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
                       ConstrainedBox(
                         constraints: const BoxConstraints(
                           maxWidth: 320, // Maximum width for iPad
@@ -81,7 +176,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           width: double.infinity,
                           height: 54,
                           child: ElevatedButton(
-                            onPressed: authService.isSigningIn ? null : _handleSignIn,
+                            onPressed: authService.isSigningIn || !_canSignIn ? null : _handleSignIn,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.textPrimary,
                               foregroundColor: Colors.black87,
@@ -107,6 +202,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                         'assets/icons/ic_google.svg',
                                         height: 24,
                                         width: 24,
+                                        colorFilter: !_canSignIn 
+                                            ? const ColorFilter.mode(
+                                                AppColors.textGrey, 
+                                                BlendMode.srcIn,
+                                              )
+                                            : null,
                                       ),
                                       const SizedBox(width: 12),
                                       Text(

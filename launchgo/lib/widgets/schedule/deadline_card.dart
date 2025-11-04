@@ -301,11 +301,11 @@ class _DeadlineCardState extends State<DeadlineCard> {
 
       if (result != null) {
         final file = result.files.first;
-        if (file.size > 10485760) { // 10MB limit
+        if (file.size > 31457280) { // 30MB limit
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('File "${file.name}" exceeds 10MB limit'),
+                content: Text('File "${file.name}" exceeds 30MB limit'),
                 backgroundColor: Colors.red,
               ),
             );

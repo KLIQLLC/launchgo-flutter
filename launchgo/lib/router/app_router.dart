@@ -129,7 +129,22 @@ class AppRouter {
           path: '/course/:courseId/assignments',
           name: 'courseAssignments',
           builder: (context, state) {
-            final course = state.extra as Map<String, dynamic>;
+            final courseId = state.pathParameters['courseId']!;
+            
+            // Try to get course from extra data (when navigating from course card)
+            Map<String, dynamic> course;
+            if (state.extra != null) {
+              course = state.extra as Map<String, dynamic>;
+            } else {
+              // Create minimal course data when navigating via URL (from notifications)
+              course = {
+                'id': courseId,
+                'code': 'Unknown', // Will be updated when assignments load
+                'name': 'Course Assignments',
+                'assignments': [], // Will be populated when screen loads
+              };
+            }
+            
             return AssignmentsScreen(course: course);
           },
         ),
@@ -240,7 +255,7 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
 
   final Widget child;
   
-  static const Color _selectedTabColor = Color(0xFFB54209);
+  static const Color _selectedTabColor = Color(0xFFDC8862);
 
   @override
   Widget build(BuildContext context) {

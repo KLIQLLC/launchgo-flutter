@@ -46,12 +46,61 @@ class DocumentsView extends StatefulWidget {
 
 class _DocumentsViewState extends State<DocumentsView> {
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   String? _previousSelectedSemesterId;
   String? _previousSelectedStudentId;
+  String? _targetDocumentId;
+  bool _hasScrolledToTarget = false;
+  
+  // Cell/line/section parameters for enhanced highlighting
+  String? _targetCellId;
+  int? _targetLineNumber;
+  String? _targetSectionId;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // Check for scroll target from navigation
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      
+      // Check both extra data and query parameters
+      final routerState = GoRouterState.of(context);
+      final extra = routerState.extra as Map<String, dynamic>?;
+      String? targetDocumentId;
+      
+      // First try extra data (for programmatic navigation)
+      if (extra != null && extra['scrollToDocumentId'] != null) {
+        targetDocumentId = extra['scrollToDocumentId'] as String;
+      }
+      // Then try query parameters (for URL-based navigation)
+      else if (routerState.uri.queryParameters['scrollToDocumentId'] != null) {
+        targetDocumentId = routerState.uri.queryParameters['scrollToDocumentId'];
+        
+        // Also extract cell/line/section parameters
+        _targetCellId = routerState.uri.queryParameters['cellId'];
+        _targetLineNumber = int.tryParse(routerState.uri.queryParameters['line'] ?? '');
+        _targetSectionId = routerState.uri.queryParameters['section'];
+      }
+      
+      if (targetDocumentId != null) {
+        _targetDocumentId = targetDocumentId;
+        _hasScrolledToTarget = false; // Reset scroll flag for new target
+        
+        String debugMessage = '🔔 Documents: Target document ID set: $_targetDocumentId';
+        if (_targetCellId != null) debugMessage += ', cellId: $_targetCellId';
+        if (_targetLineNumber != null) debugMessage += ', line: $_targetLineNumber';
+        if (_targetSectionId != null) debugMessage += ', section: $_targetSectionId';
+        debugPrint(debugMessage);
+      }
+    });
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -63,6 +112,89 @@ class _DocumentsViewState extends State<DocumentsView> {
     
     // Wait for the loading to complete by listening to state changes
     await bloc.stream.firstWhere((state) => state is! DocumentsLoading);
+  }
+  
+  /// Scroll to a specific document card and highlight it
+  void _scrollToAndHighlightDocument(GlobalKey key) {
+    // Prevent multiple scroll attempts for the same target
+    if (_hasScrolledToTarget) return;
+    
+    try {
+      // Wait a bit longer to ensure widget is fully rendered
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (!mounted) return;
+        
+        final context = key.currentContext;
+        if (context != null) {
+          final renderBox = context.findRenderObject() as RenderBox?;
+          if (renderBox != null && renderBox.hasSize) {
+            final position = renderBox.localToGlobal(Offset.zero);
+            final scrollPosition = _scrollController.offset + position.dy - 150; // Better offset calculation
+            
+            debugPrint('🔔 Scrolling to document at position: $scrollPosition');
+            
+            _scrollController.animateTo(
+              scrollPosition.clamp(0.0, _scrollController.position.maxScrollExtent),
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeInOut,
+            );
+            
+            _hasScrolledToTarget = true; // Mark as scrolled to prevent multiple attempts
+            
+            // Show cell/line/section information if available
+            if (_targetCellId != null || _targetLineNumber != null || _targetSectionId != null) {
+              String message = 'Document located';
+              if (_targetCellId != null) {
+                message += ' • Cell: $_targetCellId';
+              }
+              if (_targetLineNumber != null) {
+                message += ' • Line: $_targetLineNumber';
+              }
+              if (_targetSectionId != null) {
+                message += ' • Section: $_targetSectionId';
+              }
+              
+              Future.delayed(const Duration(milliseconds: 800), () {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(message),
+                      backgroundColor: const Color(0xFF4CAF50), // Success green
+                      duration: const Duration(seconds: 4),
+                    ),
+                  );
+                }
+              });
+            }
+            
+            // Clear the highlight after 3 seconds
+            Future.delayed(const Duration(seconds: 3), () {
+              if (mounted) {
+                setState(() {
+                  _targetDocumentId = null;
+                  _targetCellId = null;
+                  _targetLineNumber = null;
+                  _targetSectionId = null;
+                  _hasScrolledToTarget = false; // Reset for next target
+                });
+                debugPrint('🔔 Document highlight cleared');
+              }
+            });
+          } else {
+            debugPrint('⚠️ RenderBox not ready, retrying...');
+            // Retry once if renderBox isn't ready
+            Future.delayed(const Duration(milliseconds: 200), () {
+              if (mounted && !_hasScrolledToTarget) {
+                _scrollToAndHighlightDocument(key);
+              }
+            });
+          }
+        }
+      });
+    } catch (e) {
+      debugPrint('❌ Error scrolling to document: $e');
+      _hasScrolledToTarget = false; // Reset on error
+    }
   }
 
   @override
@@ -119,6 +251,7 @@ class _DocumentsViewState extends State<DocumentsView> {
                 color: ThemeService.accent,
                 onRefresh: _onRefresh,
                 child: SingleChildScrollView(
+                  controller: _scrollController,
                   physics: const AlwaysScrollableScrollPhysics(),
                   child: Column(
                   children: [
@@ -327,9 +460,38 @@ class _DocumentsViewState extends State<DocumentsView> {
                       padding: const EdgeInsets.only(bottom: 16),
                       child: Column(
                         children: state.filteredDocuments.map((document) {
-                          return DocumentCard(
-                            document: document,
-                            onDeleted: _onRefresh,
+                          final key = GlobalKey();
+                          final isTargetDocument = _targetDocumentId != null && document.id == _targetDocumentId;
+                          
+                          // Check if this is the target document to scroll to
+                          if (isTargetDocument && !_hasScrolledToTarget) {
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              _scrollToAndHighlightDocument(key);
+                            });
+                          }
+                          
+                          return AnimatedContainer(
+                            key: key,
+                            duration: const Duration(milliseconds: 500),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: isTargetDocument
+                                  ? Border.all(color: Colors.orange, width: 2)
+                                  : null,
+                              boxShadow: isTargetDocument
+                                  ? [
+                                      BoxShadow(
+                                        color: Colors.orange.withValues(alpha: 0.3),
+                                        blurRadius: 8,
+                                        spreadRadius: 2,
+                                      )
+                                    ]
+                                  : null,
+                            ),
+                            child: DocumentCard(
+                              document: document,
+                              onDeleted: _onRefresh,
+                            ),
                           );
                         }).toList(),
                       ),

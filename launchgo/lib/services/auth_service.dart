@@ -13,6 +13,7 @@ import 'permissions_service.dart';
 import 'preferences_service.dart';
 import 'chat/stream_chat_service.dart';
 import 'push_notification_service.dart';
+import 'weekly_notification_service.dart';
 
 /// Service for managing user authentication with Google Sign-In and backend JWT tokens
 class AuthService extends ChangeNotifier {
@@ -96,15 +97,22 @@ class AuthService extends ChangeNotifier {
       // Listen for authentication events
       signIn.authenticationEvents.listen(_handleAuthenticationEvent);
       
-      // If we have a valid token, skip Google Sign-In and use stored credentials
+      // If we have a valid token, attempt to load user info
       if (_accessToken != null && !JwtDecoder.isExpired(_accessToken!)) {
         
-        // Load user info and semesters immediately for valid tokens
-        debugPrint('🔐 Loading user data during initialization...');
-        await loadUserInfo();
-        
-        // Set up device registration callback for push notifications
-        _setupFCMTokenCallback();
+        // Try to load user info - if it fails, the token is invalid
+        debugPrint('🔐 Found stored token, attempting to load user data...');
+        try {
+          await loadUserInfo();
+          debugPrint('✅ Token valid, user data loaded successfully');
+          
+          // Set up device registration callback for push notifications
+          _setupFCMTokenCallback();
+        } catch (e) {
+          debugPrint('❌ Token invalid or expired, clearing stored token: $e');
+          _accessToken = null;
+          await SecureStorageService.clearAllAuthData();
+        }
       } else if (_accessToken != null && JwtDecoder.isExpired(_accessToken!)) {
         // Clear expired tokens
         await SecureStorageService.clearAllAuthData();
@@ -223,6 +231,15 @@ class AuthService extends ChangeNotifier {
       await SecureStorageService.clearAllAuthData();
       await PreferencesService.clearAllPreferences();
       
+      // Cancel weekly notifications
+      try {
+        await WeeklyNotificationService.instance.cancelWeeklyRecapNotification();
+        debugPrint('✅ [AUTH] Weekly notifications cancelled during logout');
+      } catch (e) {
+        debugPrint('❌ [AUTH] Error cancelling weekly notifications: $e');
+        // Don't fail logout if notification cancellation fails
+      }
+      
       notifyListeners();
     } catch (error) {
       // Handle sign out error
@@ -322,6 +339,12 @@ class AuthService extends ChangeNotifier {
         // Set up device registration callback for push notifications
         _setupFCMTokenCallback();
         
+        // Request push notification permissions after successful login
+        _requestPushNotificationPermissions();
+        
+        // Schedule weekly notifications for mentors after successful login
+        _scheduleWeeklyNotifications();
+        
         // Set user online after successful authentication
         if (_streamChatService != null && _streamChatService!.isUserConnected) {
           await _streamChatService!.setUserOnline();
@@ -365,6 +388,37 @@ class AuthService extends ChangeNotifier {
   /// Set StreamChat service for presence management
   void setStreamChatService(StreamChatService streamChatService) {
     _streamChatService = streamChatService;
+  }
+  
+  /// Handle authentication failures and attempt automatic recovery
+  Future<bool> handleAuthFailure() async {
+    debugPrint('🔐 [AUTH] Handling authentication failure, attempting recovery...');
+    
+    try {
+      // Clear the current invalid token
+      _accessToken = null;
+      await SecureStorageService.clearAllAuthData();
+      notifyListeners();
+      
+      // Try to restore authentication silently if user is still signed in with Google
+      if (_currentUser != null) {
+        debugPrint('🔐 [AUTH] User still signed in with Google, attempting token refresh...');
+        await requestServerAuthorization();
+        
+        if (_accessToken != null) {
+          debugPrint('✅ [AUTH] Authentication recovered successfully');
+          // Reload user info with new token
+          await loadUserInfo();
+          return true;
+        }
+      }
+      
+      debugPrint('❌ [AUTH] Authentication recovery failed - user needs to sign in manually');
+      return false;
+    } catch (e) {
+      debugPrint('❌ [AUTH] Error during authentication recovery: $e');
+      return false;
+    }
   }
   
   /// Load user information including role and students
@@ -540,7 +594,7 @@ class AuthService extends ChangeNotifier {
           channelType: 'messaging',
           members: [_userInfo!.id, studentId],
           extraData: {
-            'name': 'Chat with ${getSelectedStudent()?.name ?? 'Student'}',
+            'name': 'Chat with ${getSelectedStudent()?.name ?? 'Client'}',
             'studentId': studentId,
             'mentorId': _userInfo!.id,
           },
@@ -600,7 +654,7 @@ class AuthService extends ChangeNotifier {
             channelType: 'messaging',
             members: [_userInfo!.id, studentId],
             extraData: {
-              'name': 'Chat with ${getSelectedStudent()?.name ?? 'Student'}',
+              'name': 'Chat with ${getSelectedStudent()?.name ?? 'Client'}',
               'studentId': studentId,
               'mentorId': _userInfo!.id,
             },
@@ -687,6 +741,38 @@ class AuthService extends ChangeNotifier {
         debugPrint('✅ [FCM DEBUG] Device registered successfully with backend');
       } catch (e) {
         debugPrint('❌ [FCM DEBUG] Failed to register device with backend: $e');
+      }
+    });
+  }
+  
+  /// Request push notification permissions after successful login
+  void _requestPushNotificationPermissions() {
+    debugPrint('🔔 [AUTH] Requesting push notification permissions after login...');
+    Future.microtask(() async {
+      try {
+        final permissionGranted = await PushNotificationService.instance.requestPermissionsAndSetupToken();
+        if (permissionGranted) {
+          debugPrint('✅ [AUTH] Push notification permissions granted');
+        } else {
+          debugPrint('❌ [AUTH] Push notification permissions denied');
+        }
+      } catch (e) {
+        debugPrint('❌ [AUTH] Error requesting push notification permissions: $e');
+      }
+    });
+  }
+  
+  /// Schedule weekly notifications for mentors after successful login
+  void _scheduleWeeklyNotifications() {
+    debugPrint('📅 [AUTH] Scheduling weekly notifications after login...');
+    Future.microtask(() async {
+      try {
+        await WeeklyNotificationService.instance.initialize();
+        await WeeklyNotificationService.instance.scheduleWeeklyRecapNotification(_userInfo);
+        debugPrint('✅ [AUTH] Weekly notifications scheduled successfully');
+      } catch (e) {
+        debugPrint('❌ [AUTH] Error scheduling weekly notifications: $e');
+        // Don't fail login if notification scheduling fails
       }
     });
   }

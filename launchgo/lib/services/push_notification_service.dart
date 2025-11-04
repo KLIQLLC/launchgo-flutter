@@ -1,12 +1,15 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:path_provider/path_provider.dart';
 import 'api_service_retrofit.dart';
 import 'notifications_api_service.dart';
 import 'pending_navigation_service.dart';
+import 'auth_service.dart';
 import 'package:go_router/go_router.dart';
+import 'notification_navigation_service.dart';
+import 'android_notification_display_service.dart';
+import 'notification_parser.dart';
 
 /// Service for handling FCM token lifecycle and device registration
 class PushNotificationService extends ChangeNotifier {
@@ -20,7 +23,9 @@ class PushNotificationService extends ChangeNotifier {
   bool _isInitialized = false;
   NotificationsApiService? _notificationsService;
   GoRouter? _router;
-  static const MethodChannel _channel = MethodChannel('push_notification_channel');
+  
+  // Add auth service for semester switching
+  AuthService? _authService;
   
   // Callback for when FCM token becomes available
   VoidCallback? _onTokenAvailableCallback;
@@ -53,6 +58,16 @@ class PushNotificationService extends ChangeNotifier {
     debugPrint('🔔 PushNotificationService: Router set for direct navigation');
   }
   
+  /// Set auth service for semester switching
+  void setAuthService(AuthService authService) {
+    _authService = authService;
+    // Initialize the notification navigation service
+    if (_router != null) {
+      NotificationNavigationService.instance.initialize(_router!, authService);
+    }
+    debugPrint('🔔 PushNotificationService: AuthService set for semester switching');
+  }
+  
   /// Set callback to be called when FCM token becomes available
   void setTokenAvailableCallback(VoidCallback callback) {
     _onTokenAvailableCallback = callback;
@@ -62,7 +77,7 @@ class PushNotificationService extends ChangeNotifier {
     }
   }
   
-  /// Initialize FCM for basic functionality (token retrieval, permissions)
+  /// Initialize FCM for basic functionality (without requesting permissions)
   Future<void> initialize() async {
     if (_isInitialized) {
       debugPrint('🔔 PushNotificationService already initialized, skipping...');
@@ -72,6 +87,61 @@ class PushNotificationService extends ChangeNotifier {
     debugPrint('🔔 Initializing PushNotificationService...');
     
     try {
+      // Setup message handlers without requesting permissions
+      // Handle background messages
+      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+      
+      // Handle foreground messages
+      FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+      
+      // Add global message listener for debugging
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        debugPrint('🔔 [GLOBAL] Foreground message: ${message.notification?.title}');
+        debugPrint('🔔 [GLOBAL] Message data: ${message.data}');
+      });
+      
+      // Handle message when app is opened from notification tap
+      debugPrint('🔔 Setting up onMessageOpenedApp listener...');
+      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+        debugPrint('🔔 [LISTENER] onMessageOpenedApp triggered!');
+        _handleMessageOpenedApp(message);
+      });
+      
+      // Handle initial message if app was opened from notification
+      debugPrint('🔔 Checking for initial message...');
+      RemoteMessage? initialMessage = await _messaging.getInitialMessage();
+      if (initialMessage != null) {
+        debugPrint('🔔 [INITIAL] App opened from notification (terminated state)');
+        debugPrint('🔔 [INITIAL] Message data: ${initialMessage.data}');
+        debugPrint('🔔 [INITIAL] Screen value: ${initialMessage.data['screen']}');
+        // Store navigation - will be processed when router is ready
+        _storeNavigationFromMessage(initialMessage);
+      } else {
+        debugPrint('🔔 No initial message found');
+      }
+      
+      _isInitialized = true;
+      notifyListeners();
+      
+      debugPrint('✅ PushNotificationService initialized successfully (no permissions requested yet)');
+      _logToFile('PUSH_SERVICE_INITIALIZED: Message handlers ready, awaiting permissions');
+    } catch (e) {
+      debugPrint('❌ Error initializing PushNotificationService: $e');
+      rethrow;
+    }
+  }
+  
+
+  /// Request notification permissions and setup FCM token
+  Future<bool> requestPermissionsAndSetupToken() async {
+    debugPrint('🔔 Requesting notification permissions...');
+    
+    try {
+      // Initialize notification display service (Android only)
+      if (Platform.isAndroid) {
+        await AndroidNotificationDisplayService.instance.initialize();
+      }
+      
       // Request notification permissions
       NotificationSettings settings = await _messaging.requestPermission(
         alert: true,
@@ -114,54 +184,19 @@ class PushNotificationService extends ChangeNotifier {
           }
         });
         
-        // Handle background messages
-        FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-        
-        // Handle foreground messages
-        FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-        
-        // Add global message listener for debugging
-        FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-          debugPrint('🔔 [GLOBAL] Foreground message: ${message.notification?.title}');
-          debugPrint('🔔 [GLOBAL] Message data: ${message.data}');
-        });
-        
-        // Method channel is no longer needed - Firebase handles everything
-        debugPrint('🔔 Using Firebase-only notification handling');
-        
-        // Handle message when app is opened from notification tap
-        debugPrint('🔔 Setting up onMessageOpenedApp listener...');
-        FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-          debugPrint('🔔 [LISTENER] onMessageOpenedApp triggered!');
-          _handleMessageOpenedApp(message);
-        });
-        
-        // Handle initial message if app was opened from notification
-        debugPrint('🔔 Checking for initial message...');
-        RemoteMessage? initialMessage = await _messaging.getInitialMessage();
-        if (initialMessage != null) {
-          debugPrint('🔔 [INITIAL] App opened from notification (terminated state)');
-          debugPrint('🔔 [INITIAL] Message data: ${initialMessage.data}');
-          debugPrint('🔔 [INITIAL] Screen value: ${initialMessage.data['screen']}');
-          // Store navigation - will be processed when router is ready
-          _storeNavigationFromMessage(initialMessage);
-        } else {
-          debugPrint('🔔 No initial message found');
-        }
-        
-        _isInitialized = true;
-        notifyListeners();
-        
-        debugPrint('✅ PushNotificationService initialized successfully');
+        debugPrint('✅ Push notifications fully enabled with FCM token');
         debugPrint('🔔 FCM Token: $_fcmToken');
-        debugPrint('🔔 Method channel handler ready: ${_channel.name}');
-        _logToFile('PUSH_SERVICE_INITIALIZED: FCM Token received, method channel ready');
+        _logToFile('PUSH_NOTIFICATIONS_ENABLED: FCM Token received, ready for notifications');
+        
+        notifyListeners();
+        return true;
       } else {
         debugPrint('❌ Notification permission denied: ${settings.authorizationStatus}');
+        return false;
       }
     } catch (e) {
-      debugPrint('❌ Error initializing PushNotificationService: $e');
-      rethrow;
+      debugPrint('❌ Error requesting notification permissions: $e');
+      return false;
     }
   }
   
@@ -227,13 +262,24 @@ class PushNotificationService extends ChangeNotifier {
   
   /// Handle foreground messages
   void _handleForegroundMessage(RemoteMessage message) {
+    // 🛑 BREAKPOINT: Set breakpoint here to inspect message data
     debugPrint('🔔 Foreground message received: ${message.notification?.title}');
     debugPrint('🔔 Message data: ${message.data}');
     debugPrint('🔔 Message body: ${message.notification?.body}');
     
     // Show the notification even when app is in foreground
-    // Note: For production, you might want to show a custom in-app notification instead
-    debugPrint('🔔 Showing notification in foreground');
+    // For Stream Chat data-only notifications, show them manually
+    if (NotificationParser.isStreamChatMessage(message.data)) {
+      final chatData = NotificationParser.parseStreamChatData(message.data);
+      AndroidNotificationDisplayService.instance.showStreamChatNotification(
+        title: chatData.title,
+        body: chatData.body,
+        channelId: chatData.channelId,
+        senderId: chatData.senderId,
+      );
+    } else {
+      debugPrint('🔔 Non-Stream Chat foreground notification');
+    }
     
     // Update notification badge count when foreground notification received
     if (_notificationsService != null) {
@@ -243,6 +289,7 @@ class PushNotificationService extends ChangeNotifier {
   
   /// Handle message when app is opened from notification
   void _handleMessageOpenedApp(RemoteMessage message) {
+    // 🛑 BREAKPOINT: Set breakpoint here to inspect notification tap data
     final logMessage = '''
 ============================================
 Message opened app: ${message.notification?.title}
@@ -262,7 +309,37 @@ Screen value: ${message.data['screen']}
   void _storeNavigationFromMessage(RemoteMessage message) {
     final data = message.data;
     
-    // Determine target route
+    // First try to handle via NotificationNavigationService for structured notifications
+    if (data.containsKey('eventType')) {
+      final eventType = data['eventType'] as String;
+      debugPrint('🔔 Using NotificationNavigationService for eventType: $eventType');
+      
+      // Use the centralized navigation service for all eventType notifications
+      NotificationNavigationService.instance.handleNotification(
+        eventType: eventType,
+        data: data,
+      );
+      
+      // Return early since navigation is handled by the service
+      return;
+    }
+    
+    // Handle Stream Chat notifications
+    if (_isStreamChatNotification(data)) {
+      debugPrint('🔔 Using NotificationNavigationService for chat notification');
+      
+      // Use the specialized navigation service for chat handling
+      NotificationNavigationService.instance.handleChatNotification(
+        receiverId: data['receiver_id'],
+        channelId: data['channel_id'] ?? data['channel_cid'],
+        channelType: data['channel_type'],
+      );
+      
+      // Return early since navigation is handled by the service
+      return;
+    }
+    
+    // Fallback to legacy handling for backward compatibility
     String? targetRoute;
     Map<String, dynamic>? extra;
     
@@ -278,15 +355,6 @@ Screen value: ${message.data['screen']}
       targetRoute = data['route'] as String;
       if (data.containsKey('extra')) {
         extra = data['extra'] as Map<String, dynamic>;
-      }
-    } else if (_isStreamChatNotification(data)) {
-      targetRoute = '/chat';
-      final channelId = data['channel_id'] ?? data['channel_cid'];
-      if (channelId != null) {
-        extra = {
-          'channelId': channelId,
-          'channelType': data['channel_type'] ?? 'messaging',
-        };
       }
     }
     
@@ -354,6 +422,7 @@ Screen value: ${message.data['screen']}
 /// Background message handler (must be top-level function)
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // 🛑 BREAKPOINT: Set breakpoint here to inspect background notifications
   debugPrint('🔔 Background message received: ${message.notification?.title}');
   debugPrint('🔔 Background message data: ${message.data}');
   debugPrint('🔔 Background message body: ${message.notification?.body}');
@@ -361,10 +430,20 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // Handle background message
   // This runs when app is terminated or in background
   
-  // Android automatically shows notifications when app is in background/terminated
-  // The system notification will appear in the notification tray
-  debugPrint('🔔 Background notification will be shown by system');
-  
-  // You can update local storage, sync data, etc.
-  // But avoid heavy operations here
+  // For Stream Chat data-only notifications, we need to show them manually
+  if (NotificationParser.isStreamChatMessage(message.data)) {
+    final chatData = NotificationParser.parseStreamChatData(message.data);
+    await AndroidNotificationDisplayService.instance.showStreamChatNotification(
+      title: chatData.title,
+      body: chatData.body,
+      channelId: chatData.channelId,
+      senderId: chatData.senderId,
+    );
+  } else if (message.notification != null) {
+    // Android automatically shows notifications when app is in background/terminated
+    // The system notification will appear in the notification tray
+    debugPrint('🔔 Background notification will be shown by system');
+  } else {
+    debugPrint('🔔 Data-only notification received, no automatic display');
+  }
 }

@@ -7,9 +7,9 @@
 	<key>method</key>
 	<string>app-store-connect</string>
 	<key>teamID</key>
-	<string>6ZG4VZZ8MM</string>
+	<string>65N9689K6L</string>
 	<key>signingStyle</key>
-	<string>automatic</string>
+	<string>manual</string>
 	<key>stripSwiftSymbols</key>
 	<true/>
 	<key>uploadSymbols</key>
@@ -17,6 +17,9 @@
 	<key>manageAppVersionAndBuildNumber</key>
 	<false/>
 	<key>provisioningProfiles</key>
-	<dict/>
+	<dict>
+		<key>com.launchgo.app</key>
+		<string>LaunchGo Production Distribution</string>
+	</dict>
 </dict>
 </plist>

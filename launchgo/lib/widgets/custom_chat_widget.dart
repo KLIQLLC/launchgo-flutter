@@ -230,7 +230,7 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
     } else if (user.isMentor) {
       // if mentor
       final selectedStudent = authService.getSelectedStudent();
-      displayName = selectedStudent?.name ?? 'Student';
+      displayName = selectedStudent?.name ?? 'Client';
       displayAvatar = selectedStudent?.avatarUrl ?? '';
       otherUserId = selectedStudent?.id;
     }
