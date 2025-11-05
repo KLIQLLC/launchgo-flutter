@@ -7,7 +7,10 @@ class Event extends Equatable {
   final DateTime startAt;
   final DateTime endAt;
   final String type;
-  final String? location;
+  final String? addressLocation;
+  final double? longLocation;
+  final double? latLocation;
+  final String? checkInLocationStatus;
   final String? description;
 
   const Event({
@@ -16,7 +19,10 @@ class Event extends Equatable {
     required this.startAt,
     required this.endAt,
     required this.type,
-    this.location,
+    this.addressLocation,
+    this.longLocation,
+    this.latLocation,
+    this.checkInLocationStatus,
     this.description,
   });
 
@@ -31,7 +37,10 @@ class Event extends Equatable {
           ? _parseUtcDateTime(json['endAt'])    // Parse UTC and convert to local
           : DateTime.now(),
       type: json['type'] ?? '',
-      location: json['location'],
+      addressLocation: json['addressLocation'],
+      longLocation: json['longLocation'] != null ? double.tryParse(json['longLocation'].toString()) : null,
+      latLocation: json['latLocation'] != null ? double.tryParse(json['latLocation'].toString()) : null,
+      checkInLocationStatus: json['checkInLocationStatus'],
       description: json['description'],
     );
   }
@@ -51,7 +60,10 @@ class Event extends Equatable {
       'startAt': startAt.toUtc().toIso8601String(),  // Convert to UTC before sending
       'endAt': endAt.toUtc().toIso8601String(),      // Convert to UTC before sending
       'type': type,
-      if (location != null) 'location': location,
+      if (addressLocation != null) 'addressLocation': addressLocation,
+      if (longLocation != null) 'longLocation': longLocation.toString(),
+      if (latLocation != null) 'latLocation': latLocation.toString(),
+      if (checkInLocationStatus != null) 'checkInLocationStatus': checkInLocationStatus,
       if (description != null) 'description': description,
     };
   }
@@ -111,5 +123,5 @@ class Event extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, name, startAt, endAt, type, location, description];
+  List<Object?> get props => [id, name, startAt, endAt, type, addressLocation, longLocation, latLocation, checkInLocationStatus, description];
 }

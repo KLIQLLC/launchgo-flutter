@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../models/event_model.dart';
 import '../../services/api_service_retrofit.dart';
 import '../../services/auth_service.dart';
+import '../../utils/event_helper.dart';
 import '../swipeable_card.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
@@ -119,6 +120,7 @@ class _EventCardContent extends StatelessWidget {
     final servicesEnabled = await Geolocator.isLocationServiceEnabled();
     if (!servicesEnabled) {
       await Geolocator.openLocationSettings();
+      return;
     }
 
     // 2. Permission
@@ -134,28 +136,62 @@ class _EventCardContent extends StatelessWidget {
       ));
       return;
     }
+
     if (status.isGranted) {
       try {
-        Position pos = await Geolocator.getCurrentPosition();
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(
-            'Your coordinates: ${pos.latitude}, ${pos.longitude}'
-          ),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 1),
+        // Show loading indicator
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Getting location and checking in...'),
+          backgroundColor: Colors.blue,
+          duration: Duration(seconds: 2),
         ));
+
+        // Get current position
+        Position pos = await Geolocator.getCurrentPosition();
+        
+        // Get API service and user ID
+        final apiService = context.read<ApiServiceRetrofit>();
+        final authService = context.read<AuthService>();
+        final userId = authService.userInfo?.id;
+
+        if (userId == null) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('User not authenticated'),
+            backgroundColor: Colors.red,
+          ));
+          return;
+        }
+
+        // Prepare location data
+        final locationData = {
+          'latLocation': pos.latitude.toString(),
+          'longLocation': pos.longitude.toString(),
+        };
+
+        // Call check-in API
+        final response = await apiService.checkInEvent(userId, event.id, locationData);
+
+        if (response != null) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Successfully checked in!'),
+            backgroundColor: Colors.green,
+          ));
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Check-in failed'),
+            backgroundColor: Colors.red,
+          ));
+        }
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Unable to get location: $e'),
+          content: Text('Check-in failed: $e'),
           backgroundColor: Colors.red,
-          duration: const Duration(seconds: 1),
         ));
       }
     }
   }
 
   BoxDecoration _buildCardDecoration() {
-    // вынес формулу цвета карточки и возвращаю наружу для использования и в кнопке
     return BoxDecoration(
       color: Color.alphaBlend(
         event.color.withOpacity(0.15),
@@ -175,8 +211,7 @@ class _EventCardContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final isStudent = context.watch<AuthService>().isStudent;
     final checkInColor = event.color;
-    // TODO: Включи свою бизнес-логику для включения checkInEnabled
-    final bool checkInEnabled = false; // На время теста, потом подставь свою проверку
+    final bool checkInEnabled = EventHelper.isCheckInEnabled(event);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -187,7 +222,7 @@ class _EventCardContent extends StatelessWidget {
           _EventTitle(event: event),
           const SizedBox(height: 4),
           _EventTime(event: event),
-          if (event.location != null && event.location!.isNotEmpty) ...[
+          if (event.addressLocation != null && event.addressLocation!.isNotEmpty) ...[
             const SizedBox(height: 4),
             _EventLocation(event: event),
           ],
@@ -284,7 +319,7 @@ class _EventLocation extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(
-      event.location!,
+      event.addressLocation!,
       style: TextStyle(
         color: event.color.withValues(alpha: 0.8),
         fontSize: 14,

@@ -870,4 +870,25 @@ class ApiServiceRetrofit {
       rethrow;
     }
   }
+
+  // Event check-in endpoint
+  Future<Map<String, dynamic>?> checkInEvent(String userId, String eventId, Map<String, dynamic> locationData) async {
+    try {
+      debugPrint('📍 Checking in to event $eventId for user $userId with location: $locationData');
+      final response = await _retrofit.checkInEvent(userId, eventId, locationData);
+      final data = response.data;
+      
+      final parsedData = _parseJsonResponse(data);
+      if (parsedData is Map<String, dynamic>) {
+        debugPrint('✅ Successfully checked in to event');
+        return parsedData;
+      }
+      
+      debugPrint('❌ No valid check-in response data returned');
+      return null;
+    } catch (e) {
+      debugPrint('❌ Failed to check in to event: $e');
+      rethrow;
+    }
+  }
 }

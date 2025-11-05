@@ -191,6 +191,13 @@ abstract class ApiService {
     @Body() Map<String, dynamic> eventData,
   );
 
+  @PUT("/users/{userId}/events/{eventId}/location/check-in")
+  Future<HttpResponse<dynamic>> checkInEvent(
+    @Path("userId") String userId,
+    @Path("eventId") String eventId,
+    @Body() Map<String, dynamic> locationData,
+  );
+
   @GET("/users/{userId}/recaps")
   Future<HttpResponse<dynamic>> getRecaps(
     @Path("userId") String userId,

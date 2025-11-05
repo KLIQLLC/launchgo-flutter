@@ -61,7 +61,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
       // Edit mode - initialize with existing event data
       _nameController = TextEditingController(text: widget.event!.name);
       _descriptionController = TextEditingController(text: widget.event!.description ?? '');
-      _locationController = TextEditingController(text: widget.event!.location ?? '');
+      _locationController = TextEditingController(text: widget.event!.addressLocation ?? '');
       
       // Extract date and time components from the local DateTime
       final localStartAt = widget.event!.startAt; // Already converted to local in Event.fromJson
@@ -73,7 +73,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
       _endTime = TimeOfDay.fromDateTime(localEndAt);
       
       _selectedType = widget.event!.type;
-      _locationAddress = widget.event!.location ?? '';
+      _locationAddress = widget.event!.addressLocation ?? '';
       _locationLatLng = null;
     } else {
       // Add mode - initialize with defaults
@@ -198,7 +198,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
           eventData['description'] = _descriptionController.text.trim();
         }
         
-        if (_locationAddress != (widget.event!.location ?? '')) {
+        if (_locationAddress != (widget.event!.addressLocation ?? '')) {
           eventData['addressLocation'] = _locationAddress;
         }
         eventData['latLocation'] = _locationLatLng != null ? _locationLatLng!.latitude.toString() : '';
