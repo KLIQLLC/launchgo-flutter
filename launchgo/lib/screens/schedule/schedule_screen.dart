@@ -292,7 +292,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                     onNextWeek: () => _navigateWeek(1),
                   ),
                   Expanded(
-                    child: _buildSegmentedContent(themeService, authService),
+                    child: RefreshIndicator(
+                      onRefresh: _handleRefresh,
+                      color: ThemeService.accent,
+                      backgroundColor: themeService.cardColor,
+                      child: _buildSegmentedContent(themeService, authService),
+                    ),
                   ),
                 ],
               ),
@@ -342,30 +347,25 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           },
         ),
         Expanded(
-          child: RefreshIndicator(
-            onRefresh: _handleRefresh,
-            color: ThemeService.accent,
-            backgroundColor: themeService.cardColor,
-            child: _selectedSegment == 0
-                ? _WeeklyScheduleView(
-                    key: _weeklyViewKey,
-                    weekStart: _currentWeekStart,
-                    weekEnd: _currentWeekEnd,
-                    themeService: themeService,
-                    permissions: permissions,
-                    targetEventId: _targetEventId,
-                    onEventHighlighted: () {
-                      // Clear target after highlighting
-                      setState(() {
-                        _targetEventId = null;
-                      });
-                    },
-                  )
-                : _UpcomingDeadlinesView(
-                    assignments: _getSortedAssignments(),
-                    themeService: themeService,
-                  ),
-          ),
+          child: _selectedSegment == 0
+              ? _WeeklyScheduleView(
+                  key: _weeklyViewKey,
+                  weekStart: _currentWeekStart,
+                  weekEnd: _currentWeekEnd,
+                  themeService: themeService,
+                  permissions: permissions,
+                  targetEventId: _targetEventId,
+                  onEventHighlighted: () {
+                    // Clear target after highlighting
+                    setState(() {
+                      _targetEventId = null;
+                    });
+                  },
+                )
+              : _UpcomingDeadlinesView(
+                  assignments: _getSortedAssignments(),
+                  themeService: themeService,
+                ),
         ),
       ],
     );
@@ -653,26 +653,32 @@ class _WeeklyScheduleViewState extends State<_WeeklyScheduleView> {
     }
 
     if (_events.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.calendar_month_outlined,
-                size: 48,
-                color: Colors.grey[600],
+      return SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.6,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.calendar_month_outlined,
+                    size: 48,
+                    color: Colors.grey[600],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No events for this week',
+                    style: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              Text(
-                'No events for this week',
-                style: TextStyle(
-                  color: Colors.grey[400],
-                  fontSize: 16,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       );
@@ -825,26 +831,32 @@ class _UpcomingDeadlinesView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (assignments.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.calendar_today_outlined,
-                size: 48,
-                color: Colors.grey[600],
+      return SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.6,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.calendar_today_outlined,
+                    size: 48,
+                    color: Colors.grey[600],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No deadlines for this week',
+                    style: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              Text(
-                'No deadlines for this week',
-                style: TextStyle(
-                  color: Colors.grey[400],
-                  fontSize: 16,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       );
