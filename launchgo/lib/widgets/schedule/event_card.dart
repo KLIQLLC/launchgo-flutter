@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../models/event_model.dart';
 import '../../services/api_service_retrofit.dart';
@@ -219,13 +220,23 @@ class _EventCardContent extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _EventTitle(event: event),
+          Row(
+            children: [
+              Expanded(child: _EventTitle(event: event)),
+              if (event.addressLocation != null && event.addressLocation!.isNotEmpty)
+                SvgPicture.asset(
+                  'assets/icons/ic_marker.svg',
+                  width: 16,
+                  height: 16,
+                  colorFilter: ColorFilter.mode(
+                    event.color,
+                    BlendMode.srcIn,
+                  ),
+                ),
+            ],
+          ),
           const SizedBox(height: 4),
           _EventTime(event: event),
-          if (event.addressLocation != null && event.addressLocation!.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            _EventLocation(event: event),
-          ],
           if (isStudent)
             Padding(
               padding: const EdgeInsets.only(top: 12),
@@ -311,20 +322,3 @@ class _EventTime extends StatelessWidget {
   }
 }
 
-class _EventLocation extends StatelessWidget {
-  final Event event;
-
-  const _EventLocation({required this.event});
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      event.addressLocation!,
-      style: TextStyle(
-        color: event.color.withValues(alpha: 0.8),
-        fontSize: 14,
-      ),
-      overflow: TextOverflow.ellipsis,
-    );
-  }
-}
