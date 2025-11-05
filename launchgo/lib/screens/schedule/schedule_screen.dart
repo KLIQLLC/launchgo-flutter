@@ -739,6 +739,7 @@ class _WeeklyScheduleViewState extends State<_WeeklyScheduleView> {
                       event: event,
                       onEdit: (widget.permissions.canEditEvents && event.type.toLowerCase() != 'assignment') ? () => _editEvent(event) : null,
                       onDelete: (widget.permissions.canDeleteEvents && event.type.toLowerCase() != 'assignment') ? () => _onEventDeleted(event) : null,
+                      onEventUpdated: (updatedEvent) => _onEventUpdated(event, updatedEvent),
                     ),
                   );
                 }),
@@ -788,6 +789,15 @@ class _WeeklyScheduleViewState extends State<_WeeklyScheduleView> {
   void _onEventDeleted(Event event) {
     setState(() {
       _events.removeWhere((e) => e.id == event.id);
+    });
+  }
+
+  void _onEventUpdated(Event oldEvent, Event updatedEvent) {
+    setState(() {
+      final index = _events.indexWhere((e) => e.id == oldEvent.id);
+      if (index != -1) {
+        _events[index] = updatedEvent;
+      }
     });
   }
 

@@ -14,12 +14,14 @@ class EventCard extends StatelessWidget {
   final Event event;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final Function(Event)? onEventUpdated;
 
   const EventCard({
     super.key,
     required this.event,
     this.onEdit,
     this.onDelete,
+    this.onEventUpdated,
   });
 
   @override
@@ -30,7 +32,7 @@ class EventCard extends StatelessWidget {
       onTap: onEdit,
       onSwipeToDelete: onDelete != null ? () => _handleSwipeToDelete(context) : null,
       deleteIcon: Icons.delete,
-      child: _EventCardContent(event: event),
+      child: _EventCardContent(event: event, onEventUpdated: onEventUpdated),
     );
   }
 
@@ -113,8 +115,9 @@ class EventCard extends StatelessWidget {
 
 class _EventCardContent extends StatelessWidget {
   final Event event;
+  final Function(Event)? onEventUpdated;
 
-  const _EventCardContent({required this.event});
+  const _EventCardContent({required this.event, this.onEventUpdated});
 
   Future<void> _handleCheckIn(BuildContext context) async {
     // 1. Check if location services are enabled
@@ -172,22 +175,37 @@ class _EventCardContent extends StatelessWidget {
         // Call check-in API
         final response = await apiService.checkInEvent(userId, event.id, locationData);
 
-        if (response != null) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Successfully checked in!'),
-            backgroundColor: Colors.green,
-          ));
-        } else {
+        if (response != null && context.mounted) {
+          // Update the event with the response data (contains updated checkInLocationStatus)
+          final updatedEvent = Event.fromJson(response);
+          onEventUpdated?.call(updatedEvent);
+          
+          // Check if check-in was actually successful based on the status
+          if (updatedEvent.checkInLocationStatus == 'checked-in') {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Successfully checked in!'),
+              backgroundColor: Colors.green,
+            ));
+          } else {
+            // Check-in failed (status is still 'check-in-required' or other)
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Check-in failed: You may be out of range'),
+              backgroundColor: Colors.red,
+            ));
+          }
+        } else if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('Check-in failed'),
             backgroundColor: Colors.red,
           ));
         }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Check-in failed: $e'),
-          backgroundColor: Colors.red,
-        ));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Check-in failed: $e'),
+            backgroundColor: Colors.red,
+          ));
+        }
       }
     }
   }
