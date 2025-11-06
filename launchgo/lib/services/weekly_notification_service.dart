@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -116,6 +117,12 @@ class WeeklyNotificationService {
         iOS: iosPlatformChannelSpecifics,
       );
       
+      // Create payload data for navigation
+      final payloadData = {
+        'eventType': 'weekly-recap',
+      };
+      final payload = jsonEncode(payloadData);
+      
       // Schedule the recurring notification
       await _flutterLocalNotificationsPlugin.zonedSchedule(
         _weeklyNotificationId,
@@ -126,6 +133,7 @@ class WeeklyNotificationService {
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime, // Repeat weekly
+        payload: payload,
       );
       
       debugPrint('✅ Weekly recap notification scheduled successfully for Fridays at 9 AM');
