@@ -279,15 +279,21 @@ class _EventFormScreenState extends State<EventFormScreen> {
   Widget build(BuildContext context) {
     final themeService = context.watch<ThemeService>();
     return Scaffold(
-      backgroundColor: const Color(0xFF0F1419),
+      backgroundColor: themeService.backgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A2332),
+        backgroundColor: themeService.backgroundColor,
+        elevation: 0,
+        centerTitle: true,
         title: Text(
           isEditMode ? 'Edit Event' : 'Add Event',
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(
+            color: themeService.textColor,
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.white),
+          icon: Icon(Icons.close, color: themeService.textColor),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -309,9 +315,9 @@ class _EventFormScreenState extends State<EventFormScreen> {
                       themeService: themeService,
                     ),
                     const SizedBox(height: 20),
-                    _buildDateSection(),
+                    _buildDateSection(themeService),
                     const SizedBox(height: 20),
-                    _buildTimeSection(),
+                    _buildTimeSection(themeService),
                     const SizedBox(height: 20),
                     _buildTypeDropdown(),
                     const SizedBox(height: 20),
@@ -320,23 +326,22 @@ class _EventFormScreenState extends State<EventFormScreen> {
                       children: [
                         Text(
                           'Location',
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: themeService.textColor,
                             fontSize: 16,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
                         const SizedBox(height: 8),
                         InkWell(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(12),
                           onTap: () => _openLocationEditScreen(context),
                           child: Container(
-                            height: 52,
-                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF1A2332),
-                              border: Border.all(color: Colors.grey[600]!),
-                              borderRadius: BorderRadius.circular(8),
+                              color: themeService.cardColor,
+                              border: Border.all(color: themeService.borderColor),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                             child: Row(
                               children: [
@@ -344,8 +349,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
                                   child: Text(
                                     _locationAddress?.isNotEmpty == true ? _locationAddress! : 'Enter event location',
                                     style: TextStyle(
-                                      color: _locationAddress?.isNotEmpty == true ? Colors.white : Colors.white54,
-                                      fontSize: 15,
+                                      color: _locationAddress?.isNotEmpty == true ? themeService.textColor : themeService.inputPlaceholderColor,
+                                      fontSize: 16,
                                     ),
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
@@ -353,7 +358,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                                 ),
                                 Icon(
                                   _locationAddress?.isNotEmpty == true ? Icons.edit_location_alt : Icons.add_location_alt,
-                                  color: Colors.white,
+                                  color: themeService.textColor,
                                 )
                               ],
                             ),
@@ -444,29 +449,32 @@ class _EventFormScreenState extends State<EventFormScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          maxLines: maxLines,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: TextStyle(color: themeService.inputPlaceholderColor),
-            filled: true,
-            fillColor: const Color(0xFF1A2332),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[600]!),
+        SizedBox(
+          height: maxLines == 1 ? 42 : null,
+          child: TextFormField(
+            controller: controller,
+            maxLines: maxLines,
+            style: TextStyle(color: themeService.textColor),
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: TextStyle(color: themeService.inputPlaceholderColor),
+              filled: true,
+              fillColor: themeService.cardColor,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: themeService.borderColor),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: themeService.borderColor),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Colors.blue),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[600]!),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.blue),
-            ),
-          ),
-          validator: isRequired
+            validator: isRequired
               ? (value) {
                   if (value == null || value.trim().isEmpty) {
                     return '$label is required';
@@ -474,6 +482,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                   return null;
                 }
               : null,
+          ),
         ),
       ],
     );
@@ -513,7 +522,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
     );
   }
 
-  Widget _buildDateSection() {
+  Widget _buildDateSection(ThemeService themeService) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -529,22 +538,22 @@ class _EventFormScreenState extends State<EventFormScreen> {
         InkWell(
           onTap: _selectStartDate,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8.5),
             decoration: BoxDecoration(
-              color: const Color(0xFF1A2332),
-              border: Border.all(color: Colors.grey[600]!),
-              borderRadius: BorderRadius.circular(8),
+              color: themeService.cardColor,
+              border: Border.all(color: themeService.borderColor),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               children: [
                 Text(
                   DateFormat('MM/dd/yyyy').format(_startDate),
-                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                  style: TextStyle(color: themeService.textColor, fontSize: 16),
                 ),
                 const Spacer(),
                 Icon(
                   Icons.calendar_today,
-                  color: Colors.grey[400],
+                  color: themeService.inputPlaceholderColor,
                   size: 20,
                 ),
               ],
@@ -555,17 +564,17 @@ class _EventFormScreenState extends State<EventFormScreen> {
     );
   }
 
-  Widget _buildTimeSection() {
+  Widget _buildTimeSection(ThemeService themeService) {
     return Row(
       children: [
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Start Time',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: themeService.textColor,
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
                 ),
@@ -603,10 +612,10 @@ class _EventFormScreenState extends State<EventFormScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'End Time',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: themeService.textColor,
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
                 ),

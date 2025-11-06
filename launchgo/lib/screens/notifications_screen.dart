@@ -252,6 +252,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         top: false,
         child: SizedBox(
           width: double.infinity,
+          height: 54,
           child: ElevatedButton(
             onPressed: () async {
               try {
@@ -276,17 +277,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: themeService.cardColor,
-              foregroundColor: themeService.textColor,
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              backgroundColor: AppColors.buttonPrimary,
+              foregroundColor: const Color(0xFF1A1F2B),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
               ),
+              elevation: 0,
             ),
             child: const Text(
               'Mark all as read',
               style: TextStyle(
-                fontSize: 16,
+                color: Color(0xFF1A1F2B),
+                fontSize: 17,
                 fontWeight: FontWeight.w600,
               ),
             ),

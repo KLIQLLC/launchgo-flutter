@@ -296,36 +296,40 @@ class _RecapFormScreenState extends State<RecapFormScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          maxLines: maxLines,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: TextStyle(color: themeService.inputPlaceholderColor),
-            filled: true,
-            fillColor: themeService.cardColor,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[600]!),
+        SizedBox(
+          height: maxLines == 1 ? 42 : null,
+          child: TextFormField(
+            controller: controller,
+            maxLines: maxLines,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: TextStyle(color: themeService.inputPlaceholderColor),
+              filled: true,
+              fillColor: themeService.cardColor,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: themeService.borderColor),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: themeService.borderColor),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: themeService.borderColor),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[600]!),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.blue),
-            ),
-          ),
-          validator: isRequired
-              ? (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return '$label is required';
+            validator: isRequired
+                ? (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return '$label is required';
+                    }
+                    return null;
                   }
-                  return null;
-                }
-              : null,
+                : null,
+          ),
         ),
       ],
     );

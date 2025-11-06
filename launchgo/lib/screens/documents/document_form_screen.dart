@@ -296,46 +296,50 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                TextFormField(
-                  controller: _nameController,
-                  style: TextStyle(color: themeService.inputTextColor),
-                  decoration: InputDecoration(
-                    hintText: 'Enter document name',
-                    hintStyle: TextStyle(color: themeService.inputPlaceholderColor),
-                    filled: true,
-                    fillColor: themeService.cardColor,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: themeService.borderColor,
+                SizedBox(
+                  height: 42,
+                  child: TextFormField(
+                    controller: _nameController,
+                    style: TextStyle(color: themeService.inputTextColor),
+                    decoration: InputDecoration(
+                      hintText: 'Enter document name',
+                      hintStyle: TextStyle(color: themeService.inputPlaceholderColor),
+                      filled: true,
+                      fillColor: themeService.cardColor,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: themeService.borderColor,
+                        ),
                       ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: themeService.borderColor,
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: themeService.borderColor,
+                        ),
                       ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                        color: ThemeService.accent,
-                        width: 2,
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: ThemeService.accent,
+                          width: 2,
+                        ),
                       ),
-                    ),
-                    errorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                        color: AppColors.error,
+                      errorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: AppColors.error,
+                        ),
                       ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Please enter a document name';
+                      }
+                      return null;
+                    },
                   ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Please enter a document name';
-                    }
-                    return null;
-                  },
                 ),
                 const SizedBox(height: 24),
 
