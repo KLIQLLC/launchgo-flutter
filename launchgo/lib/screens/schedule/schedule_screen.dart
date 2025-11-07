@@ -22,7 +22,7 @@ class ScheduleScreen extends StatefulWidget {
   State<ScheduleScreen> createState() => _ScheduleScreenState();
 }
 
-class _ScheduleScreenState extends State<ScheduleScreen> {
+class _ScheduleScreenState extends State<ScheduleScreen> with WidgetsBindingObserver {
   List<DeadlineAssignment> _assignments = [];
   bool _isLoading = true;
   String? _errorMessage;
@@ -36,6 +36,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initializeWeekStart();
     _loadDeadlines();
     
@@ -369,6 +370,22 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         ),
       ],
     );
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    // Refresh schedule data when app comes to foreground (same as pull-to-refresh)
+    if (state == AppLifecycleState.resumed && mounted) {
+      _handleRefresh();
+    }
   }
 }
 
