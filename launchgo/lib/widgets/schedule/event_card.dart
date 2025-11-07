@@ -133,37 +133,43 @@ class _EventCardContent extends StatelessWidget {
       status = await Permission.locationWhenInUse.request();
     }
     if (status.isPermanentlyDenied || status.isRestricted) {
-      await openAppSettings();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Location access permission denied. Enable access manually in app settings.'),
-        backgroundColor: Colors.red,
-      ));
+      if (context.mounted) {
+        await _showLocationPermissionDialog(context);
+      }
       return;
     }
 
     if (status.isGranted) {
       try {
         // Show loading indicator
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Getting location and checking in...'),
-          backgroundColor: Colors.blue,
-          duration: Duration(seconds: 2),
-        ));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Getting location and checking in...'),
+            backgroundColor: Colors.blue,
+            duration: Duration(seconds: 2),
+          ));
+        }
 
         // Get current position
         Position pos = await Geolocator.getCurrentPosition();
         
         // Get API service and user ID
-        final apiService = context.read<ApiServiceRetrofit>();
-        final authService = context.read<AuthService>();
-        final userId = authService.userInfo?.id;
+        final apiService = context.mounted ? context.read<ApiServiceRetrofit>() : null;
+        final authService = context.mounted ? context.read<AuthService>() : null;
+        final userId = authService?.userInfo?.id;
 
         if (userId == null) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('User not authenticated'),
-            backgroundColor: Colors.red,
-          ));
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('User not authenticated'),
+              backgroundColor: Colors.red,
+            ));
+          }
           return;
+        }
+
+        if (apiService == null) {
+          return; // Context no longer valid
         }
 
         // Prepare location data
@@ -206,6 +212,44 @@ class _EventCardContent extends StatelessWidget {
             backgroundColor: Colors.red,
           ));
         }
+      }
+    }
+  }
+
+  Future<void> _showLocationPermissionDialog(BuildContext context) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Location Permission Required'),
+          content: const Text(
+            'To check in to this event, we need access to your device location to verify you are at the correct location.\n\n'
+            'Would you like to open Settings to enable location access?'
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Open Settings'),
+            ),
+          ],
+        );
+      },
+    );
+
+    // Only open settings if user confirmed
+    if (result == true) {
+      if (context.mounted) {
+        await openAppSettings();
+      }
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Enable location access in Settings, then try checking in again.'),
+          backgroundColor: Colors.orange,
+        ));
       }
     }
   }
