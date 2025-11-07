@@ -342,9 +342,6 @@ class AuthService extends ChangeNotifier {
         // Request push notification permissions after successful login
         _requestPushNotificationPermissions();
         
-        // Schedule weekly notifications for mentors after successful login
-        _scheduleWeeklyNotifications();
-        
         // Set user online after successful authentication
         if (_streamChatService != null && _streamChatService!.isUserConnected) {
           await _streamChatService!.setUserOnline();
@@ -762,19 +759,5 @@ class AuthService extends ChangeNotifier {
     });
   }
   
-  /// Schedule weekly notifications for mentors after successful login
-  void _scheduleWeeklyNotifications() {
-    debugPrint('📅 [AUTH] Scheduling weekly notifications after login...');
-    Future.microtask(() async {
-      try {
-        await WeeklyNotificationService.instance.initialize();
-        await WeeklyNotificationService.instance.scheduleWeeklyRecapNotification(_userInfo);
-        debugPrint('✅ [AUTH] Weekly notifications scheduled successfully');
-      } catch (e) {
-        debugPrint('❌ [AUTH] Error scheduling weekly notifications: $e');
-        // Don't fail login if notification scheduling fails
-      }
-    });
-  }
   
 }

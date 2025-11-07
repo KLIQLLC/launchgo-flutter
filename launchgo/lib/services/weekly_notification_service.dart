@@ -7,6 +7,7 @@ import 'package:timezone/data/latest.dart' as tz;
 import '../models/user_model.dart';
 import 'permissions_service.dart';
 import 'android_notification_display_service.dart';
+import 'notification_navigation_service.dart';
 
 /// Service for managing weekly recap notifications for mentors
 /// 
@@ -33,8 +34,6 @@ class WeeklyNotificationService {
   Future<void> initialize() async {
     if (_isInitialized) return;
     
-    debugPrint('📅 Initializing WeeklyNotificationService...');
-    
     try {
       // Initialize timezone database
       tz.initializeTimeZones();
@@ -43,7 +42,6 @@ class WeeklyNotificationService {
       if (Platform.isAndroid) {
         // Leverage existing AndroidNotificationDisplayService initialization
         await AndroidNotificationDisplayService.instance.initialize();
-        debugPrint('📅 Using existing AndroidNotificationDisplayService for notifications');
       } else {
         // iOS initialization
         const DarwinInitializationSettings initializationSettingsDarwin = 
@@ -57,12 +55,13 @@ class WeeklyNotificationService {
           iOS: initializationSettingsDarwin,
         );
         
-        await _flutterLocalNotificationsPlugin.initialize(initializationSettings);
-        debugPrint('📅 iOS local notifications initialized');
+        await _flutterLocalNotificationsPlugin.initialize(
+          initializationSettings,
+          onDidReceiveNotificationResponse: _onNotificationTapped,
+        );
       }
       
       _isInitialized = true;
-      debugPrint('✅ WeeklyNotificationService initialized');
     } catch (e) {
       debugPrint('❌ Error initializing WeeklyNotificationService: $e');
       rethrow;
@@ -71,27 +70,23 @@ class WeeklyNotificationService {
   
   /// Schedule weekly recap notification for mentors (Fridays at 9 AM)
   Future<void> scheduleWeeklyRecapNotification(UserModel? userInfo) async {
-    if (!_isInitialized) {
-      debugPrint('⚠️ WeeklyNotificationService not initialized');
-      return;
-    }
+    if (!_isInitialized) return;
     
     // Only schedule for mentors and case managers
-    final permissions = PermissionsService(userInfo);
-    if (!permissions.isMentor && !permissions.isCaseManager) {
-      debugPrint('📅 User is not a mentor/case manager, skipping weekly notification setup');
-      return;
+    if (userInfo != null) {
+      final permissions = PermissionsService(userInfo);
+      if (!permissions.isMentor && !permissions.isCaseManager) {
+        return;
+      }
     }
     
     try {
-      // Cancel any existing weekly notification
+      // Cancel any existing weekly notifications
       await _flutterLocalNotificationsPlugin.cancel(_weeklyNotificationId);
       
       // Calculate next Friday at 9 AM
       final now = tz.TZDateTime.now(tz.local);
       tz.TZDateTime nextFridayAt9AM = _getNextFridayAt9AM(now);
-      
-      debugPrint('📅 Scheduling weekly recap notification for: $nextFridayAt9AM');
       
       // Create notification details
       const AndroidNotificationDetails androidPlatformChannelSpecifics = 
@@ -102,7 +97,7 @@ class WeeklyNotificationService {
             importance: Importance.high,
             priority: Priority.high,
             showWhen: true,
-            icon: 'ic_notification', // Use existing notification icon
+            icon: 'ic_notification',
           );
       
       const DarwinNotificationDetails iosPlatformChannelSpecifics = 
@@ -123,21 +118,17 @@ class WeeklyNotificationService {
       };
       final payload = jsonEncode(payloadData);
       
-      // Schedule the recurring notification
+      // Schedule weekly notification
       await _flutterLocalNotificationsPlugin.zonedSchedule(
         _weeklyNotificationId,
         'Weekly Recap Reminder',
-        'Please make sure you submit your weekly recaps.',
+        'Time to submit your weekly recap!',
         nextFridayAt9AM,
         platformChannelSpecifics,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime, // Repeat weekly
         payload: payload,
       );
-      
-      debugPrint('✅ Weekly recap notification scheduled successfully for Fridays at 9 AM');
-      debugPrint('📅 Next notification: $nextFridayAt9AM');
       
     } catch (e) {
       debugPrint('❌ Failed to schedule weekly recap notification: $e');
@@ -150,7 +141,6 @@ class WeeklyNotificationService {
     
     try {
       await _flutterLocalNotificationsPlugin.cancel(_weeklyNotificationId);
-      debugPrint('🗑️ Weekly recap notification cancelled');
     } catch (e) {
       debugPrint('❌ Failed to cancel weekly recap notification: $e');
     }
@@ -222,5 +212,24 @@ class WeeklyNotificationService {
     
     final pendingNotifications = await getPendingNotifications();
     return pendingNotifications.any((notification) => notification.id == _weeklyNotificationId);
+  }
+  
+  /// Handle iOS local notification tap
+  void _onNotificationTapped(NotificationResponse response) {
+    if (response.payload == null) return;
+    
+    try {
+      final payloadData = jsonDecode(response.payload!);
+      final eventType = payloadData['eventType'] as String?;
+      
+      if (eventType != null) {
+        NotificationNavigationService.instance.handleNotification(
+          eventType: eventType,
+          data: payloadData,
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Error parsing iOS notification payload: $e');
+    }
   }
 }

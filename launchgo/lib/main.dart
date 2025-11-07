@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
@@ -15,6 +16,8 @@ import 'package:launchgo/services/push_notification_service.dart';
 import 'package:launchgo/services/android_notification_display_service.dart';
 import 'package:launchgo/services/pending_navigation_service.dart';
 import 'package:launchgo/services/notifications_api_service.dart';
+import 'package:launchgo/services/notification_navigation_service.dart';
+import 'package:launchgo/services/weekly_notification_service.dart';
 import 'package:launchgo/widgets/splash_screen.dart';
 import 'package:launchgo/features/recaps/presentation/bloc/recap_bloc.dart';
 import 'package:launchgo/features/recaps/data/recap_repository.dart';
@@ -145,9 +148,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // Set NotificationsApiService reference in PushNotificationService for badge updates
     PushNotificationService.instance.setNotificationsService(_notificationsService);
     
-    // Set router and auth service for AndroidNotificationDisplayService for tap navigation
-    AndroidNotificationDisplayService.instance.setRouter(_appRouter.router);
-    AndroidNotificationDisplayService.instance.setAuthService(_authService);
+    // Set router and auth service for AndroidNotificationDisplayService for tap navigation (Android only)
+    if (Platform.isAndroid) {
+      AndroidNotificationDisplayService.instance.setRouter(_appRouter.router);
+      AndroidNotificationDisplayService.instance.setAuthService(_authService);
+    }
+    
+    // Initialize NotificationNavigationService for local notification tap handling
+    NotificationNavigationService.instance.initialize(_appRouter.router, _authService);
     
     // Add app lifecycle observer
     WidgetsBinding.instance.addObserver(this);
@@ -189,6 +197,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             
             // Load notifications
             _notificationsService.fetchNotifications();
+            
+            // Initialize and schedule weekly notifications for authenticated users
+            await WeeklyNotificationService.instance.initialize();
+            await WeeklyNotificationService.instance.scheduleWeeklyRecapNotification(_authService.userInfo);
           });
         }
       }

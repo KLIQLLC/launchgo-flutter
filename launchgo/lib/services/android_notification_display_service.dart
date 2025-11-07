@@ -120,9 +120,13 @@ class AndroidNotificationDisplayService {
       // Parse the payload data
       final payloadData = jsonDecode(response.payload!);
       final notificationType = payloadData['type'] as String?;
+      final eventType = payloadData['eventType'] as String?;
       
       if (notificationType == 'chat') {
         _handleChatNotificationTap(payloadData);
+      } else if (eventType != null) {
+        // Use the existing NotificationNavigationService for eventType notifications
+        _handleEventTypeNotificationTap(payloadData);
       } else {
         debugPrint('🔔 Unknown notification type: $notificationType');
       }
@@ -149,6 +153,24 @@ class AndroidNotificationDisplayService {
       receiverId: senderId,
       channelId: channelId,
       channelType: 'messaging',
+    );
+  }
+  
+  /// Handle eventType notification tap using NotificationNavigationService
+  void _handleEventTypeNotificationTap(Map<String, dynamic> data) {
+    final eventType = data['eventType'] as String?;
+    
+    if (eventType == null) {
+      debugPrint('❌ No eventType in notification payload');
+      return;
+    }
+    
+    debugPrint('🔔 Handling eventType notification: $eventType');
+    
+    // Use the existing NotificationNavigationService
+    NotificationNavigationService.instance.handleNotification(
+      eventType: eventType,
+      data: data,
     );
   }
   
