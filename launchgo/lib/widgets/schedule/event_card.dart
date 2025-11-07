@@ -213,18 +213,18 @@ class _EventCardContent extends StatelessWidget {
   BoxDecoration _buildCardDecoration() {
     return BoxDecoration(
       color: Color.alphaBlend(
-        event.color.withOpacity(0.15),
+        event.color.withValues(alpha: 0.15),
         const Color(0xFF1A2332),
       ),
       borderRadius: BorderRadius.circular(12),
       border: Border.all(
-        color: event.color.withOpacity(0.4),
+        color: event.color.withValues(alpha: 0.4),
         width: 1.0,
       ),
     );
   }
 
-  Color get _cardFillColor => Color.alphaBlend(event.color.withOpacity(0.15), const Color(0xFF1A2332));
+  Color get _cardFillColor => Color.alphaBlend(event.color.withValues(alpha: 0.15), const Color(0xFF1A2332));
 
   @override
   Widget build(BuildContext context) {
@@ -265,7 +265,7 @@ class _EventCardContent extends StatelessWidget {
                       onPressed: () => _handleCheckIn(context),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF1A2332),
-                        side: BorderSide(color: event.color.withOpacity(0.4), width: 0.5),
+                        side: BorderSide(color: event.color.withValues(alpha: 0.4), width: 0.5),
                         elevation: 0,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -284,16 +284,16 @@ class _EventCardContent extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                       decoration: BoxDecoration(
                         color: _cardFillColor,
-                        border: Border.all(color: event.color.withOpacity(0.4), width: 0.5),
+                        border: Border.all(color: event.color.withValues(alpha: 0.4), width: 0.5),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.check_circle_outline, color: checkInColor.withOpacity(0.5)),
+                          Icon(Icons.check_circle_outline, color: checkInColor.withValues(alpha: 0.5)),
                           const SizedBox(width: 12),
-                          Text('Check In', style: TextStyle(color: checkInColor.withOpacity(0.5), fontSize: 16, fontWeight: FontWeight.w600)),
+                          Text('Check In', style: TextStyle(color: checkInColor.withValues(alpha: 0.5), fontSize: 16, fontWeight: FontWeight.w600)),
                         ],
                       ),
                     ),
