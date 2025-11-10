@@ -643,7 +643,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
     );
   }
 
-  void _openLocationEditScreen(BuildContext context) async {
+  void _openLocationEditScreen(BuildContext screenContext) async {
     String? suggestAddress;
     LatLng? suggestCoords;
 
@@ -660,9 +660,14 @@ class _EventFormScreenState extends State<EventFormScreen> {
     }
 
     if (status.isPermanentlyDenied || status.isRestricted) {
-      await openAppSettings();
+      if (!mounted) return;
+      final shouldOpenSettings = await _showLocationPermissionDeniedDialog(screenContext);
+      if (shouldOpenSettings) {
+        await openAppSettings();
+      }
     }
 
+    // Try to get current location if permission is granted
     if (status.isGranted) {
       try {
         Position pos = await Geolocator.getCurrentPosition();
@@ -683,6 +688,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
         // fallback: не удалось определить координаты/адрес
       }
     }
+
+    if (!mounted) return;
     final result = await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => LocationEditScreen(
@@ -701,5 +708,30 @@ class _EventFormScreenState extends State<EventFormScreen> {
         }
       });
     }
+  }
+
+
+  Future<bool> _showLocationPermissionDeniedDialog(BuildContext dialogContext) async {
+    return await showDialog<bool>(
+      context: dialogContext,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Location Permission Required'),
+          content: const Text(
+            'Location access is permanently denied. To enable automatic location suggestions, please go to Settings and enable location permission for this app.\n\nYou can still manually enter addresses.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Continue'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Go to Settings'),
+            ),
+          ],
+        );
+      },
+    ) ?? false;
   }
 }
