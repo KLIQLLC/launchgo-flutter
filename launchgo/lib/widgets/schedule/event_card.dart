@@ -275,6 +275,7 @@ class _EventCardContent extends StatelessWidget {
     final isStudent = context.watch<AuthService>().isStudent;
     final checkInColor = event.color;
     final bool checkInEnabled = EventHelper.isCheckInEnabled(event);
+    final bool shouldShowCheckIn = EventHelper.shouldShowCheckInButton(event);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -299,7 +300,7 @@ class _EventCardContent extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           _EventTime(event: event),
-          if (isStudent)
+          if (isStudent && shouldShowCheckIn)
             Padding(
               padding: const EdgeInsets.only(top: 12),
               child: SizedBox(
