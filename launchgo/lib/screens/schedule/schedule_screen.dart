@@ -98,10 +98,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> with WidgetsBindingObse
   }
 
   Future<void> _loadDeadlines() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
       final apiService = context.read<ApiServiceRetrofit>();
@@ -116,18 +118,24 @@ class _ScheduleScreenState extends State<ScheduleScreen> with WidgetsBindingObse
           .map((a) => DeadlineAssignment.fromJson(a))
           .toList();
           
-      setState(() {
-        _assignments = assignments;
-      });
+      if (mounted) {
+        setState(() {
+          _assignments = assignments;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to load deadlines. Please try again.';
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to load deadlines. Please try again.';
+        });
+      }
       debugPrint('Error loading deadlines: $e');
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -632,9 +640,11 @@ class _WeeklyScheduleViewState extends State<_WeeklyScheduleView> {
   }
 
   Future<void> _loadEvents() async {
-    setState(() {
-      _isLoadingEvents = true;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoadingEvents = true;
+      });
+    }
 
     try {
       final apiService = context.read<ApiServiceRetrofit>();
@@ -646,15 +656,19 @@ class _WeeklyScheduleViewState extends State<_WeeklyScheduleView> {
 
       final events = response.map((eventData) => Event.fromJson(eventData)).toList();
       
-      setState(() {
-        _events = events;
-      });
+      if (mounted) {
+        setState(() {
+          _events = events;
+        });
+      }
     } catch (e) {
       debugPrint('Failed to load events: $e');
     } finally {
-      setState(() {
-        _isLoadingEvents = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoadingEvents = false;
+        });
+      }
     }
   }
 
@@ -811,18 +825,22 @@ class _WeeklyScheduleViewState extends State<_WeeklyScheduleView> {
   }
 
   void _onEventDeleted(Event event) {
-    setState(() {
-      _events.removeWhere((e) => e.id == event.id);
-    });
+    if (mounted) {
+      setState(() {
+        _events.removeWhere((e) => e.id == event.id);
+      });
+    }
   }
 
   void _onEventUpdated(Event oldEvent, Event updatedEvent) {
-    setState(() {
-      final index = _events.indexWhere((e) => e.id == oldEvent.id);
-      if (index != -1) {
-        _events[index] = updatedEvent;
-      }
-    });
+    if (mounted) {
+      setState(() {
+        final index = _events.indexWhere((e) => e.id == oldEvent.id);
+        if (index != -1) {
+          _events[index] = updatedEvent;
+        }
+      });
+    }
   }
 
   Future<void> _openEvent(Event event) async {
