@@ -178,9 +178,10 @@ class _LocationEditScreenState extends State<LocationEditScreen> {
         children: [
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(14.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
                     'Location',
