@@ -40,6 +40,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
 
   late String _selectedType;
   bool _isLoading = false;
+  bool _isLocationLoading = false;
 
   String? _locationAddress;
   LatLng? _locationLatLng;
@@ -338,7 +339,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                         const SizedBox(height: 8),
                         InkWell(
                           borderRadius: BorderRadius.circular(12),
-                          onTap: widget.isReadOnly ? null : () => _openLocationEditScreen(context),
+                          onTap: (widget.isReadOnly || _isLocationLoading) ? null : () => _openLocationEditScreen(context),
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             decoration: BoxDecoration(
@@ -359,10 +360,19 @@ class _EventFormScreenState extends State<EventFormScreen> {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                                Icon(
-                                  _locationAddress?.isNotEmpty == true ? Icons.edit_location_alt : Icons.add_location_alt,
-                                  color: themeService.textColor,
-                                )
+                                _isLocationLoading
+                                  ? SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: themeService.textColor,
+                                      ),
+                                    )
+                                  : Icon(
+                                      _locationAddress?.isNotEmpty == true ? Icons.edit_location_alt : Icons.add_location_alt,
+                                      color: themeService.textColor,
+                                    )
                               ],
                             ),
                           ),
@@ -650,72 +660,143 @@ class _EventFormScreenState extends State<EventFormScreen> {
   }
 
   void _openLocationEditScreen(BuildContext screenContext) async {
-    String? suggestAddress;
-    LatLng? suggestCoords;
+    // Prevent multiple simultaneous navigation attempts
+    if (_isLocationLoading) return;
+    
+    setState(() {
+      _isLocationLoading = true;
+    });
 
-    // Ensure Location Services are enabled
-    final servicesEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!servicesEnabled) {
-      await Geolocator.openLocationSettings();
-    }
+    try {
+      String? suggestAddress;
+      LatLng? suggestCoords;
 
-    // Request app-level permission explicitly for iOS
-    var status = await Permission.locationWhenInUse.status;
-    if (status.isDenied) {
-      status = await Permission.locationWhenInUse.request();
-    }
-
-    if (status.isPermanentlyDenied || status.isRestricted) {
-      if (!mounted) return;
-      final shouldOpenSettings = await _showLocationPermissionDeniedDialog(screenContext);
-      if (shouldOpenSettings) {
-        await openAppSettings();
+      // Check location permissions first - deny navigation if no permission
+      final servicesEnabled = await Geolocator.isLocationServiceEnabled();
+      var status = await Permission.locationWhenInUse.status;
+      
+      if (status.isDenied) {
+        status = await Permission.locationWhenInUse.request();
       }
-    }
 
-    // Try to get current location if permission is granted
-    if (status.isGranted) {
-      try {
-        Position pos = await Geolocator.getCurrentPosition();
-        suggestCoords = LatLng(pos.latitude, pos.longitude);
-        List<geocoding.Placemark> placemarks = await geocoding.placemarkFromCoordinates(pos.latitude, pos.longitude);
-        if (placemarks.isNotEmpty) {
-          final place = placemarks.first;
-          final address = [
-            if (place.street != null) place.street,
-            if (place.subLocality != null) place.subLocality,
-            if (place.locality != null) place.locality,
-            if (place.administrativeArea != null) place.administrativeArea,
-            if (place.country != null) place.country,
-          ].where((e) => e != null && e.toString().trim().isNotEmpty).join(', ');
-          suggestAddress = address;
-        }
-      } catch (e) {
-        // fallback: не удалось определить координаты/адрес
-      }
-    }
-
-    if (!mounted) return;
-    final result = await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => LocationEditScreen(
-          initialLocation: suggestAddress ?? _locationAddress ?? '',
-          initialCoords: suggestCoords ?? _locationLatLng,
-        ),
-      ),
-    );
-    if (result is Map && result['address'] is String) {
-      setState(() {
-        _locationAddress = result['address'] ?? '';
-        if (result['lat'] is double && result['lng'] is double) {
-          _locationLatLng = LatLng(result['lat'], result['lng']);
+      // Handle all permission issues in one place
+      if (!servicesEnabled || status.isPermanentlyDenied || status.isRestricted || status.isDenied) {
+        if (!mounted) return;
+        
+        String message;
+        bool openLocationSettings = false;
+        
+        if (!servicesEnabled) {
+          message = 'Location services are required to use the location feature. Enable them in Settings to continue.';
+          openLocationSettings = true;
         } else {
-          _locationLatLng = null;
+          message = 'Location permission is required to use the location feature. Enable it in Settings to continue.';
         }
-      });
+        
+        final shouldOpenSettings = await _showLocationPermissionDialog(message);
+        if (shouldOpenSettings) {
+          if (openLocationSettings) {
+            await Geolocator.openLocationSettings();
+          } else {
+            await openAppSettings();
+          }
+        }
+        return; // Don't navigate if any permission issue
+      }
+
+      // Only proceed if permission is granted
+      if (status.isGranted) {
+        // Try to get current location
+        try {
+          Position pos = await Geolocator.getCurrentPosition(
+            timeLimit: const Duration(seconds: 5),
+          );
+          suggestCoords = LatLng(pos.latitude, pos.longitude);
+          List<geocoding.Placemark> placemarks = await geocoding.placemarkFromCoordinates(
+            pos.latitude, 
+            pos.longitude
+          );
+          if (placemarks.isNotEmpty) {
+            final place = placemarks.first;
+            final address = [
+              if (place.street != null) place.street,
+              if (place.subLocality != null) place.subLocality,
+              if (place.locality != null) place.locality,
+              if (place.administrativeArea != null) place.administrativeArea,
+              if (place.country != null) place.country,
+            ].where((e) => e != null && e.toString().trim().isNotEmpty).join(', ');
+            suggestAddress = address;
+          }
+        } catch (e) {
+          // Location getting failed - continue with navigation
+        }
+      }
+
+      if (!mounted) return;
+      
+      final result = await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => LocationEditScreen(
+            initialLocation: suggestAddress ?? _locationAddress ?? '',
+            initialCoords: suggestCoords ?? _locationLatLng,
+          ),
+        ),
+      );
+      
+      if (result is Map && result['address'] is String && mounted) {
+        setState(() {
+          _locationAddress = result['address'] ?? '';
+          if (result['lat'] is double && result['lng'] is double) {
+            _locationLatLng = LatLng(result['lat'], result['lng']);
+          } else {
+            _locationLatLng = null;
+          }
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLocationLoading = false;
+        });
+      }
     }
   }
 
+
+  Future<bool> _showLocationPermissionDialog(String message) async {
+    return await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1A2332),
+          title: const Text(
+            'Location Permission',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: Text(
+            message,
+            style: const TextStyle(color: Colors.white),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text(
+                'Go to Settings',
+                style: TextStyle(color: Colors.blue),
+              ),
+            ),
+          ],
+        );
+      },
+    ) ?? false;
+  }
 
   Future<bool> _showLocationPermissionDeniedDialog(BuildContext dialogContext) async {
     return await showDialog<bool>(
