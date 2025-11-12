@@ -464,9 +464,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        SizedBox(
-          height: maxLines == 1 ? 42 : null,
-          child: TextFormField(
+        TextFormField(
             controller: controller,
             maxLines: maxLines,
             enabled: !readOnly,
@@ -499,7 +497,6 @@ class _EventFormScreenState extends State<EventFormScreen> {
                 }
               : null,
           ),
-        ),
       ],
     );
   }
