@@ -760,8 +760,9 @@ class _WeeklyScheduleViewState extends State<_WeeklyScheduleView> {
                     child: EventCard(
                       key: ValueKey('event_card_${event.id}'),
                       event: event,
-                      onEdit: (widget.permissions.canEditEvents && event.type.toLowerCase() != 'assignment') ? () => _editEvent(event) : null,
+                      onEdit: (widget.permissions.canEditEvents && event.type.toLowerCase() != 'assignment') ? () => _openEvent(event) : null,
                       onDelete: (widget.permissions.canDeleteEvents && event.type.toLowerCase() != 'assignment') ? () => _onEventDeleted(event) : null,
+                      onView: () => _openEvent(event),
                       onEventUpdated: (updatedEvent) => _onEventUpdated(event, updatedEvent),
                     ),
                   );
@@ -824,9 +825,9 @@ class _WeeklyScheduleViewState extends State<_WeeklyScheduleView> {
     });
   }
 
-  Future<void> _editEvent(Event event) async {
+  Future<void> _openEvent(Event event) async {
     final result = await context.push(
-      '/edit-event/${event.id}',
+      '/event/${event.id}',
       extra: event,
     );
     

@@ -157,7 +157,7 @@ class _CupertinoDropdownState extends State<CupertinoDropdown> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         GestureDetector(
-          onTap: widget.items.isEmpty ? null : () => _showPicker(context, themeService),
+          onTap: (widget.items.isEmpty || widget.onChanged == null) ? null : () => _showPicker(context, themeService),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(

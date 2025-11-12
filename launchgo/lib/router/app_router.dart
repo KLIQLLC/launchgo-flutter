@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import '../services/permissions_service.dart';
 import '../theme/app_colors.dart';
 import 'package:launchgo/widgets/chat_badge_widget.dart';
 import 'package:launchgo/features/documents/domain/entities/document_entity.dart';
@@ -180,11 +182,13 @@ class AppRouter {
           builder: (context, state) => const RecurringEventFormScreen(),
         ),
         GoRoute(
-          path: '/edit-event/:eventId',
-          name: 'editEvent',
+          path: '/event/:eventId',
+          name: 'event',
           builder: (context, state) {
             final event = state.extra as Event;
-            return EventFormScreen(event: event);
+            final permissions = context.read<AuthService>().permissions;
+            final isReadOnly = !permissions.canEditEvents;
+            return EventFormScreen(event: event, isReadOnly: isReadOnly);
           },
         ),
         GoRoute(

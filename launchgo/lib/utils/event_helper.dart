@@ -1,8 +1,8 @@
 import '../models/event_model.dart';
 
-/// Helper class for event-related business logic
+/// Helper class for event-related business logic and utilities
 class EventHelper {
-  /// Determines if the check-in button should be visible for an event
+  /// Determines if the check-in button should be visible for an event 
   /// 
   /// Visible when:
   /// - Event has a location (addressLocation is not null/empty)
@@ -22,6 +22,8 @@ class EventHelper {
       return false;
     }
     
+    // All conditions met - show check-in button
+    return true;
   }
 
   /// Determines if the event is within the check-in timeframe

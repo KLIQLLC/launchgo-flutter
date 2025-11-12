@@ -14,6 +14,7 @@ class EventCard extends StatelessWidget {
   final Event event;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final VoidCallback? onView;
   final Function(Event)? onEventUpdated;
 
   const EventCard({
@@ -21,6 +22,7 @@ class EventCard extends StatelessWidget {
     required this.event,
     this.onEdit,
     this.onDelete,
+    this.onView,
     this.onEventUpdated,
   });
 
@@ -28,8 +30,8 @@ class EventCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return SwipeableCard(
       canSwipe: onDelete != null,
-      canTap: onEdit != null,
-      onTap: onEdit,
+      canTap: true,
+      onTap: onEdit ?? onView,
       onSwipeToDelete: onDelete != null ? () => _handleSwipeToDelete(context) : null,
       deleteIcon: Icons.delete,
       child: _EventCardContent(event: event, onEventUpdated: onEventUpdated),

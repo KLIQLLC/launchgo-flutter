@@ -15,10 +15,12 @@ import 'package:geocoding/geocoding.dart' as geocoding;
 
 class EventFormScreen extends StatefulWidget {
   final Event? event;
+  final bool isReadOnly;
 
   const EventFormScreen({
     super.key,
     this.event,
+    this.isReadOnly = false,
   });
 
   @override
@@ -285,7 +287,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
         elevation: 0,
         centerTitle: true,
         title: Text(
-          isEditMode ? 'Edit Event' : 'Add Event',
+          widget.isReadOnly ? 'Event Details' : (isEditMode ? 'Edit Event' : 'Add Event'),
           style: TextStyle(
             color: themeService.textColor,
             fontSize: 20,
@@ -313,6 +315,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                       hint: 'Enter event name',
                       isRequired: true,
                       themeService: themeService,
+                      readOnly: widget.isReadOnly,
                     ),
                     const SizedBox(height: 20),
                     _buildDateSection(themeService),
@@ -335,7 +338,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                         const SizedBox(height: 8),
                         InkWell(
                           borderRadius: BorderRadius.circular(12),
-                          onTap: () => _openLocationEditScreen(context),
+                          onTap: widget.isReadOnly ? null : () => _openLocationEditScreen(context),
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             decoration: BoxDecoration(
@@ -373,6 +376,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                       hint: 'Enter event description',
                       maxLines: 3,
                       themeService: themeService,
+                      readOnly: widget.isReadOnly,
                     ),
                     const SizedBox(height: 20), // Add some bottom padding
                   ],
@@ -392,7 +396,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                 ),
               ],
             ),
-            child: SafeArea(
+            child: widget.isReadOnly ? const SizedBox.shrink() : SafeArea(
               top: false,
               child: SizedBox(
                 width: double.infinity,
@@ -436,6 +440,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
     required ThemeService themeService,
     bool isRequired = false,
     int maxLines = 1,
+    bool readOnly = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -454,6 +459,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
           child: TextFormField(
             controller: controller,
             maxLines: maxLines,
+            enabled: !readOnly,
             style: TextStyle(color: themeService.textColor),
             decoration: InputDecoration(
               hintText: hint,
@@ -505,7 +511,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
           value: _formatEventType(_selectedType),
           items: _eventTypes.map((type) => _formatEventType(type)).toList(),
           hintText: 'Select event type',
-          onChanged: (value) {
+          onChanged: widget.isReadOnly ? null : (value) {
             if (value != null) {
               final index = _eventTypes.indexWhere((type) => 
                 _formatEventType(type) == value
@@ -536,7 +542,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
         ),
         const SizedBox(height: 8),
         InkWell(
-          onTap: _selectStartDate,
+          onTap: widget.isReadOnly ? null : _selectStartDate,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8.5),
             decoration: BoxDecoration(
@@ -584,7 +590,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                 value: TimeUtils.formatTimeForDropdown(_startTime),
                 items: TimeUtils.getTimeSlots(),
                 hintText: 'Select time',
-                onChanged: (value) {
+                onChanged: widget.isReadOnly ? null : (value) {
                   if (value != null) {
                     final newTime = TimeUtils.parseTimeString(value);
                     if (newTime != null) {
@@ -625,7 +631,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                 value: TimeUtils.formatTimeForDropdown(_endTime),
                 items: TimeUtils.getTimeSlots(),
                 hintText: 'Select time',
-                onChanged: (value) {
+                onChanged: widget.isReadOnly ? null : (value) {
                   if (value != null) {
                     final newTime = TimeUtils.parseTimeString(value);
                     if (newTime != null) {
