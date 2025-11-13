@@ -27,7 +27,7 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
   late DateTime _recurrenceEndDate;
 
   String _selectedType = 'study';
-  String _recursionType = 'every-day';
+  String _recurrenceType = 'every-day';
   bool _isLoading = false;
 
   final List<String> _eventTypes = [
@@ -41,7 +41,7 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
     'extracurricular',
   ];
 
-  final List<String> _recursionTypes = [
+  final List<String> _recurrenceTypes = [
     'every-day',
     'every-week',
     'every-month',
@@ -85,7 +85,7 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
     return type[0].toUpperCase() + type.substring(1);
   }
 
-  String _formatRecursionType(String type) {
+  String _formatrecurrenceType(String type) {
     switch (type) {
       case 'every-day':
         return 'Every Day';
@@ -243,8 +243,8 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
         'dateAt': DateFormat('yyyy-MM-dd').format(_selectedDate),
         'startTime': TimeUtils.formatTimeForDropdown(_startTime),
         'endTime': TimeUtils.formatTimeForDropdown(_endTime),
-        'recursionEndAt': _recurrenceEndDate.toUtc().toIso8601String(),
-        'recursionType': _recursionType,
+        'recurrenceEndAt': _recurrenceEndDate.toUtc().toIso8601String(),
+        'recurrenceType': _recurrenceType,
         'type': _selectedType,
         'location': _locationController.text.trim(),
         'description': _descriptionController.text.trim(),
@@ -594,7 +594,7 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Recursion Type',
+                    'recurrence Type',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 16,
@@ -603,17 +603,17 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
                   ),
                   const SizedBox(height: 8),
                   CupertinoDropdown(
-                    value: _formatRecursionType(_recursionType),
-                    items: _recursionTypes.map((type) => _formatRecursionType(type)).toList(),
-                    hintText: 'Select recursion',
+                    value: _formatrecurrenceType(_recurrenceType),
+                    items: _recurrenceTypes.map((type) => _formatrecurrenceType(type)).toList(),
+                    hintText: 'Select recurrence',
                     onChanged: (value) {
                       if (value != null) {
-                        final index = _recursionTypes.indexWhere((type) => 
-                          _formatRecursionType(type) == value
+                        final index = _recurrenceTypes.indexWhere((type) => 
+                          _formatrecurrenceType(type) == value
                         );
                         if (index != -1) {
                           setState(() {
-                            _recursionType = _recursionTypes[index];
+                            _recurrenceType = _recurrenceTypes[index];
                           });
                         }
                       }

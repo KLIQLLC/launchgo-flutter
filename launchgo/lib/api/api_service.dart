@@ -172,7 +172,7 @@ abstract class ApiService {
     @Body() Map<String, dynamic> eventData,
   );
 
-  @POST("/users/{userId}/events/recursion")
+  @POST("/users/{userId}/events/recurrence")
   Future<HttpResponse<dynamic>> createRecurringEvent(
     @Path("userId") String userId,
     @Body() Map<String, dynamic> eventData,
