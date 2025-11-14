@@ -36,6 +36,7 @@ Comprehensive scheduling system that displays events, tracks deadlines, and mana
   - Delete events with confirmation
   - **Delete button disabled for events that started before (current time + 15 minutes)**
   - **After deleting recurring events, weekly schedule automatically reloads to reflect changes**
+  - **Update Recurring Event button hidden when form is in read-only/view mode**
   - Form validation for required fields
   - Integration with backend API
 
@@ -105,16 +106,20 @@ Comprehensive scheduling system that displays events, tracks deadlines, and mana
 - Check-in button with appropriate state (students only)
 - Check-in button hidden when no location is set for the event
 - Check-in button hidden for mentor/case manager users
-- **Delete/swipe-to-delete/tap-to-edit/view disabled for events that started before (current time + 15 minutes)**
-- **Example: If current time is 15:00, disable delete for events that started before 15:15**
+- **Delete/swipe-to-delete/edit disabled for events that started before (current time + 15 minutes)**
+- **View always enabled for all events (past and future)**
+- **Example: If current time is 15:00, disable delete/edit for events that started before 15:15**
 - **Disabled buttons shown in grayed-out state with reduced opacity**
 
 #### Event Interaction Restrictions:
 **Example at 15:00:**
-- ❌ **Cannot interact**: Events starting before 15:15 (no delete, swipe-to-delete, edit, or view)
-- ✅ **Can interact**: Events starting at 15:15 or later (all actions available)
+- ❌ **Cannot delete/edit**: Events starting before 15:15 (no delete, swipe-to-delete, or edit)
+- ✅ **Can always view**: All events (past and future) can be tapped to view details
+- ✅ **Can delete/edit**: Events starting at 15:15 or later (all actions available)
 
-**Logic**: `event.startEventAt < (DateTime.now() + Duration(minutes: 15))`
+**Logic**: 
+- Delete/Edit: `event.startEventAt < (DateTime.now() + Duration(minutes: 15))`
+- View: Always enabled for both students and mentors
 - Visual status indicators (checked-in, missed, etc.)
 - Tap to view details
 

@@ -773,6 +773,11 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> wit
   }
 
   Widget _buildActionButtons() {
+    // Hide button when in read-only mode
+    if (widget.isReadOnly) {
+      return const SizedBox.shrink();
+    }
+    
     return SizedBox(
       width: double.infinity,
       height: 54,

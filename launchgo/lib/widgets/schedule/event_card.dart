@@ -29,12 +29,23 @@ class EventCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool canDelete = onDelete != null && EventHelper.canDeleteEvent(event);
-    final bool canInteract = EventHelper.canDeleteEvent(event);
+    final bool canEdit = onEdit != null && EventHelper.canDeleteEvent(event);
+    final bool canView = onView != null; // View is always enabled if callback provided
+    
+    // Determine the tap action: edit if available and allowed, otherwise view
+    final VoidCallback? tapAction;
+    if (canEdit) {
+      tapAction = onEdit;
+    } else if (canView) {
+      tapAction = onView;
+    } else {
+      tapAction = null;
+    }
     
     return SwipeableCard(
       canSwipe: canDelete,
-      canTap: canInteract,
-      onTap: canInteract ? (onEdit ?? onView) : null,
+      canTap: tapAction != null,
+      onTap: tapAction,
       onSwipeToDelete: canDelete ? () => _handleSwipeToDelete(context) : null,
       deleteIcon: Icons.delete,
       child: _EventCardContent(event: event, onEventUpdated: onEventUpdated),
