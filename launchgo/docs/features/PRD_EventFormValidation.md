@@ -161,7 +161,7 @@ class SmartTimeDefaults {
 ```
 
 #### Smart Default Behavior
-1. **Form Initialization**: Start time defaults to next 15-minute interval after current time
+1. **Form Initialization**: Start time defaults to current time + 1 hour, rounded to 15-minute interval
 2. **End Time Suggestion**: Automatically suggests start time + 1 hour (on 15-minute interval)
 3. **Dropdown Filtering**: Only shows valid 15-minute interval times that are in the future for today's date
 4. **No Auto-correction Needed**: Since dropdowns prevent invalid selections, no time corrections are necessary

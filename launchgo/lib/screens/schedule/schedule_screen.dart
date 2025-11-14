@@ -827,9 +827,15 @@ class _WeeklyScheduleViewState extends State<_WeeklyScheduleView> {
 
   void _onEventDeleted(Event event) {
     if (mounted) {
-      setState(() {
-        _events.removeWhere((e) => e.id == event.id);
-      });
+      if (event.isRecurrence) {
+        // For recurring events, reload entire schedule to ensure all instances are removed
+        _loadEvents();
+      } else {
+        // For single events, just remove the specific event
+        setState(() {
+          _events.removeWhere((e) => e.id == event.id);
+        });
+      }
     }
   }
 

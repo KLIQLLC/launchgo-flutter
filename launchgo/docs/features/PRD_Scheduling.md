@@ -35,6 +35,7 @@ Comprehensive scheduling system that displays events, tracks deadlines, and mana
   - Edit existing events with validation
   - Delete events with confirmation
   - **Delete button disabled for events that started before (current time + 15 minutes)**
+  - **After deleting recurring events, weekly schedule automatically reloads to reflect changes**
   - Form validation for required fields
   - Integration with backend API
 

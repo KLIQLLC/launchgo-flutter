@@ -85,7 +85,9 @@ class _EventFormScreenState extends State<EventFormScreen> with EventFormValidat
       _descriptionController = TextEditingController();
       _locationController = TextEditingController();
       
-      final suggestedStart = suggestNextValidDateTime();
+      // Set start time to current time + 1 hour, rounded to 15-minute interval
+      final oneHourFromNow = DateTime.now().add(const Duration(hours: 1));
+      final suggestedStart = TimeUtils.roundTo15MinuteIntervalDateTime(oneHourFromNow);
       final suggestedEnd = suggestEndTimeForStart(suggestedStart);
       
       _startDate = DateTime(suggestedStart.year, suggestedStart.month, suggestedStart.day);

@@ -79,7 +79,9 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> wit
       _descriptionController = TextEditingController();
       _locationController = TextEditingController();
       
-      final suggestedStart = suggestNextValidDateTime();
+      // Set start time to current time + 1 hour, rounded to 15-minute interval
+      final oneHourFromNow = DateTime.now().add(const Duration(hours: 1));
+      final suggestedStart = TimeUtils.roundTo15MinuteIntervalDateTime(oneHourFromNow);
       final suggestedEnd = suggestEndTimeForStart(suggestedStart);
       
       _selectedDate = DateTime(suggestedStart.year, suggestedStart.month, suggestedStart.day);
