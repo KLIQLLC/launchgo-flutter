@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
@@ -9,6 +8,8 @@ import '../../widgets/cupertino_dropdown.dart';
 import '../../utils/time_utils.dart';
 import '../../utils/recurrence_utils.dart';
 import '../../models/event_model.dart';
+import '../../mixins/event_form_validation_mixin.dart';
+import '../../services/event_validation_service.dart';
 
 class RecurringEventFormScreen extends StatefulWidget {
   final Event? event;
@@ -24,7 +25,7 @@ class RecurringEventFormScreen extends StatefulWidget {
   State<RecurringEventFormScreen> createState() => _RecurringEventFormScreenState();
 }
 
-class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
+class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> with EventFormValidationMixin {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _descriptionController;
@@ -73,15 +74,18 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
       _recurrenceType = widget.event!.recurrenceType ?? 'every-day';
       _recurrenceEndDate = widget.event!.endRecurrenceAt ?? DateTime.now().add(const Duration(days: 30));
     } else {
-      // Add mode - initialize with defaults
+      // Add mode - initialize with defaults using smart suggestions
       _nameController = TextEditingController();
       _descriptionController = TextEditingController();
       _locationController = TextEditingController();
       
-      _selectedDate = DateTime.now();
-      _startTime = const TimeOfDay(hour: 12, minute: 0); // 12:00 PM
-      _endTime = const TimeOfDay(hour: 12, minute: 0); // 12:00 PM
-      _recurrenceEndDate = DateTime.now().add(const Duration(days: 30));
+      final suggestedStart = suggestNextValidDateTime();
+      final suggestedEnd = suggestEndTimeForStart(suggestedStart);
+      
+      _selectedDate = DateTime(suggestedStart.year, suggestedStart.month, suggestedStart.day);
+      _startTime = TimeOfDay.fromDateTime(suggestedStart);
+      _endTime = TimeOfDay.fromDateTime(suggestedEnd);
+      _recurrenceEndDate = EventValidationService.suggestRecurrenceEndDate(suggestedStart);
     }
   }
 
@@ -105,6 +109,33 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
     );
   }
 
+  DateTime get _startDateTime => _combineDateAndTime(_selectedDate, _startTime);
+  DateTime get _endDateTime => _combineDateAndTime(_selectedDate, _endTime);
+
+  /// Gets available time slots based on current date constraints
+  List<String> _getAvailableTimeSlots() {
+    final allSlots = TimeUtils.getTimeSlots();
+    
+    // If not today, return all slots
+    final now = DateTime.now();
+    if (_selectedDate.year != now.year || 
+        _selectedDate.month != now.month || 
+        _selectedDate.day != now.day) {
+      return allSlots;
+    }
+    
+    // For today, filter out past times
+    final minTime = getMinimumTimeForDate(_selectedDate, isEditMode: isEditMode);
+    if (minTime == null) return allSlots;
+    
+    return allSlots.where((slot) {
+      final time = TimeUtils.parseTimeString(slot);
+      if (time == null) return false;
+      return time.hour > minTime.hour || 
+             (time.hour == minTime.hour && time.minute >= minTime.minute);
+    }).toList();
+  }
+
   String _formatEventType(String type) {
     if (type == 'lg_session') {
       return 'LG Session';
@@ -115,11 +146,16 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
 
 
   Future<void> _selectDate() async {
+    final constraints = getDateConstraints(
+      isEditMode: isEditMode,
+      originalDate: isEditMode ? widget.event?.startEventAt : null,
+    );
+    
     final picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      firstDate: constraints.start,
+      lastDate: constraints.end,
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -134,6 +170,7 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
         );
       },
     );
+    
     if (picked != null) {
       setState(() {
         _selectedDate = picked;
@@ -141,73 +178,26 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
           _recurrenceEndDate = _selectedDate.add(const Duration(days: 30));
         }
       });
+      
+      // Trigger validation after date change (no auto-correction needed with valid dropdowns)
+      validateEventTimes(
+        startDateTime: _startDateTime,
+        endDateTime: _endDateTime,
+        recurrenceEndDate: _recurrenceEndDate,
+        recurrenceType: _recurrenceType,
+        isEditMode: isEditMode,
+        originalStartTime: isEditMode ? widget.event?.startEventAt : null,
+      );
     }
   }
 
-  Future<void> _selectStartTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _startTime,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: Colors.blue,
-              onPrimary: Colors.white,
-              surface: Color(0xFF1A2332),
-              onSurface: Colors.white,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null) {
-      setState(() {
-        _startTime = picked;
-        // Auto-adjust end time if needed
-        if (_endTime.hour < _startTime.hour || 
-            (_endTime.hour == _startTime.hour && _endTime.minute <= _startTime.minute)) {
-          _endTime = TimeOfDay(
-            hour: _startTime.hour + 1 > 23 ? 23 : _startTime.hour + 1,
-            minute: _startTime.minute,
-          );
-        }
-      });
-    }
-  }
-
-  Future<void> _selectEndTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _endTime,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: Colors.blue,
-              onPrimary: Colors.white,
-              surface: Color(0xFF1A2332),
-              onSurface: Colors.white,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null) {
-      setState(() {
-        _endTime = picked;
-      });
-    }
-  }
 
   Future<void> _selectRecurrenceEndDate() async {
     final picked = await showDatePicker(
       context: context,
       initialDate: _recurrenceEndDate,
       firstDate: _selectedDate,
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate: EventValidationService.getMaximumDate(_selectedDate),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -222,27 +212,40 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
         );
       },
     );
+    
     if (picked != null) {
       setState(() {
         _recurrenceEndDate = picked;
       });
+      
+      // Trigger validation after recurrence end date change
+      validateEventTimes(
+        startDateTime: _startDateTime,
+        endDateTime: _endDateTime,
+        recurrenceEndDate: _recurrenceEndDate,
+        recurrenceType: _recurrenceType,
+        isEditMode: isEditMode,
+        originalStartTime: isEditMode ? widget.event?.startEventAt : null,
+      );
     }
   }
 
   Future<void> _saveRecurringEvent() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final startDateTime = _combineDateAndTime(_selectedDate, _startTime);
-    final endDateTime = _combineDateAndTime(_selectedDate, _endTime);
-
-    if (endDateTime.isBefore(startDateTime) || endDateTime.isAtSameMomentAs(startDateTime)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('End time must be after start time'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
+    // Perform final validation before save
+    validateEventTimes(
+      startDateTime: _startDateTime,
+      endDateTime: _endDateTime,
+      recurrenceEndDate: _recurrenceEndDate,
+      recurrenceType: _recurrenceType,
+      isEditMode: isEditMode,
+      originalStartTime: isEditMode ? widget.event?.startEventAt : null,
+      immediate: true,
+    );
+    
+    if (!canSubmitForm()) {
+      return; // Validation errors will be shown by the mixin
     }
 
     setState(() {
@@ -272,12 +275,12 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
           eventData['type'] = _selectedType;
         }
         
-        if (!startDateTime.isAtSameMomentAs(widget.event!.startEventAt)) {
-          eventData['startEventAt'] = startDateTime.toUtc().toIso8601String();
+        if (!_startDateTime.isAtSameMomentAs(widget.event!.startEventAt)) {
+          eventData['startEventAt'] = _startDateTime.toUtc().toIso8601String();
         }
         
-        if (!endDateTime.isAtSameMomentAs(widget.event!.endEventAt)) {
-          eventData['endEventAt'] = endDateTime.toUtc().toIso8601String();
+        if (!_endDateTime.isAtSameMomentAs(widget.event!.endEventAt)) {
+          eventData['endEventAt'] = _endDateTime.toUtc().toIso8601String();
         }
         
         if (_recurrenceType != widget.event!.recurrenceType) {
@@ -309,15 +312,15 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
         final eventData = {
           'id': '',
           'name': _nameController.text.trim(),
-          'startEventAt': startDateTime.toUtc().toIso8601String(),
-          'endEventAt': endDateTime.toUtc().toIso8601String(),
+          'startEventAt': _startDateTime.toUtc().toIso8601String(),
+          'endEventAt': _endDateTime.toUtc().toIso8601String(),
           'addressLocation': _locationController.text.trim(),
           'longLocation': '',
           'latLocation': '',
           'checkInLocationStatus': 'check-in-required',
           'description': _descriptionController.text.trim(),
           'recurrenceType': _recurrenceType,
-          'startRecurrenceAt': startDateTime.toUtc().toIso8601String(),
+          'startRecurrenceAt': _startDateTime.toUtc().toIso8601String(),
           'endRecurrenceAt': _recurrenceEndDate.toUtc().toIso8601String(),
           'isRecurrence': true,
           'type': _selectedType,
@@ -358,15 +361,21 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
   Widget build(BuildContext context) {
     final themeService = context.watch<ThemeService>();
     return Scaffold(
-      backgroundColor: const Color(0xFF0F1419),
+      backgroundColor: themeService.backgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A2332),
+        backgroundColor: themeService.backgroundColor,
+        elevation: 0,
+        centerTitle: true,
         title: Text(
           widget.isReadOnly ? 'Recurring Event Details' : (isEditMode ? 'Edit Recurring Event' : 'Add Recurring Events'),
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(
+            color: themeService.textColor,
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.white),
+          icon: Icon(Icons.close, color: themeService.textColor),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -389,13 +398,13 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
                       readOnly: widget.isReadOnly,
                     ),
                     const SizedBox(height: 20),
-                    _buildDateField(),
+                    _buildDateField(themeService),
                     const SizedBox(height: 20),
-                    _buildTimeSection(),
+                    _buildTimeSection(themeService),
                     const SizedBox(height: 20),
-                    _buildRecurrenceSection(),
+                    _buildRecurrenceSection(themeService),
                     const SizedBox(height: 20),
-                    _buildTypeDropdown(),
+                    _buildTypeDropdown(themeService),
                     const SizedBox(height: 20),
                     _buildTextField(
                       controller: _locationController,
@@ -466,24 +475,26 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
           controller: controller,
           maxLines: maxLines,
           enabled: !readOnly,
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: themeService.textColor),
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: TextStyle(color: themeService.inputPlaceholderColor),
             filled: true,
-            fillColor: const Color(0xFF1A2332),
+            fillColor: themeService.cardColor,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[600]!),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: themeService.borderColor),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[600]!),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: themeService.borderColor),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: Colors.blue),
             ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8.5),
+            isDense: true,
           ),
           validator: isRequired
               ? (value) {
@@ -498,12 +509,12 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
     );
   }
 
-  Widget _buildDateField() {
+  Widget _buildDateField(ThemeService themeService) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Date',
+          'Start Recurrence Date',
           style: TextStyle(
             color: Colors.white,
             fontSize: 16,
@@ -512,29 +523,26 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
         ),
         const SizedBox(height: 8),
         InkWell(
+          borderRadius: BorderRadius.circular(12),
           onTap: widget.isReadOnly ? null : _selectDate,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8.5),
             decoration: BoxDecoration(
-              color: const Color(0xFF1A2332),
-              border: Border.all(color: Colors.grey[600]!),
-              borderRadius: BorderRadius.circular(8),
+              color: themeService.cardColor,
+              border: Border.all(color: themeService.borderColor),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               children: [
                 Text(
                   DateFormat('MM/dd/yyyy').format(_selectedDate),
-                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                  style: TextStyle(color: themeService.textColor, fontSize: 16),
                 ),
                 const Spacer(),
-                SvgPicture.asset(
-                  'assets/icons/ic_calendar.svg',
-                  width: 20,
-                  height: 20,
-                  colorFilter: ColorFilter.mode(
-                    Colors.grey[400]!,
-                    BlendMode.srcIn,
-                  ),
+                Icon(
+                  Icons.calendar_today,
+                  color: themeService.inputPlaceholderColor,
+                  size: 20,
                 ),
               ],
             ),
@@ -544,17 +552,17 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
     );
   }
 
-  Widget _buildTimeSection() {
+  Widget _buildTimeSection(ThemeService themeService) {
     return Row(
       children: [
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Start Time',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: themeService.textColor,
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
                 ),
@@ -562,7 +570,7 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
               const SizedBox(height: 8),
               CupertinoDropdown(
                 value: TimeUtils.formatTimeForDropdown(_startTime),
-                items: TimeUtils.getTimeSlots(),
+                items: _getAvailableTimeSlots(),
                 hintText: 'Select time',
                 onChanged: widget.isReadOnly ? null : (value) {
                   if (value != null) {
@@ -570,7 +578,25 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
                     if (time != null) {
                       setState(() {
                         _startTime = time;
+                        // Auto-adjust end time if needed
+                        if (_endTime.hour < _startTime.hour || 
+                            (_endTime.hour == _startTime.hour && _endTime.minute <= _startTime.minute)) {
+                          _endTime = TimeOfDay(
+                            hour: _startTime.hour + 1 > 23 ? 23 : _startTime.hour + 1,
+                            minute: _startTime.minute,
+                          );
+                        }
                       });
+                      
+                      // Trigger validation without auto-correction (since dropdown prevents invalid times)
+                      validateEventTimes(
+                        startDateTime: _startDateTime,
+                        endDateTime: _endDateTime,
+                        recurrenceEndDate: _recurrenceEndDate,
+                        recurrenceType: _recurrenceType,
+                        isEditMode: isEditMode,
+                        originalStartTime: isEditMode ? widget.event?.startEventAt : null,
+                      );
                     }
                   }
                 },
@@ -583,10 +609,10 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'End Time',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: themeService.textColor,
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
                 ),
@@ -594,7 +620,7 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
               const SizedBox(height: 8),
               CupertinoDropdown(
                 value: TimeUtils.formatTimeForDropdown(_endTime),
-                items: TimeUtils.getTimeSlots(),
+                items: _getAvailableTimeSlots(),
                 hintText: 'Select time',
                 onChanged: widget.isReadOnly ? null : (value) {
                   if (value != null) {
@@ -603,6 +629,16 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
                       setState(() {
                         _endTime = time;
                       });
+                      
+                      // Trigger validation without auto-correction (since dropdown prevents invalid times)
+                      validateEventTimes(
+                        startDateTime: _startDateTime,
+                        endDateTime: _endDateTime,
+                        recurrenceEndDate: _recurrenceEndDate,
+                        recurrenceType: _recurrenceType,
+                        isEditMode: isEditMode,
+                        originalStartTime: isEditMode ? widget.event?.startEventAt : null,
+                      );
                     }
                   }
                 },
@@ -614,7 +650,7 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
     );
   }
 
-  Widget _buildRecurrenceSection() {
+  Widget _buildRecurrenceSection(ThemeService themeService) {
     return Column(
       children: [
         Row(
@@ -623,40 +659,37 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Recurrence Until',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: themeService.textColor,
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                   const SizedBox(height: 8),
                   InkWell(
+                    borderRadius: BorderRadius.circular(12),
                     onTap: widget.isReadOnly ? null : _selectRecurrenceEndDate,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8.5),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1A2332),
-                        border: Border.all(color: Colors.grey[600]!),
-                        borderRadius: BorderRadius.circular(8),
+                        color: themeService.cardColor,
+                        border: Border.all(color: themeService.borderColor),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
                           Expanded(
                             child: Text(
                               DateFormat('MM/dd/yyyy').format(_recurrenceEndDate),
-                              style: const TextStyle(color: Colors.white, fontSize: 16),
+                              style: TextStyle(color: themeService.textColor, fontSize: 16),
                             ),
                           ),
-                          SvgPicture.asset(
-                            'assets/icons/ic_calendar.svg',
-                            width: 20,
-                            height: 20,
-                            colorFilter: ColorFilter.mode(
-                              Colors.grey[400]!,
-                              BlendMode.srcIn,
-                            ),
+                          Icon(
+                            Icons.calendar_today,
+                            color: themeService.inputPlaceholderColor,
+                            size: 20,
                           ),
                         ],
                       ),
@@ -670,10 +703,10 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'recurrence Type',
+                  Text(
+                    'Recurrence Type',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: themeService.textColor,
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
                     ),
@@ -703,14 +736,14 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
     );
   }
 
-  Widget _buildTypeDropdown() {
+  Widget _buildTypeDropdown(ThemeService themeService) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Event Type',
           style: TextStyle(
-            color: Colors.white,
+            color: themeService.textColor,
             fontSize: 16,
             fontWeight: FontWeight.w500,
           ),
@@ -740,25 +773,21 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
   Widget _buildActionButtons() {
     return SizedBox(
       width: double.infinity,
-      child: widget.isReadOnly ? const SizedBox.shrink() : ElevatedButton(
+      height: 54,
+      child: ElevatedButton(
         onPressed: _isLoading ? null : _saveRecurringEvent,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.white,
           foregroundColor: const Color(0xFF1A1F2B),
-          padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
           elevation: 0,
         ),
         child: _isLoading
-            ? const SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(
-                  color: Color(0xFF1A1F2B),
-                  strokeWidth: 2,
-                ),
+            ? const CircularProgressIndicator(
+                color: Color(0xFF1A1F2B),
+                strokeWidth: 2,
               )
             : Text(
                 isEditMode ? 'Update Recurring Event' : 'Add Recurring Events',

@@ -77,4 +77,46 @@ class TimeUtils {
       return null;
     }
   }
+
+
+  /// Rounds a DateTime to the nearest 15-minute interval
+  static DateTime roundTo15MinuteIntervalDateTime(DateTime dateTime) {
+    final totalMinutes = dateTime.hour * 60 + dateTime.minute;
+    final roundedMinutes = ((totalMinutes / 15).round() * 15) % (24 * 60);
+    final hours = roundedMinutes ~/ 60;
+    final minutes = roundedMinutes % 60;
+    
+    return DateTime(
+      dateTime.year,
+      dateTime.month,
+      dateTime.day,
+      hours,
+      minutes,
+    );
+  }
+
+  /// Gets the next 15-minute interval DateTime for smart time suggestions
+  static DateTime nextValid15MinuteIntervalDateTime(DateTime dateTime) {
+    final totalMinutes = dateTime.hour * 60 + dateTime.minute;
+    final nextIntervalMinutes = ((totalMinutes / 15).ceil() * 15);
+    
+    // Handle day overflow
+    if (nextIntervalMinutes >= 24 * 60) {
+      return DateTime(
+        dateTime.year,
+        dateTime.month,
+        dateTime.day + 1,
+        0,
+        0,
+      );
+    }
+    
+    return DateTime(
+      dateTime.year,
+      dateTime.month,
+      dateTime.day,
+      nextIntervalMinutes ~/ 60,
+      nextIntervalMinutes % 60,
+    );
+  }
 }

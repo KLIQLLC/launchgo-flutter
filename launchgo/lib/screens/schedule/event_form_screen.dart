@@ -7,6 +7,7 @@ import '../../services/theme_service.dart';
 import '../../models/event_model.dart';
 import '../../widgets/cupertino_dropdown.dart';
 import '../../utils/time_utils.dart';
+import '../../mixins/event_form_validation_mixin.dart';
 import 'location_edit_screen.dart'; // Added import for LocationEditScreen
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -27,7 +28,7 @@ class EventFormScreen extends StatefulWidget {
   State<EventFormScreen> createState() => _EventFormScreenState();
 }
 
-class _EventFormScreenState extends State<EventFormScreen> {
+class _EventFormScreenState extends State<EventFormScreen> with EventFormValidationMixin {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _descriptionController;
@@ -79,15 +80,18 @@ class _EventFormScreenState extends State<EventFormScreen> {
       _locationAddress = widget.event!.addressLocation ?? '';
       _locationLatLng = null;
     } else {
-      // Add mode - initialize with defaults
+      // Add mode - initialize with defaults using smart suggestions
       _nameController = TextEditingController();
       _descriptionController = TextEditingController();
       _locationController = TextEditingController();
       
-      _startDate = DateTime.now();
-      _startTime = const TimeOfDay(hour: 12, minute: 0); // 12:00 PM
-      _endDate = DateTime.now();
-      _endTime = const TimeOfDay(hour: 12, minute: 0); // 12:00 PM
+      final suggestedStart = suggestNextValidDateTime();
+      final suggestedEnd = suggestEndTimeForStart(suggestedStart);
+      
+      _startDate = DateTime(suggestedStart.year, suggestedStart.month, suggestedStart.day);
+      _startTime = TimeOfDay.fromDateTime(suggestedStart);
+      _endDate = DateTime(suggestedEnd.year, suggestedEnd.month, suggestedEnd.day);
+      _endTime = TimeOfDay.fromDateTime(suggestedEnd);
       
       _selectedType = 'lg_session';
       _locationAddress = '';
@@ -125,6 +129,30 @@ class _EventFormScreenState extends State<EventFormScreen> {
     );
   }
 
+  /// Gets available time slots based on current date constraints
+  List<String> _getAvailableTimeSlots() {
+    final allSlots = TimeUtils.getTimeSlots();
+    
+    // If not today, return all slots
+    final now = DateTime.now();
+    if (_startDate.year != now.year || 
+        _startDate.month != now.month || 
+        _startDate.day != now.day) {
+      return allSlots;
+    }
+    
+    // For today, filter out past times
+    final minTime = getMinimumTimeForDate(_startDate, isEditMode: isEditMode);
+    if (minTime == null) return allSlots;
+    
+    return allSlots.where((slot) {
+      final time = TimeUtils.parseTimeString(slot);
+      if (time == null) return false;
+      return time.hour > minTime.hour || 
+             (time.hour == minTime.hour && time.minute >= minTime.minute);
+    }).toList();
+  }
+
   String _formatEventType(String type) {
     if (type == 'lg_session') {
       return 'LG Session';
@@ -134,15 +162,16 @@ class _EventFormScreenState extends State<EventFormScreen> {
 
 
   Future<void> _selectStartDate() async {
+    final constraints = getDateConstraints(
+      isEditMode: isEditMode,
+      originalDate: isEditMode ? widget.event?.startEventAt : null,
+    );
+    
     final picked = await showDatePicker(
       context: context,
       initialDate: _startDate,
-      firstDate: isEditMode 
-          ? _startDate.isBefore(DateTime.now()) 
-              ? _startDate 
-              : DateTime.now()
-          : DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      firstDate: constraints.start,
+      lastDate: constraints.end,
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -157,6 +186,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
         );
       },
     );
+    
     if (picked != null) {
       setState(() {
         _startDate = picked;
@@ -164,6 +194,14 @@ class _EventFormScreenState extends State<EventFormScreen> {
           _endDate = _startDate;
         }
       });
+      
+      // Trigger validation after date change
+      validateEventTimes(
+        startDateTime: _startDateTime,
+        endDateTime: _endDateTime,
+        isEditMode: isEditMode,
+        originalStartTime: isEditMode ? widget.event?.startEventAt : null,
+      );
     }
   }
 
@@ -172,14 +210,17 @@ class _EventFormScreenState extends State<EventFormScreen> {
   Future<void> _saveEvent() async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (_endDateTime.isBefore(_startDateTime) || _endDateTime.isAtSameMomentAs(_startDateTime)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('End time must be after start time'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
+    // Perform final validation before save
+    validateEventTimes(
+      startDateTime: _startDateTime,
+      endDateTime: _endDateTime,
+      isEditMode: isEditMode,
+      originalStartTime: isEditMode ? widget.event?.startEventAt : null,
+      immediate: true,
+    );
+    
+    if (!canSubmitForm()) {
+      return; // Validation errors will be shown by the mixin
     }
 
     setState(() {
@@ -488,7 +529,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
                 borderRadius: BorderRadius.circular(12),
                 borderSide: const BorderSide(color: Colors.blue),
               ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8.5),
+              isDense: true,
             ),
             validator: isRequired
               ? (value) {
@@ -597,7 +639,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
               const SizedBox(height: 8),
               CupertinoDropdown(
                 value: TimeUtils.formatTimeForDropdown(_startTime),
-                items: TimeUtils.getTimeSlots(),
+                items: _getAvailableTimeSlots(),
                 hintText: 'Select time',
                 onChanged: widget.isReadOnly ? null : (value) {
                   if (value != null) {
@@ -615,6 +657,14 @@ class _EventFormScreenState extends State<EventFormScreen> {
                           );
                         }
                       });
+                      
+                      // Trigger validation (no auto-correction needed since dropdown has valid 15-min intervals)
+                      validateEventTimes(
+                        startDateTime: _startDateTime,
+                        endDateTime: _endDateTime,
+                        isEditMode: isEditMode,
+                        originalStartTime: isEditMode ? widget.event?.startEventAt : null,
+                      );
                     }
                   }
                 },
@@ -638,7 +688,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
               const SizedBox(height: 8),
               CupertinoDropdown(
                 value: TimeUtils.formatTimeForDropdown(_endTime),
-                items: TimeUtils.getTimeSlots(),
+                items: _getAvailableTimeSlots(),
                 hintText: 'Select time',
                 onChanged: widget.isReadOnly ? null : (value) {
                   if (value != null) {
@@ -647,6 +697,14 @@ class _EventFormScreenState extends State<EventFormScreen> {
                       setState(() {
                         _endTime = newTime;
                       });
+                      
+                      // Trigger validation (no auto-correction needed since dropdown has valid 15-min intervals)
+                      validateEventTimes(
+                        startDateTime: _startDateTime,
+                        endDateTime: _endDateTime,
+                        isEditMode: isEditMode,
+                        originalStartTime: isEditMode ? widget.event?.startEventAt : null,
+                      );
                     }
                   }
                 },
