@@ -7,6 +7,7 @@ import '../../services/api_service_retrofit.dart';
 import '../../services/theme_service.dart';
 import '../../widgets/cupertino_dropdown.dart';
 import '../../utils/time_utils.dart';
+import '../../utils/recurrence_utils.dart';
 import '../../models/event_model.dart';
 
 class RecurringEventFormScreen extends StatefulWidget {
@@ -49,11 +50,6 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
     'extracurricular',
   ];
 
-  final List<String> _recurrenceTypes = [
-    'every-day',
-    'every-week',
-    'every-month',
-  ];
 
   @override
   void initState() {
@@ -116,18 +112,6 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
     return type[0].toUpperCase() + type.substring(1);
   }
 
-  String _formatrecurrenceType(String type) {
-    switch (type) {
-      case 'every-day':
-        return 'Every Day';
-      case 'every-week':
-        return 'Every Week';
-      case 'every-month':
-        return 'Every Month';
-      default:
-        return type;
-    }
-  }
 
 
   Future<void> _selectDate() async {
@@ -402,6 +386,7 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
                       hint: 'Enter event name',
                       isRequired: true,
                       themeService: themeService,
+                      readOnly: widget.isReadOnly,
                     ),
                     const SizedBox(height: 20),
                     _buildDateField(),
@@ -417,6 +402,7 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
                       label: 'Location (Optional)',
                       hint: 'Enter event location',
                       themeService: themeService,
+                      readOnly: widget.isReadOnly,
                     ),
                     const SizedBox(height: 20),
                     _buildTextField(
@@ -425,6 +411,7 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
                       hint: 'Enter event description',
                       maxLines: 3,
                       themeService: themeService,
+                      readOnly: widget.isReadOnly,
                     ),
                     const SizedBox(height: 20), // Add some bottom padding
                   ],
@@ -461,6 +448,7 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
     required ThemeService themeService,
     bool isRequired = false,
     int maxLines = 1,
+    bool readOnly = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -477,6 +465,7 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
         TextFormField(
           controller: controller,
           maxLines: maxLines,
+          enabled: !readOnly,
           style: const TextStyle(color: Colors.white),
           decoration: InputDecoration(
             hintText: hint,
@@ -523,7 +512,7 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
         ),
         const SizedBox(height: 8),
         InkWell(
-          onTap: _selectDate,
+          onTap: widget.isReadOnly ? null : _selectDate,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
             decoration: BoxDecoration(
@@ -575,7 +564,7 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
                 value: TimeUtils.formatTimeForDropdown(_startTime),
                 items: TimeUtils.getTimeSlots(),
                 hintText: 'Select time',
-                onChanged: (value) {
+                onChanged: widget.isReadOnly ? null : (value) {
                   if (value != null) {
                     final time = TimeUtils.parseTimeString(value);
                     if (time != null) {
@@ -607,7 +596,7 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
                 value: TimeUtils.formatTimeForDropdown(_endTime),
                 items: TimeUtils.getTimeSlots(),
                 hintText: 'Select time',
-                onChanged: (value) {
+                onChanged: widget.isReadOnly ? null : (value) {
                   if (value != null) {
                     final time = TimeUtils.parseTimeString(value);
                     if (time != null) {
@@ -644,7 +633,7 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
                   ),
                   const SizedBox(height: 8),
                   InkWell(
-                    onTap: _selectRecurrenceEndDate,
+                    onTap: widget.isReadOnly ? null : _selectRecurrenceEndDate,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                       decoration: BoxDecoration(
@@ -691,17 +680,15 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
                   ),
                   const SizedBox(height: 8),
                   CupertinoDropdown(
-                    value: _formatrecurrenceType(_recurrenceType),
-                    items: _recurrenceTypes.map((type) => _formatrecurrenceType(type)).toList(),
+                    value: RecurrenceUtils.formatType(_recurrenceType),
+                    items: RecurrenceUtils.formattedTypes,
                     hintText: 'Select recurrence',
-                    onChanged: (value) {
+                    onChanged: widget.isReadOnly ? null : (value) {
                       if (value != null) {
-                        final index = _recurrenceTypes.indexWhere((type) => 
-                          _formatrecurrenceType(type) == value
-                        );
-                        if (index != -1) {
+                        final rawType = RecurrenceUtils.getRawType(value);
+                        if (rawType != null) {
                           setState(() {
-                            _recurrenceType = _recurrenceTypes[index];
+                            _recurrenceType = rawType;
                           });
                         }
                       }
@@ -733,7 +720,7 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
           value: _formatEventType(_selectedType),
           items: _eventTypes.map((type) => _formatEventType(type)).toList(),
           hintText: 'Select event type',
-          onChanged: (value) {
+          onChanged: widget.isReadOnly ? null : (value) {
             if (value != null) {
               final index = _eventTypes.indexWhere((type) => 
                 _formatEventType(type) == value
@@ -753,7 +740,7 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
   Widget _buildActionButtons() {
     return SizedBox(
       width: double.infinity,
-      child: ElevatedButton(
+      child: widget.isReadOnly ? const SizedBox.shrink() : ElevatedButton(
         onPressed: _isLoading ? null : _saveRecurringEvent,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.white,
@@ -773,9 +760,9 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
                   strokeWidth: 2,
                 ),
               )
-            : const Text(
-                'Add Recurring Events',
-                style: TextStyle(
+            : Text(
+                isEditMode ? 'Update Recurring Event' : 'Add Recurring Events',
+                style: const TextStyle(
                   color: Color(0xFF1A1F2B),
                   fontSize: 17,
                   fontWeight: FontWeight.w600,

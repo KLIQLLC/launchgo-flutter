@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
+import '../utils/recurrence_utils.dart';
 
 class Event extends Equatable {
   final String id;
@@ -167,16 +168,7 @@ class Event extends Equatable {
   bool get isSingleEvent => !isRecurrence;
   
   String get recurrenceTypeFormatted {
-    switch (recurrenceType?.toLowerCase()) {
-      case 'every-day':
-        return 'Daily';
-      case 'weekly':
-        return 'Weekly';
-      case 'monthly':
-        return 'Monthly';
-      default:
-        return recurrenceType ?? '';
-    }
+    return RecurrenceUtils.formatType(recurrenceType);
   }
 
   @override
