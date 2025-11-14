@@ -7,9 +7,17 @@ import '../../services/api_service_retrofit.dart';
 import '../../services/theme_service.dart';
 import '../../widgets/cupertino_dropdown.dart';
 import '../../utils/time_utils.dart';
+import '../../models/event_model.dart';
 
 class RecurringEventFormScreen extends StatefulWidget {
-  const RecurringEventFormScreen({super.key});
+  final Event? event;
+  final bool isReadOnly;
+
+  const RecurringEventFormScreen({
+    super.key,
+    this.event,
+    this.isReadOnly = false,
+  });
 
   @override
   State<RecurringEventFormScreen> createState() => _RecurringEventFormScreenState();
@@ -50,14 +58,35 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController();
-    _descriptionController = TextEditingController();
-    _locationController = TextEditingController();
     
-    _selectedDate = DateTime.now();
-    _startTime = const TimeOfDay(hour: 12, minute: 0); // 12:00 PM
-    _endTime = const TimeOfDay(hour: 12, minute: 0); // 12:00 PM
-    _recurrenceEndDate = DateTime.now().add(const Duration(days: 30));
+    if (widget.event != null) {
+      // Edit mode - initialize with existing event data
+      _nameController = TextEditingController(text: widget.event!.name);
+      _descriptionController = TextEditingController(text: widget.event!.description ?? '');
+      _locationController = TextEditingController(text: widget.event!.addressLocation ?? '');
+      
+      // Extract date and time components from the local DateTime
+      final localStartAt = widget.event!.startEventAt;
+      final localEndAt = widget.event!.endEventAt;
+      
+      _selectedDate = DateTime(localStartAt.year, localStartAt.month, localStartAt.day);
+      _startTime = TimeOfDay.fromDateTime(localStartAt);
+      _endTime = TimeOfDay.fromDateTime(localEndAt);
+      
+      _selectedType = widget.event!.type;
+      _recurrenceType = widget.event!.recurrenceType ?? 'every-day';
+      _recurrenceEndDate = widget.event!.endRecurrenceAt ?? DateTime.now().add(const Duration(days: 30));
+    } else {
+      // Add mode - initialize with defaults
+      _nameController = TextEditingController();
+      _descriptionController = TextEditingController();
+      _locationController = TextEditingController();
+      
+      _selectedDate = DateTime.now();
+      _startTime = const TimeOfDay(hour: 12, minute: 0); // 12:00 PM
+      _endTime = const TimeOfDay(hour: 12, minute: 0); // 12:00 PM
+      _recurrenceEndDate = DateTime.now().add(const Duration(days: 30));
+    }
   }
 
   @override
@@ -67,6 +96,8 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
     _locationController.dispose();
     super.dispose();
   }
+
+  bool get isEditMode => widget.event != null;
 
   DateTime _combineDateAndTime(DateTime date, TimeOfDay time) {
     return DateTime(
@@ -237,40 +268,95 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
     try {
       final apiService = context.read<ApiServiceRetrofit>();
       
-      final eventData = {
-        'id': '',
-        'name': _nameController.text.trim(),
-        'startEventAt': startDateTime.toUtc().toIso8601String(),
-        'endEventAt': endDateTime.toUtc().toIso8601String(),
-        'addressLocation': _locationController.text.trim(),
-        'longLocation': '',
-        'latLocation': '',
-        'checkInLocationStatus': 'check-in-required',
-        'description': _descriptionController.text.trim(),
-        'recurrenceType': _recurrenceType,
-        'startRecurrenceAt': startDateTime.toUtc().toIso8601String(),
-        'endRecurrenceAt': _recurrenceEndDate.toUtc().toIso8601String(),
-        'isRecurrence': true,
-        'type': _selectedType,
-      };
+      if (isEditMode) {
+        // Update existing recurring event
+        final eventData = <String, dynamic>{};
+        
+        if (_nameController.text.trim() != widget.event!.name) {
+          eventData['name'] = _nameController.text.trim();
+        }
+        
+        if (_descriptionController.text.trim() != (widget.event!.description ?? '')) {
+          eventData['description'] = _descriptionController.text.trim();
+        }
+        
+        if (_locationController.text.trim() != (widget.event!.addressLocation ?? '')) {
+          eventData['addressLocation'] = _locationController.text.trim();
+        }
+        
+        if (_selectedType != widget.event!.type) {
+          eventData['type'] = _selectedType;
+        }
+        
+        if (!startDateTime.isAtSameMomentAs(widget.event!.startEventAt)) {
+          eventData['startEventAt'] = startDateTime.toUtc().toIso8601String();
+        }
+        
+        if (!endDateTime.isAtSameMomentAs(widget.event!.endEventAt)) {
+          eventData['endEventAt'] = endDateTime.toUtc().toIso8601String();
+        }
+        
+        if (_recurrenceType != widget.event!.recurrenceType) {
+          eventData['recurrenceType'] = _recurrenceType;
+        }
+        
+        if (!_recurrenceEndDate.isAtSameMomentAs(widget.event!.endRecurrenceAt ?? DateTime.now())) {
+          eventData['endRecurrenceAt'] = _recurrenceEndDate.toUtc().toIso8601String();
+        }
 
-      await apiService.createRecurringEvent(eventData);
-      
-      // Consider the operation successful if no exception was thrown
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Recurring events created successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.of(context).pop(true);
+        if (eventData.isEmpty) {
+          Navigator.of(context).pop(false);
+          return;
+        }
+
+        final result = await apiService.updateRecurringEvent(widget.event!.id, eventData);
+        
+        if (result != null && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Recurring event updated successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.of(context).pop(true);
+        }
+      } else {
+        // Create new recurring event
+        final eventData = {
+          'id': '',
+          'name': _nameController.text.trim(),
+          'startEventAt': startDateTime.toUtc().toIso8601String(),
+          'endEventAt': endDateTime.toUtc().toIso8601String(),
+          'addressLocation': _locationController.text.trim(),
+          'longLocation': '',
+          'latLocation': '',
+          'checkInLocationStatus': 'check-in-required',
+          'description': _descriptionController.text.trim(),
+          'recurrenceType': _recurrenceType,
+          'startRecurrenceAt': startDateTime.toUtc().toIso8601String(),
+          'endRecurrenceAt': _recurrenceEndDate.toUtc().toIso8601String(),
+          'isRecurrence': true,
+          'type': _selectedType,
+        };
+
+        await apiService.createRecurringEvent(eventData);
+        
+        // Consider the operation successful if no exception was thrown
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Recurring events created successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.of(context).pop(true);
+        }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to create recurring events: $e'),
+            content: Text('Failed to ${isEditMode ? 'update' : 'create'} recurring event: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -291,9 +377,9 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
       backgroundColor: const Color(0xFF0F1419),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1A2332),
-        title: const Text(
-          'Add Recurring Events',
-          style: TextStyle(color: Colors.white),
+        title: Text(
+          widget.isReadOnly ? 'Recurring Event Details' : (isEditMode ? 'Edit Recurring Event' : 'Add Recurring Events'),
+          style: const TextStyle(color: Colors.white),
         ),
         leading: IconButton(
           icon: const Icon(Icons.close, color: Colors.white),

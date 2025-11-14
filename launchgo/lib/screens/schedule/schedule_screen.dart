@@ -844,8 +844,16 @@ class _WeeklyScheduleViewState extends State<_WeeklyScheduleView> {
   }
 
   Future<void> _openEvent(Event event) async {
+    // Route to appropriate form based on event type
+    final String routePath;
+    if (event.isRecurrence) {
+      routePath = '/recurring-event/${event.id}';
+    } else {
+      routePath = '/event/${event.id}';
+    }
+    
     final result = await context.push(
-      '/event/${event.id}',
+      routePath,
       extra: event,
     );
     
@@ -1278,34 +1286,34 @@ class _ExpandableFABState extends State<_ExpandableFAB>
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Recurrent Event FAB - DISABLED FOR NOW
-        // AnimatedBuilder(
-        //   animation: _scaleAnimation,
-        //   builder: (context, child) {
-        //     return Transform.scale(
-        //       scale: _scaleAnimation.value,
-        //       child: _isExpanded
-        //           ? _SubFAB(
-        //               icon: SvgPicture.asset(
-        //                 'assets/icons/recurring.svg',
-        //                 width: 20,
-        //                 height: 20,
-        //                 colorFilter: const ColorFilter.mode(
-        //                   Colors.white70,
-        //                   BlendMode.srcIn,
-        //                 ),
-        //               ),
-        //               label: 'Recurring',
-        //               onPressed: () => _onOptionSelected(widget.onRecurrentEvent),
-        //               backgroundColor: const Color(0xFF1A2332),
-        //               foregroundColor: Colors.white70,
-        //             )
-        //           : const SizedBox.shrink(),
-        //     );
-        //   },
-        // ),
+        // Recurrent Event FAB
+        AnimatedBuilder(
+          animation: _scaleAnimation,
+          builder: (context, child) {
+            return Transform.scale(
+              scale: _scaleAnimation.value,
+              child: _isExpanded
+                  ? _SubFAB(
+                      icon: SvgPicture.asset(
+                        'assets/icons/recurring.svg',
+                        width: 20,
+                        height: 20,
+                        colorFilter: const ColorFilter.mode(
+                          Colors.white70,
+                          BlendMode.srcIn,
+                        ),
+                      ),
+                      label: 'Recurring',
+                      onPressed: () => _onOptionSelected(widget.onRecurrentEvent),
+                      backgroundColor: const Color(0xFF1A2332),
+                      foregroundColor: Colors.white70,
+                    )
+                  : const SizedBox.shrink(),
+            );
+          },
+        ),
         
-        // if (_isExpanded) const SizedBox(height: 16),
+        if (_isExpanded) const SizedBox(height: 16),
         
         // Single Event FAB
         AnimatedBuilder(

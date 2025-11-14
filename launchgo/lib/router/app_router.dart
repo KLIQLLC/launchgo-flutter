@@ -192,6 +192,16 @@ class AppRouter {
           },
         ),
         GoRoute(
+          path: '/recurring-event/:eventId',
+          name: 'recurringEvent',
+          builder: (context, state) {
+            final event = state.extra as Event;
+            final permissions = context.read<AuthService>().permissions;
+            final isReadOnly = !permissions.canEditEvents;
+            return RecurringEventFormScreen(event: event, isReadOnly: isReadOnly);
+          },
+        ),
+        GoRoute(
           path: '/new-recap',
           name: 'newRecap',
           builder: (context, state) => const RecapFormScreen(),
