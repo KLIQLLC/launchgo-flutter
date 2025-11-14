@@ -713,6 +713,38 @@ class ApiServiceRetrofit {
       rethrow;
     }
   }
+  
+  Future<Map<String, dynamic>?> updateRecurringEvent(String eventId, Map<String, dynamic> eventData) async {
+    try {
+      // Ensure user info is loaded
+      if (_authService.userInfo == null) {
+        debugPrint('⚠️ User info not loaded yet, loading now...');
+        await _authService.loadUserInfo();
+      }
+      
+      final userId = _getEffectiveUserId();
+      if (userId == null) {
+        debugPrint('❌ Cannot update recurring event: User ID is null');
+        return null;
+      }
+      
+      debugPrint('🔄 Updating recurring event $eventId for user $userId with data: $eventData');
+      final response = await _retrofit.updateRecurringEvent(userId, eventId, eventData);
+      final data = response.data;
+      
+      final parsedData = _parseJsonResponse(data);
+      if (parsedData is Map<String, dynamic>) {
+        debugPrint('✅ Successfully updated recurring event');
+        return parsedData;
+      }
+      
+      debugPrint('❌ No valid event data returned');
+      return null;
+    } catch (e) {
+      debugPrint('❌ Failed to update recurring event: $e');
+      rethrow;
+    }
+  }
 
   Future<void> deleteEvent(String eventId) async {
     try {

@@ -240,16 +240,18 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> {
       final eventData = {
         'id': '',
         'name': _nameController.text.trim(),
-        'dateAt': DateFormat('yyyy-MM-dd').format(_selectedDate),
-        'startTime': TimeUtils.formatTimeForDropdown(_startTime),
-        'endTime': TimeUtils.formatTimeForDropdown(_endTime),
-        'recurrenceEndAt': _recurrenceEndDate.toUtc().toIso8601String(),
-        'recurrenceType': _recurrenceType,
-        'type': _selectedType,
-        'location': _locationController.text.trim(),
+        'startEventAt': startDateTime.toUtc().toIso8601String(),
+        'endEventAt': endDateTime.toUtc().toIso8601String(),
+        'addressLocation': _locationController.text.trim(),
+        'longLocation': '',
+        'latLocation': '',
+        'checkInLocationStatus': 'check-in-required',
         'description': _descriptionController.text.trim(),
-        'startAt': startDateTime.toUtc().toIso8601String(),
-        'endAt': endDateTime.toUtc().toIso8601String(),
+        'recurrenceType': _recurrenceType,
+        'startRecurrenceAt': startDateTime.toUtc().toIso8601String(),
+        'endRecurrenceAt': _recurrenceEndDate.toUtc().toIso8601String(),
+        'isRecurrence': true,
+        'type': _selectedType,
       };
 
       await apiService.createRecurringEvent(eventData);

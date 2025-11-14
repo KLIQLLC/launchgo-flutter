@@ -196,10 +196,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> with WidgetsBindingObse
         orElse: () => throw Exception('Event not found'),
       );
       
-      debugPrint('🔔 Event found: ${targetEvent.name} on ${targetEvent.startAt}');
+      debugPrint('🔔 Event found: ${targetEvent.name} on ${targetEvent.startEventAt}');
       
       // Calculate the week that contains this event
-      final eventDate = targetEvent.startAt;
+      final eventDate = targetEvent.startEventAt;
       final eventWeekday = eventDate.weekday % 7; // Sunday = 0
       final eventWeekStart = DateTime(
         eventDate.year,
@@ -796,16 +796,16 @@ class _WeeklyScheduleViewState extends State<_WeeklyScheduleView> {
     final dayDates = <String, DateTime>{};
     
     for (final event in events) {
-      final dayKey = _formatDayKey(event.startAt);
+      final dayKey = _formatDayKey(event.startEventAt);
       if (!grouped.containsKey(dayKey)) {
         grouped[dayKey] = [];
-        dayDates[dayKey] = DateTime(event.startAt.year, event.startAt.month, event.startAt.day);
+        dayDates[dayKey] = DateTime(event.startEventAt.year, event.startEventAt.month, event.startEventAt.day);
       }
       grouped[dayKey]!.add(event);
     }
     
     for (final dayEvents in grouped.values) {
-      dayEvents.sort((a, b) => a.startAt.compareTo(b.startAt));
+      dayEvents.sort((a, b) => a.startEventAt.compareTo(b.startEventAt));
     }
     
     final sortedEntries = grouped.entries.toList();

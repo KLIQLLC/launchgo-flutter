@@ -178,17 +178,24 @@ abstract class ApiService {
     @Body() Map<String, dynamic> eventData,
   );
 
-  @DELETE("/users/{userId}/events/{eventId}")
-  Future<HttpResponse<void>> deleteEvent(
-    @Path("userId") String userId,
-    @Path("eventId") String eventId,
-  );
-
-  @PATCH("/users/{userId}/events/{eventId}")
+  @PATCH("/users/{userId}/events/{eventId}/single")
   Future<HttpResponse<dynamic>> updateEvent(
     @Path("userId") String userId,
     @Path("eventId") String eventId,
     @Body() Map<String, dynamic> eventData,
+  );
+
+  @PATCH("/users/{userId}/events/{eventId}/recurrence")
+  Future<HttpResponse<dynamic>> updateRecurringEvent(
+    @Path("userId") String userId,
+    @Path("eventId") String eventId,
+    @Body() Map<String, dynamic> eventData,
+  );
+
+  @DELETE("/users/{userId}/events/{eventId}")
+  Future<HttpResponse<void>> deleteEvent(
+    @Path("userId") String userId,
+    @Path("eventId") String eventId,
   );
 
   @PUT("/users/{userId}/events/{eventId}/location/check-in")

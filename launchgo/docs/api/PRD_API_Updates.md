@@ -20,17 +20,15 @@ The event API has been restructured to separate single events and recurring even
 **Request Body:**
 ```json
 {
-    "addressLocation": "",
-    "dateAt": "2025-11-11",
-    "description": "",
-    "endEventAt": "2025-11-18 12:00:00Z",
-    "endTime": "12:00 PM",
     "id": "",
-    "latLocation": "",
-    "longLocation": "",
     "name": "SIN",
     "startEventAt": "2025-11-18 11:00:00Z",
-    "startTime": "13:00 PM",
+    "endEventAt": "2025-11-18 12:00:00Z",
+    "addressLocation": "",
+    "longLocation": "",
+    "latLocation": "",
+    "description": "",
+    "isRecurrence": false,
     "type": "study"
 }
 ```
@@ -38,9 +36,8 @@ The event API has been restructured to separate single events and recurring even
 **Changes from Previous API:**
 - Now uses `/single` endpoint instead of generic `/events`
 - User ID is now in the URL path
-- New field: `dateAt` for event date
-- Separate `startEventAt`/`endEventAt` with full ISO timestamps
-- Separate `startTime`/`endTime` with formatted times
+- Simplified to only `startEventAt`/`endEventAt` ISO timestamps (no separate date/time fields)
+- New field: `isRecurrence` boolean to distinguish single vs recurring events
 - Location coordinates now separate: `latLocation`, `longLocation`
 
 ##### 2. Update Single Event
@@ -68,26 +65,29 @@ The event API has been restructured to separate single events and recurring even
 **Request Body:**
 ```json
 {
-    "addressLocation": "",
-    "dateAt": "2025-11-11",
-    "description": "",
-    "endEventAt": "2025-11-18 12:00:00Z",
-    "endRecurrenceAt": "2025-11-20 23:59:00Z",
-    "recurrenceType": "every-day",
-    "endTime": "12:00 PM",
     "id": "",
-    "latLocation": "",
-    "longLocation": "",
-    "name": "SIN",
-    "startEventAt": "2025-11-18 11:00:00Z",
-    "startTime": "13:00 PM",
+    "name": "rec event name",
+    "startEventAt": "2025-11-14 17:00:00.000",
+    "endEventAt": "2025-11-14 17:15:00.000",
+    "addressLocation": "Ukraine, Kyiv Oblast, Ukraine",
+    "longLocation": "30.7667133",
+    "latLocation": "50.0529506",
+    "checkInLocationStatus": "check-in-required",
+    "description": "description",
+    "recurrenceType": "every-day",
+    "startRecurrenceAt": "2025-11-14 17:00:00.000",
+    "endRecurrenceAt": "2025-11-20 17:15:00.000",
+    "isRecurrence": true,
     "type": "study"
 }
 ```
 
 **New Fields:**
-- `endRecurrenceAt`: When the recurrence pattern ends
+- `checkInLocationStatus`: Location check-in requirement ("check-in-required", etc.)
 - `recurrenceType`: Type of recurrence (e.g., "every-day", "weekly", etc.)
+- `startRecurrenceAt`: When the recurrence pattern begins  
+- `endRecurrenceAt`: When the recurrence pattern ends
+- `isRecurrence`: Boolean set to true for recurring events
 
 ##### 4. Update Recurring Event
 **Endpoint:** `PATCH /api/v1/users/{userId}/events/{eventId}/recurrence`
@@ -112,14 +112,16 @@ The event API has been restructured to separate single events and recurring even
 - [ ] Update URL patterns to include user ID
 
 #### 2. Event Form Changes
-- [ ] Add `dateAt` field handling
-- [ ] Support separate `startEventAt`/`endEventAt` ISO timestamps
-- [ ] Handle separate `startTime`/`endTime` formatted strings
+- [ ] Support `startEventAt`/`endEventAt` ISO timestamps only (simplified from previous design)
+- [ ] Add `isRecurrence` boolean field handling
 - [ ] Update location fields (`latLocation`, `longLocation`)
+- [ ] Add `checkInLocationStatus` field for recurring events
 
 #### 3. Recurring Event Support
-- [ ] Add `endRecurrenceAt` date picker
+- [ ] Add `startRecurrenceAt` date picker
+- [ ] Add `endRecurrenceAt` date picker  
 - [ ] Add `recurrenceType` dropdown/selector
+- [ ] Add `checkInLocationStatus` field handling
 - [ ] Update recurring event form to handle new fields
 
 #### 4. Data Model Updates
@@ -160,12 +162,14 @@ The event API has been restructured to separate single events and recurring even
 ### Old vs New Field Mapping
 | Old Field | New Field | Notes |
 |-----------|-----------|--------|
-| `startAt` | `startEventAt` + `startTime` | Split into ISO timestamp and formatted time |
-| `endAt` | `endEventAt` + `endTime` | Split into ISO timestamp and formatted time |
+| `startAt` | `startEventAt` | Renamed to match new API |
+| `endAt` | `endEventAt` | Renamed to match new API |
 | `addressLocation` | `addressLocation` | Unchanged |
 | N/A | `latLocation` | New separate field for latitude |
 | N/A | `longLocation` | New separate field for longitude |
-| N/A | `dateAt` | New field for event date |
+| N/A | `isRecurrence` | New boolean field to distinguish event types |
+| N/A | `checkInLocationStatus` | New field for recurring events |
+| N/A | `startRecurrenceAt` | New field for recurring events |
 | N/A | `endRecurrenceAt` | New field for recurring events |
 | N/A | `recurrenceType` | New field for recurring events |
 
@@ -182,9 +186,13 @@ The event API has been restructured to separate single events and recurring even
 ## Breaking Changes
 1. **Endpoint Structure**: `/events` split into `/events/single` and `/events/recurrence`
 2. **HTTP Methods**: Updates now use PATCH instead of PUT
-3. **Field Names**: Location coordinates split into `latLocation`/`longLocation`
-4. **Data Structure**: Times split into separate timestamp and formatted string fields
+3. **Field Names**: 
+   - `startAt` → `startEventAt`
+   - `endAt` → `endEventAt`
+   - Location coordinates split into `latLocation`/`longLocation`
+4. **New Required Fields**: `isRecurrence` boolean to distinguish event types
 5. **URL Parameters**: User ID now required in URL path
+6. **Simplified Structure**: No separate `dateAt`, `startTime`, `endTime` fields - just ISO timestamps
 
 ## Migration Notes
 

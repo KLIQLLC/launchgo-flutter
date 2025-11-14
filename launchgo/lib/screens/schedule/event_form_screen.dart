@@ -67,8 +67,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
       _locationController = TextEditingController(text: widget.event!.addressLocation ?? '');
       
       // Extract date and time components from the local DateTime
-      final localStartAt = widget.event!.startAt; // Already converted to local in Event.fromJson
-      final localEndAt = widget.event!.endAt;     // Already converted to local in Event.fromJson
+      final localStartAt = widget.event!.startEventAt; // Already converted to local in Event.fromJson
+      final localEndAt = widget.event!.endEventAt;     // Already converted to local in Event.fromJson
       
       _startDate = DateTime(localStartAt.year, localStartAt.month, localStartAt.day);
       _startTime = TimeOfDay.fromDateTime(localStartAt);
@@ -211,12 +211,12 @@ class _EventFormScreenState extends State<EventFormScreen> {
           eventData['type'] = _selectedType;
         }
         
-        if (!_startDateTime.isAtSameMomentAs(widget.event!.startAt)) {
-          eventData['startAt'] = _startDateTime.toUtc().toIso8601String();
+        if (!_startDateTime.isAtSameMomentAs(widget.event!.startEventAt)) {
+          eventData['startEventAt'] = _startDateTime.toUtc().toIso8601String();
         }
         
-        if (!_endDateTime.isAtSameMomentAs(widget.event!.endAt)) {
-          eventData['endAt'] = _endDateTime.toUtc().toIso8601String();
+        if (!_endDateTime.isAtSameMomentAs(widget.event!.endEventAt)) {
+          eventData['endEventAt'] = _endDateTime.toUtc().toIso8601String();
         }
 
         if (eventData.isEmpty) {
@@ -238,14 +238,16 @@ class _EventFormScreenState extends State<EventFormScreen> {
       } else {
         // Create new event
         final eventData = {
+          'id': '',
           'name': _nameController.text.trim(),
-          'description': _descriptionController.text.trim(),
+          'startEventAt': _startDateTime.toUtc().toIso8601String(),
+          'endEventAt': _endDateTime.toUtc().toIso8601String(),
           'addressLocation': _locationAddress ?? '',
-          'latLocation': _locationLatLng != null ? _locationLatLng!.latitude.toString() : '',
           'longLocation': _locationLatLng != null ? _locationLatLng!.longitude.toString() : '',
+          'latLocation': _locationLatLng != null ? _locationLatLng!.latitude.toString() : '',
+          'description': _descriptionController.text.trim(),
+          'isRecurrence': false,
           'type': _selectedType,
-          'startAt': _startDateTime.toUtc().toIso8601String(),
-          'endAt': _endDateTime.toUtc().toIso8601String(),
         };
 
         final result = await apiService.createEvent(eventData);

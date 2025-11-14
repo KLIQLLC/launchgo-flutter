@@ -36,8 +36,8 @@ class EventHelper {
   /// - After event end time
   static bool isWithinCheckInTimeframe(Event event) {
     final now = DateTime.now();
-    final checkInStartTime = event.startAt.subtract(const Duration(minutes: 15));
-    final checkInEndTime = event.endAt;
+    final checkInStartTime = event.startEventAt.subtract(const Duration(minutes: 15));
+    final checkInEndTime = event.endEventAt;
     
     return now.isAfter(checkInStartTime) && now.isBefore(checkInEndTime);
   }

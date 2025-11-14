@@ -4,45 +4,81 @@ import 'package:flutter/material.dart';
 class Event extends Equatable {
   final String id;
   final String name;
-  final DateTime startAt;
-  final DateTime endAt;
+  final DateTime startEventAt;
+  final DateTime endEventAt;
   final String type;
   final String? addressLocation;
   final double? longLocation;
   final double? latLocation;
   final String? checkInLocationStatus;
   final String? description;
+  final String? recurrenceType;
+  final DateTime? startRecurrenceAt;
+  final DateTime? endRecurrenceAt;
+  final bool isRecurrence;
 
   const Event({
     required this.id,
     required this.name,
-    required this.startAt,
-    required this.endAt,
+    required this.startEventAt,
+    required this.endEventAt,
     required this.type,
     this.addressLocation,
     this.longLocation,
     this.latLocation,
     this.checkInLocationStatus,
     this.description,
+    this.recurrenceType,
+    this.startRecurrenceAt,
+    this.endRecurrenceAt,
+    this.isRecurrence = false,
   });
 
   factory Event.fromJson(Map<String, dynamic> json) {
     return Event(
       id: json['id'] ?? '',
       name: json['name'] ?? '',
-      startAt: json['startAt'] != null 
-          ? _parseUtcDateTime(json['startAt'])  // Parse UTC and convert to local
-          : DateTime.now(),
-      endAt: json['endAt'] != null 
-          ? _parseUtcDateTime(json['endAt'])    // Parse UTC and convert to local
-          : DateTime.now(),
+      startEventAt: _getStartDateTime(json),  // Handle both old and new field names
+      endEventAt: _getEndDateTime(json),      // Handle both old and new field names
       type: json['type'] ?? '',
       addressLocation: json['addressLocation'],
       longLocation: json['longLocation'] != null ? double.tryParse(json['longLocation'].toString()) : null,
       latLocation: json['latLocation'] != null ? double.tryParse(json['latLocation'].toString()) : null,
       checkInLocationStatus: json['checkInLocationStatus'],
       description: json['description'],
+      recurrenceType: json['recurrenceType'],
+      startRecurrenceAt: json['startRecurrenceAt'] != null ? _parseUtcDateTime(json['startRecurrenceAt']) : null,
+      endRecurrenceAt: json['endRecurrenceAt'] != null ? _parseUtcDateTime(json['endRecurrenceAt']) : null,
+      isRecurrence: json['isRecurrence'] ?? false,
     );
+  }
+
+  static DateTime _getStartDateTime(Map<String, dynamic> json) {
+    // Try new API field name first, then fall back to old field name
+    final startEventAt = json['startEventAt'];
+    final startAt = json['startAt'];
+    
+    if (startEventAt != null) {
+      return _parseUtcDateTime(startEventAt);
+    } else if (startAt != null) {
+      return _parseUtcDateTime(startAt);
+    } else {
+      return DateTime.now();
+    }
+  }
+
+  static DateTime _getEndDateTime(Map<String, dynamic> json) {
+    // Try new API field name first, then fall back to old field name
+    final endEventAt = json['endEventAt'];
+    final endAt = json['endAt'];
+    
+    if (endEventAt != null) {
+      return _parseUtcDateTime(endEventAt);
+    } else if (endAt != null) {
+      return _parseUtcDateTime(endAt);
+    } else {
+      return DateTime.now();
+    }
   }
 
   static DateTime _parseUtcDateTime(String dateTimeString) {
@@ -57,27 +93,31 @@ class Event extends Equatable {
     return {
       'id': id,
       'name': name,
-      'startAt': startAt.toUtc().toIso8601String(),  // Convert to UTC before sending
-      'endAt': endAt.toUtc().toIso8601String(),      // Convert to UTC before sending
+      'startEventAt': startEventAt.toUtc().toIso8601String(),
+      'endEventAt': endEventAt.toUtc().toIso8601String(),
       'type': type,
       if (addressLocation != null) 'addressLocation': addressLocation,
       if (longLocation != null) 'longLocation': longLocation.toString(),
       if (latLocation != null) 'latLocation': latLocation.toString(),
       if (checkInLocationStatus != null) 'checkInLocationStatus': checkInLocationStatus,
       if (description != null) 'description': description,
+      if (recurrenceType != null) 'recurrenceType': recurrenceType,
+      if (startRecurrenceAt != null) 'startRecurrenceAt': startRecurrenceAt!.toUtc().toIso8601String(),
+      if (endRecurrenceAt != null) 'endRecurrenceAt': endRecurrenceAt!.toUtc().toIso8601String(),
+      'isRecurrence': isRecurrence,
     };
   }
 
   // Get formatted time range for display
   String get timeRange {
-    final startTime = _formatTime(startAt);
-    final endTime = _formatTime(endAt);
+    final startTime = _formatTime(startEventAt);
+    final endTime = _formatTime(endEventAt);
     return '$startTime - $endTime';
   }
 
   // Get formatted time for display based on event type
   String get displayTime {
-    final startTime = _formatTime(startAt);
+    final startTime = _formatTime(startEventAt);
     
     // For assignment type events, show only start time
     if (type.toLowerCase() == 'assignment') {
@@ -85,7 +125,7 @@ class Event extends Equatable {
     }
     
     // For all other events, show time range
-    final endTime = _formatTime(endAt);
+    final endTime = _formatTime(endEventAt);
     return '$startTime - $endTime';
   }
 
@@ -122,6 +162,23 @@ class Event extends Equatable {
     return '$displayHour:$minute $period';
   }
 
+  // Helper methods for recurring events
+  bool get isRecurringEvent => isRecurrence;
+  bool get isSingleEvent => !isRecurrence;
+  
+  String get recurrenceTypeFormatted {
+    switch (recurrenceType?.toLowerCase()) {
+      case 'every-day':
+        return 'Daily';
+      case 'weekly':
+        return 'Weekly';
+      case 'monthly':
+        return 'Monthly';
+      default:
+        return recurrenceType ?? '';
+    }
+  }
+
   @override
-  List<Object?> get props => [id, name, startAt, endAt, type, addressLocation, longLocation, latLocation, checkInLocationStatus, description];
+  List<Object?> get props => [id, name, startEventAt, endEventAt, type, addressLocation, longLocation, latLocation, checkInLocationStatus, description, recurrenceType, startRecurrenceAt, endRecurrenceAt, isRecurrence];
 }
