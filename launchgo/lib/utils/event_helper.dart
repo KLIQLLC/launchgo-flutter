@@ -74,4 +74,23 @@ class EventHelper {
         return 'No check-in required';
     }
   }
+
+  /// Determines if an event can be deleted/edited
+  /// 
+  /// Can be deleted when:
+  /// - Event starts at or after (current time + 15 minutes)
+  /// 
+  /// Cannot be deleted when:
+  /// - Event started before (current time + 15 minutes)
+  /// 
+  /// Example: If current time is 15:00
+  /// - Events starting at 15:20+ can be deleted
+  /// - Events starting before 15:15 cannot be deleted
+  static bool canDeleteEvent(Event event) {
+    final now = DateTime.now();
+    final deleteGraceCutoff = now.add(const Duration(minutes: 15));
+    
+    return event.startEventAt.isAfter(deleteGraceCutoff) || 
+           event.startEventAt.isAtSameMomentAs(deleteGraceCutoff);
+  }
 }

@@ -176,16 +176,10 @@ class EventValidationService {
         corrections['endDateTime'] = correctedEnd;
       }
     }
-    // Correct time intervals even if not in past
-    else if (!TimeUtils.isValid15MinuteIntervalDateTime(startDateTime)) {
-      correctedStart = TimeUtils.roundTo15MinuteIntervalDateTime(startDateTime);
-      corrections['startDateTime'] = correctedStart;
-    }
     
-    // Correct end time if before start or invalid interval
+    // Correct end time if before start or at same time
     if (endDateTime.isBefore(correctedStart) || 
-        endDateTime.isAtSameMomentAs(correctedStart) ||
-        !TimeUtils.isValid15MinuteIntervalDateTime(endDateTime)) {
+        endDateTime.isAtSameMomentAs(correctedStart)) {
       correctedEnd = TimeUtils.roundTo15MinuteIntervalDateTime(suggestEndTime(correctedStart));
       corrections['endDateTime'] = correctedEnd;
     }

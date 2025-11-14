@@ -28,11 +28,14 @@ class EventCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool canDelete = onDelete != null && EventHelper.canDeleteEvent(event);
+    final bool canInteract = EventHelper.canDeleteEvent(event);
+    
     return SwipeableCard(
-      canSwipe: onDelete != null,
-      canTap: true,
-      onTap: onEdit ?? onView,
-      onSwipeToDelete: onDelete != null ? () => _handleSwipeToDelete(context) : null,
+      canSwipe: canDelete,
+      canTap: canInteract,
+      onTap: canInteract ? (onEdit ?? onView) : null,
+      onSwipeToDelete: canDelete ? () => _handleSwipeToDelete(context) : null,
       deleteIcon: Icons.delete,
       child: _EventCardContent(event: event, onEventUpdated: onEventUpdated),
     );

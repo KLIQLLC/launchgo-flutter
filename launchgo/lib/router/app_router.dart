@@ -23,12 +23,12 @@ import 'package:launchgo/screens/notifications_screen.dart';
 import 'package:launchgo/screens/schedule/event_form_screen.dart';
 import 'package:launchgo/screens/schedule/recurring_event_form_screen.dart';
 import 'package:launchgo/models/event_model.dart';
+import 'package:launchgo/utils/event_helper.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/widgets/app_drawer.dart';
 import 'package:launchgo/widgets/custom_icon.dart';
 import 'package:launchgo/widgets/notification_badge_widget.dart';
-import 'package:provider/provider.dart';
 
 class AppRouter {
   final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -187,7 +187,7 @@ class AppRouter {
           builder: (context, state) {
             final event = state.extra as Event;
             final permissions = context.read<AuthService>().permissions;
-            final isReadOnly = !permissions.canEditEvents;
+            final isReadOnly = !permissions.canEditEvents || !EventHelper.canDeleteEvent(event);
             return EventFormScreen(event: event, isReadOnly: isReadOnly);
           },
         ),
@@ -197,7 +197,7 @@ class AppRouter {
           builder: (context, state) {
             final event = state.extra as Event;
             final permissions = context.read<AuthService>().permissions;
-            final isReadOnly = !permissions.canEditEvents;
+            final isReadOnly = !permissions.canEditEvents || !EventHelper.canDeleteEvent(event);
             return RecurringEventFormScreen(event: event, isReadOnly: isReadOnly);
           },
         ),

@@ -10,6 +10,7 @@ import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/widgets/schedule/deadline_card.dart';
 import 'package:launchgo/widgets/schedule/event_card.dart';
 import 'package:launchgo/models/event_model.dart';
+import 'package:launchgo/utils/event_helper.dart';
 import 'package:launchgo/theme/app_colors.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -774,8 +775,8 @@ class _WeeklyScheduleViewState extends State<_WeeklyScheduleView> {
                     child: EventCard(
                       key: ValueKey('event_card_${event.id}'),
                       event: event,
-                      onEdit: (widget.permissions.canEditEvents && event.type.toLowerCase() != 'assignment') ? () => _openEvent(event) : null,
-                      onDelete: (widget.permissions.canDeleteEvents && event.type.toLowerCase() != 'assignment') ? () => _onEventDeleted(event) : null,
+                      onEdit: (widget.permissions.canEditEvents && event.type.toLowerCase() != 'assignment' && EventHelper.canDeleteEvent(event)) ? () => _openEvent(event) : null,
+                      onDelete: (widget.permissions.canDeleteEvents && event.type.toLowerCase() != 'assignment' && EventHelper.canDeleteEvent(event)) ? () => _onEventDeleted(event) : null,
                       onView: () => _openEvent(event),
                       onEventUpdated: (updatedEvent) => _onEventUpdated(event, updatedEvent),
                     ),
