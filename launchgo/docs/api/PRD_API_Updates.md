@@ -5,6 +5,74 @@ Document API changes that affect the Flutter application functionality and requi
 
 ## API Changes
 
+### November 18, 2025 - Stream Tokens Separation (Chat & Video)
+
+#### Breaking Changes
+The `/users/me` endpoint now returns separate tokens for Stream Chat and Stream Video calls.
+
+#### Updated Response Structure
+
+**Endpoint:** `GET /api/v1/users/me`
+**Authentication:** Bearer Token required
+
+**Response for Mentor:**
+```json
+{
+    "id": "c9965340-b49b-4458-bb1d-c248e4e121f6",
+    "email": "igor.moisieiev@gmail.com",
+    "name": "Igor Mentor",
+    "avatar": "https://lh3.googleusercontent.com/a/ACg8ocKt1FoBt0weERkep1RlC8qKZlznVymidveNJNnMLrU4jaWzDQ=s96-c",
+    "role": "mentor",
+    "createdAt": "2025-08-08 13:34:48.097",
+    "chatGetStreamToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "callGetStreamToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "getStreamId": "c9965340-b49b-4458-bb1d-c248e4e121f6",
+    "students": [
+        {
+            "id": "68489807-88ac-4d95-92d2-a535db8cf6d8",
+            "name": "vkk",
+            "email": "vqq.koval@gmail.com",
+            "avatar": "https://lh3.googleusercontent.com/a/...",
+            "status": "INVITED",
+            "gpa": "0",
+            "academicYear": "",
+            "createdAt": "2025-10-02 08:28:10.000",
+            "role": "student",
+            "chatGetStreamToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+            "callGetStreamToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+            "mentorId": "c9965340-b49b-4458-bb1d-c248e4e121f6"
+        }
+    ],
+    "isReadonly": false
+}
+```
+
+**Key Changes:**
+- **OLD:** `getStreamToken` (single token for both chat and video)
+- **NEW:**
+  - `chatGetStreamToken` - Token for Stream Chat SDK (replaces `getStreamToken`)
+  - `callGetStreamToken` - Token for Stream Video SDK (new field)
+- **Students array** also includes both tokens for each student
+- **Migration:** Use `chatGetStreamToken` instead of `getStreamToken` for chat functionality
+
+#### Impact on Flutter Application
+
+**Required Changes:**
+1. **UserModel Update** - Add `callGetStreamToken` field; rename `getStreamToken` → `chatGetStreamToken`
+2. **StreamVideoService** - Use `callGetStreamToken` for video call initialization
+3. **StreamChatService** - Use `chatGetStreamToken` instead of `getStreamToken` for chat
+4. **Student Model** - Add `callGetStreamToken` field; rename `getStreamToken` → `chatGetStreamToken`
+
+**Migration Notes:**
+- The `getStreamToken` field is **deprecated** and replaced by two separate tokens:
+  - Chat: Use `chatGetStreamToken` (replaces old `getStreamToken`)
+  - Video: Use `callGetStreamToken` (new field)
+- Update all references from `getStreamToken` to `chatGetStreamToken` for chat functionality
+- Ensure backward compatibility during deployment if both tokens aren't always present
+- Token expiration may differ between chat and call tokens
+
+---
+
 ### November 13, 2025 - Event Management API Restructure
 
 #### Breaking Changes
@@ -210,12 +278,3 @@ The new API requires user ID in the URL. This can be extracted from:
 ### Backward Compatibility
 - Old event data may need migration for new field structure
 - Consider graceful handling of missing new fields during transition
-
-### Testing Checklist
-- [ ] Single event creation works with new endpoint
-- [ ] Single event update works with PATCH method
-- [ ] Recurring event creation includes all new fields
-- [ ] Recurring event update works properly
-- [ ] Location coordinates save/load correctly
-- [ ] Date and time fields display properly
-- [ ] User permissions still work with new user ID in URL

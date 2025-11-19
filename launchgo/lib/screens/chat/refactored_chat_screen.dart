@@ -72,7 +72,7 @@ class _RefactoredChatScreenState extends State<RefactoredChatScreen>
       throw Exception('User info not loaded');
     }
 
-    if (user.getStreamToken?.isEmpty ?? true) {
+    if (user.chatGetStreamToken?.isEmpty ?? true) {
       throw Exception('Stream Chat token not available');
     }
 
@@ -88,7 +88,7 @@ class _RefactoredChatScreenState extends State<RefactoredChatScreen>
 
     return await _channelManager!.initializeChannel(
       user: user,
-      token: user.getStreamToken!,
+      token: user.chatGetStreamToken!,
       selectedStudentId: selectedStudentId,
     );
   }

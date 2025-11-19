@@ -163,12 +163,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // Auto-connect Stream Chat for unread badge when user is authenticated
     // Only for students - mentors connect when they select a student
     _authService.addListener(() async {
-      if (_authService.userInfo != null && _authService.userInfo!.getStreamToken != null) {
+      if (_authService.userInfo != null && _authService.userInfo!.chatGetStreamToken != null) {
         // Only auto-connect students - mentors connect selectively
         if (_authService.userInfo!.isStudent) {
           await _streamChatService.autoConnectUser(
             userId: _authService.userInfo!.id,
-            token: _authService.userInfo!.getStreamToken,
+            token: _authService.userInfo!.chatGetStreamToken,
             userName: _authService.userInfo!.name,
             userImage: _authService.userInfo!.avatarUrl,
           );
@@ -205,14 +205,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         }
       }
     });
-    
+
     // Try to connect immediately if already authenticated (students only)
-    if (_authService.userInfo != null && 
-        _authService.userInfo!.getStreamToken != null &&
+    if (_authService.userInfo != null &&
+        _authService.userInfo!.chatGetStreamToken != null &&
         _authService.userInfo!.isStudent) {
       _streamChatService.autoConnectUser(
         userId: _authService.userInfo!.id,
-        token: _authService.userInfo!.getStreamToken,
+        token: _authService.userInfo!.chatGetStreamToken,
         userName: _authService.userInfo!.name,
         userImage: _authService.userInfo!.avatarUrl,
       );
@@ -256,12 +256,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // Stream Chat automatically manages presence based on WebSocket connection
     // When app resumes, ensure connection is active for presence
     if (state == AppLifecycleState.resumed) {
-      if (_authService.userInfo != null && _authService.userInfo!.getStreamToken != null) {
+      if (_authService.userInfo != null && _authService.userInfo!.chatGetStreamToken != null) {
         // Only auto-reconnect students - mentors will reconnect when they select students
         if (_authService.userInfo!.isStudent) {
           _streamChatService.autoConnectUser(
             userId: _authService.userInfo!.id,
-            token: _authService.userInfo!.getStreamToken,
+            token: _authService.userInfo!.chatGetStreamToken,
             userName: _authService.userInfo!.name,
             userImage: _authService.userInfo!.avatarUrl,
           );

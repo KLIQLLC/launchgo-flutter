@@ -20,7 +20,7 @@ class ChatDataProvider {
   static Map<String, dynamic> _getStudentChatData(UserModel user) {
     return {
       'userId': user.id,
-      'userToken': user.getStreamToken ?? '',
+      'userToken': user.chatGetStreamToken ?? '',
       'userName': user.name,
       'userImage': user.avatarUrl ?? '',
       'secondUserId': user.mentorId ?? '',
@@ -46,7 +46,7 @@ class ChatDataProvider {
 
     return {
       'userId': user.id,
-      'userToken': user.getStreamToken ?? '',
+      'userToken': user.chatGetStreamToken ?? '',
       'userName': user.name,
       'userImage': user.avatarUrl ?? '',
       'secondUserId': student.id,
