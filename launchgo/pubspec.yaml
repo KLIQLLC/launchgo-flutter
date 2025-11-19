@@ -89,7 +89,11 @@ dependencies:
   ## User Preferences (UserDefaults for iOS, SharedPreferences for Android)
   shared_preferences: ^2.2.2
   stream_chat_flutter: ^8.3.0
-  
+
+  ## Stream Video
+  stream_video_flutter: ^0.8.2
+  wakelock_plus: ^1.2.8
+
   ## App Icon Badge
   app_badge_plus: ^1.1.5
 

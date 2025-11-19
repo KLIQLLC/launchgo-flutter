@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
@@ -12,6 +13,7 @@ import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/api_service.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/services/chat/stream_chat_service.dart';
+import 'package:launchgo/services/video_call/stream_video_service.dart';
 import 'package:launchgo/services/push_notification_service.dart';
 import 'package:launchgo/services/android_notification_display_service.dart';
 import 'package:launchgo/services/pending_navigation_service.dart';
@@ -64,6 +66,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => AuthService()..initialize()),
         ChangeNotifierProvider(create: (_) => ThemeService()),
         ChangeNotifierProvider(create: (_) => StreamChatService()),
+        ChangeNotifierProvider(create: (_) => StreamVideoService()),
         ChangeNotifierProvider.value(value: PushNotificationService.instance),
         ChangeNotifierProvider.value(value: PendingNavigationService.instance),
         Provider(
@@ -118,13 +121,16 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   bool _showSplash = true;
   late final AuthService _authService;
   late final StreamChatService _streamChatService;
+  late final StreamVideoService _streamVideoService;
   late final NotificationsApiService _notificationsService;
+  StreamSubscription? _incomingCallSubscription;
 
   @override
   void initState() {
     super.initState();
     _authService = context.read<AuthService>();
     _streamChatService = context.read<StreamChatService>();
+    _streamVideoService = context.read<StreamVideoService>();
     _notificationsService = context.read<NotificationsApiService>();
     _appRouter = AppRouter(_authService);
     
@@ -164,8 +170,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // Only for students - mentors connect when they select a student
     _authService.addListener(() async {
       if (_authService.userInfo != null && _authService.userInfo!.getStreamToken != null) {
-        // Only auto-connect students - mentors connect selectively
+        // Initialize video service for all authenticated users
+        await _streamVideoService.initialize(_authService.userInfo!);
+
+        // Setup incoming call listener for students
         if (_authService.userInfo!.isStudent) {
+          _setupIncomingCallListener();
+
+          // Auto-connect students to Stream Chat
           await _streamChatService.autoConnectUser(
             userId: _authService.userInfo!.id,
             token: _authService.userInfo!.getStreamToken,
@@ -206,16 +218,22 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       }
     });
     
-    // Try to connect immediately if already authenticated (students only)
-    if (_authService.userInfo != null && 
-        _authService.userInfo!.getStreamToken != null &&
-        _authService.userInfo!.isStudent) {
-      _streamChatService.autoConnectUser(
-        userId: _authService.userInfo!.id,
-        token: _authService.userInfo!.getStreamToken,
-        userName: _authService.userInfo!.name,
-        userImage: _authService.userInfo!.avatarUrl,
-      );
+    // Initialize video service and connect Stream Chat immediately if already authenticated
+    if (_authService.userInfo != null && _authService.userInfo!.getStreamToken != null) {
+      // Initialize video service
+      _streamVideoService.initialize(_authService.userInfo!);
+
+      // Setup incoming call listener and connect Stream Chat (students only)
+      if (_authService.userInfo!.isStudent) {
+        _setupIncomingCallListener();
+
+        _streamChatService.autoConnectUser(
+          userId: _authService.userInfo!.id,
+          token: _authService.userInfo!.getStreamToken,
+          userName: _authService.userInfo!.name,
+          userImage: _authService.userInfo!.avatarUrl,
+        );
+      }
     }
     
     // Setup FCM token if already authenticated
@@ -242,8 +260,27 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     });
   }
 
+  void _setupIncomingCallListener() {
+    // Cancel any existing subscription
+    _incomingCallSubscription?.cancel();
+
+    // Listen for incoming calls (students only)
+    _streamVideoService.addListener(() {
+      if (_streamVideoService.incomingCallId != null &&
+          _streamVideoService.incomingCallerName != null) {
+        // Navigate to incoming call screen
+        _appRouter.router.pushNamed(
+          'incoming-call',
+          pathParameters: {'callId': _streamVideoService.incomingCallId!},
+          queryParameters: {'callerName': _streamVideoService.incomingCallerName!},
+        );
+      }
+    });
+  }
+
   @override
   void dispose() {
+    _incomingCallSubscription?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
