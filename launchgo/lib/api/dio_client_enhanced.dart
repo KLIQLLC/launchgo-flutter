@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../config/environment.dart';
 import '../services/auth_service.dart';
 import 'interceptors/auth_interceptor.dart';
+import 'interceptors/error_handling_interceptor.dart';
 import 'interceptors/logging_interceptor.dart';
 
 class DioClientEnhanced {
@@ -33,13 +34,16 @@ class DioClientEnhanced {
       authService: _authService,
       dio: dio,
     ));
-    
-    // 2. Logging interceptor (for debugging)
+
+    // 2. Error handling interceptor (converts 4xx and 5xx responses to exceptions with clean messages)
+    dio.interceptors.add(ErrorHandlingInterceptor());
+
+    // 3. Logging interceptor (for debugging)
     if (kDebugMode) {
       dio.interceptors.add(LoggingInterceptor());
     }
-    
-    // 3. Retry interceptor (optional - for network issues)
+
+    // 4. Retry interceptor (optional - for network issues)
     dio.interceptors.add(RetryInterceptor(dio: dio));
     
     return dio;
