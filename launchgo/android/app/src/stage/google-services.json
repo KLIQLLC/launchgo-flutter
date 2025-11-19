@@ -1,0 +1,124 @@
+{
+  "project_info": {
+    "project_number": "481027521494",
+    "project_id": "turnkey-point-466710-a2",
+    "storage_bucket": "turnkey-point-466710-a2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:481027521494:android:212d21e1bc94b4cd240277",
+        "android_client_info": {
+          "package_name": "com.launchgo.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "481027521494-1tno6qigj7p1h97ofoafc38kn7mljeho.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.launchgo.app",
+            "certificate_hash": "302dbc4db08585cedb6f039b45cc656db15d57ae"
+          }
+        },
+        {
+          "client_id": "481027521494-673t5kunpnapgl0aqhd33nkmi1q94mab.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.launchgo.app",
+            "certificate_hash": "535ea430239de8635d03fbcd1e61978d02a639c2"
+          }
+        },
+        {
+          "client_id": "481027521494-bvmr8gv065lnd4fvd0pc45ge3dg9pbup.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.launchgo.app",
+            "certificate_hash": "5551fe16fde1c3d5acc4d2fc2d904e37f9d09e28"
+          }
+        },
+        {
+          "client_id": "481027521494-t3b8vqe1o9nfrejek745uji6q1ed6dgi.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAR8S50SI_DW5dSHReJMoZte7TjnjQgeEw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "481027521494-t3b8vqe1o9nfrejek745uji6q1ed6dgi.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "481027521494-m3ttqvnu1bakqlu9gldt6ujgbvfobbg0.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.launchgo.stage",
+                "app_store_id": "6751249725"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:481027521494:android:21d8229e2c967842240277",
+        "android_client_info": {
+          "package_name": "com.launchgo.stage"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "481027521494-2n2aohfu79f944nhhpaefp7cvk7upvhc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.launchgo.stage",
+            "certificate_hash": "5551fe16fde1c3d5acc4d2fc2d904e37f9d09e28"
+          }
+        },
+        {
+          "client_id": "481027521494-rv1fvmls22rhbnvq6v65gt23g4c8i30k.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.launchgo.stage",
+            "certificate_hash": "302dbc4db08585cedb6f039b45cc656db15d57ae"
+          }
+        },
+        {
+          "client_id": "481027521494-t3b8vqe1o9nfrejek745uji6q1ed6dgi.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAR8S50SI_DW5dSHReJMoZte7TjnjQgeEw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "481027521494-t3b8vqe1o9nfrejek745uji6q1ed6dgi.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "481027521494-m3ttqvnu1bakqlu9gldt6ujgbvfobbg0.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.launchgo.stage",
+                "app_store_id": "6751249725"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
