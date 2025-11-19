@@ -29,7 +29,7 @@ class StreamVideoService extends ChangeNotifier {
           name: user.name,
           image: user.avatarUrl,
         ),
-        userToken: user.getStreamToken ?? '',
+        userToken: user.callGetStreamToken ?? '',
       );
 
       // Listen for incoming calls (for students)
@@ -50,7 +50,7 @@ class StreamVideoService extends ChangeNotifier {
       if (call == null) return;
 
       debugPrint('Incoming call from: ${call.callCid}');
-      _incomingCallId = call.callCid.value;
+      _incomingCallId = call.callCid.id; // Use just the ID, not the full CID value
 
       // Get caller name from call state
       call.state.listen((callState) {
@@ -89,10 +89,13 @@ class StreamVideoService extends ChangeNotifier {
         ringing: true, // This triggers incoming call notification
       );
 
+      // Join the call immediately after creating it (mentor side)
+      await call.join();
+
       _activeCall = call;
       notifyListeners();
 
-      debugPrint('Call created successfully: $callId');
+      debugPrint('Call created and joined successfully: $callId');
       return call;
     } catch (e) {
       debugPrint('Error creating call: $e');

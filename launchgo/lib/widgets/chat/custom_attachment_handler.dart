@@ -47,20 +47,11 @@ class CustomAttachmentHandler {
 
   // Permission handling methods
   static Future<bool> _requestCameraPermission() async {
-    if (Platform.isIOS) {
-      // iOS handles permissions automatically through Info.plist
-      return true;
-    }
     final cameraStatus = await Permission.camera.request();
     return cameraStatus.isGranted;
   }
 
   static Future<bool> _requestPhotosPermission() async {
-    if (Platform.isIOS) {
-      // iOS handles permissions automatically through Info.plist
-      return true;
-    }
-    
     if (Platform.isAndroid) {
       // Try storage permission first (works for most Android versions)
       try {
@@ -74,15 +65,13 @@ class CustomAttachmentHandler {
         return false;
       }
     }
-    
-    return false;
+
+    // iOS: Request photos permission
+    final photosStatus = await Permission.photos.request();
+    return photosStatus.isGranted;
   }
 
   static Future<bool> _requestMicrophonePermission() async {
-    if (Platform.isIOS) {
-      // iOS handles permissions automatically through Info.plist
-      return true;
-    }
     final micStatus = await Permission.microphone.request();
     return micStatus.isGranted;
   }
