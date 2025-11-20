@@ -374,7 +374,7 @@ class _EventFormScreenState extends State<EventFormScreen> with EventFormValidat
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Location',
+                          'Location (Optional)',
                           style: TextStyle(
                             color: themeService.textColor,
                             fontSize: 16,
@@ -427,7 +427,7 @@ class _EventFormScreenState extends State<EventFormScreen> with EventFormValidat
                     const SizedBox(height: 20),
                     _buildTextField(
                       controller: _descriptionController,
-                      label: 'Description',
+                      label: 'Description (Optional)',
                       hint: 'Enter event description',
                       maxLines: 3,
                       themeService: themeService,
