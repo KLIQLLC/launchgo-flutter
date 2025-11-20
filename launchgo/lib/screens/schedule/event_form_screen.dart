@@ -1,18 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../services/api_service_retrofit.dart';
 import '../../services/theme_service.dart';
 import '../../models/event_model.dart';
 import '../../widgets/cupertino_dropdown.dart';
+import '../../widgets/schedule/location_field.dart';
 import '../../utils/time_utils.dart';
 import '../../mixins/event_form_validation_mixin.dart';
-import 'location_edit_screen.dart'; // Added import for LocationEditScreen
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart' as geocoding;
 
 class EventFormScreen extends StatefulWidget {
   final Event? event;
@@ -32,7 +29,6 @@ class _EventFormScreenState extends State<EventFormScreen> with EventFormValidat
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _descriptionController;
-  late final TextEditingController _locationController;
 
   late DateTime _startDate;
   late TimeOfDay _startTime;
@@ -41,7 +37,6 @@ class _EventFormScreenState extends State<EventFormScreen> with EventFormValidat
 
   late String _selectedType;
   bool _isLoading = false;
-  bool _isLocationLoading = false;
 
   String? _locationAddress;
   LatLng? _locationLatLng;
@@ -65,17 +60,16 @@ class _EventFormScreenState extends State<EventFormScreen> with EventFormValidat
       // Edit mode - initialize with existing event data
       _nameController = TextEditingController(text: widget.event!.name);
       _descriptionController = TextEditingController(text: widget.event!.description ?? '');
-      _locationController = TextEditingController(text: widget.event!.addressLocation ?? '');
-      
+
       // Extract date and time components from the local DateTime
       final localStartAt = widget.event!.startEventAt; // Already converted to local in Event.fromJson
       final localEndAt = widget.event!.endEventAt;     // Already converted to local in Event.fromJson
-      
+
       _startDate = DateTime(localStartAt.year, localStartAt.month, localStartAt.day);
       _startTime = TimeOfDay.fromDateTime(localStartAt);
       _endDate = DateTime(localEndAt.year, localEndAt.month, localEndAt.day);
       _endTime = TimeOfDay.fromDateTime(localEndAt);
-      
+
       _selectedType = widget.event!.type;
       _locationAddress = widget.event!.addressLocation ?? '';
       _locationLatLng = null;
@@ -83,7 +77,6 @@ class _EventFormScreenState extends State<EventFormScreen> with EventFormValidat
       // Add mode - initialize with defaults using smart suggestions
       _nameController = TextEditingController();
       _descriptionController = TextEditingController();
-      _locationController = TextEditingController();
       
       // Set start time to current time + 1 hour, rounded to 15-minute interval
       final oneHourFromNow = DateTime.now().add(const Duration(hours: 1));
@@ -105,7 +98,6 @@ class _EventFormScreenState extends State<EventFormScreen> with EventFormValidat
   void dispose() {
     _nameController.dispose();
     _descriptionController.dispose();
-    _locationController.dispose();
     super.dispose();
   }
 
@@ -370,59 +362,17 @@ class _EventFormScreenState extends State<EventFormScreen> with EventFormValidat
                     const SizedBox(height: 20),
                     _buildTypeDropdown(),
                     const SizedBox(height: 20),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Location (Optional)',
-                          style: TextStyle(
-                            color: themeService.textColor,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        InkWell(
-                          borderRadius: BorderRadius.circular(12),
-                          onTap: (widget.isReadOnly || _isLocationLoading) ? null : () => _openLocationEditScreen(context),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: themeService.cardColor,
-                              border: Border.all(color: themeService.borderColor),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    _locationAddress?.isNotEmpty == true ? _locationAddress! : 'Enter event location',
-                                    style: TextStyle(
-                                      color: _locationAddress?.isNotEmpty == true ? themeService.textColor : themeService.inputPlaceholderColor,
-                                      fontSize: 16,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                _isLocationLoading
-                                  ? SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: themeService.textColor,
-                                      ),
-                                    )
-                                  : Icon(
-                                      _locationAddress?.isNotEmpty == true ? Icons.edit_location_alt : Icons.add_location_alt,
-                                      color: themeService.textColor,
-                                    )
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
+                    LocationField(
+                      initialAddress: _locationAddress,
+                      initialLatLng: _locationLatLng,
+                      onLocationChanged: (address, latLng) {
+                        setState(() {
+                          _locationAddress = address;
+                          _locationLatLng = latLng;
+                        });
+                      },
+                      isReadOnly: widget.isReadOnly,
+                      themeService: themeService,
                     ),
                     const SizedBox(height: 20),
                     _buildTextField(
@@ -718,166 +668,4 @@ class _EventFormScreenState extends State<EventFormScreen> with EventFormValidat
     );
   }
 
-  void _openLocationEditScreen(BuildContext screenContext) async {
-    // Prevent multiple simultaneous navigation attempts
-    if (_isLocationLoading) return;
-    
-    setState(() {
-      _isLocationLoading = true;
-    });
-
-    try {
-      String? suggestAddress;
-      LatLng? suggestCoords;
-
-      // Check location permissions first - deny navigation if no permission
-      final servicesEnabled = await Geolocator.isLocationServiceEnabled();
-      var status = await Permission.locationWhenInUse.status;
-      
-      if (status.isDenied) {
-        status = await Permission.locationWhenInUse.request();
-      }
-
-      // Handle all permission issues in one place
-      if (!servicesEnabled || status.isPermanentlyDenied || status.isRestricted || status.isDenied) {
-        if (!mounted) return;
-        
-        String message;
-        bool openLocationSettings = false;
-        
-        if (!servicesEnabled) {
-          message = 'Location services are required to use the location feature. Enable them in Settings to continue.';
-          openLocationSettings = true;
-        } else {
-          message = 'Location permission is required to use the location feature. Enable it in Settings to continue.';
-        }
-        
-        final shouldOpenSettings = await _showLocationPermissionDialog(message);
-        if (shouldOpenSettings) {
-          if (openLocationSettings) {
-            await Geolocator.openLocationSettings();
-          } else {
-            await openAppSettings();
-          }
-        }
-        return; // Don't navigate if any permission issue
-      }
-
-      // Only proceed if permission is granted
-      if (status.isGranted) {
-        // Try to get current location
-        try {
-          Position pos = await Geolocator.getCurrentPosition(
-            timeLimit: const Duration(seconds: 5),
-          );
-          suggestCoords = LatLng(pos.latitude, pos.longitude);
-          List<geocoding.Placemark> placemarks = await geocoding.placemarkFromCoordinates(
-            pos.latitude, 
-            pos.longitude
-          );
-          if (placemarks.isNotEmpty) {
-            final place = placemarks.first;
-            final address = [
-              if (place.street != null) place.street,
-              if (place.subLocality != null) place.subLocality,
-              if (place.locality != null) place.locality,
-              if (place.administrativeArea != null) place.administrativeArea,
-              if (place.country != null) place.country,
-            ].where((e) => e != null && e.toString().trim().isNotEmpty).join(', ');
-            suggestAddress = address;
-          }
-        } catch (e) {
-          // Location getting failed - continue with navigation
-        }
-      }
-
-      if (!mounted) return;
-      
-      final result = await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => LocationEditScreen(
-            initialLocation: suggestAddress ?? _locationAddress ?? '',
-            initialCoords: suggestCoords ?? _locationLatLng,
-          ),
-        ),
-      );
-      
-      if (result is Map && result['address'] is String && mounted) {
-        setState(() {
-          _locationAddress = result['address'] ?? '';
-          if (result['lat'] is double && result['lng'] is double) {
-            _locationLatLng = LatLng(result['lat'], result['lng']);
-          } else {
-            _locationLatLng = null;
-          }
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLocationLoading = false;
-        });
-      }
-    }
-  }
-
-
-  Future<bool> _showLocationPermissionDialog(String message) async {
-    return await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF1A2332),
-          title: const Text(
-            'Location Permission',
-            style: TextStyle(color: Colors.white),
-          ),
-          content: Text(
-            message,
-            style: const TextStyle(color: Colors.white),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(color: Colors.grey),
-              ),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text(
-                'Go to Settings',
-                style: TextStyle(color: Colors.blue),
-              ),
-            ),
-          ],
-        );
-      },
-    ) ?? false;
-  }
-
-  Future<bool> _showLocationPermissionDeniedDialog(BuildContext dialogContext) async {
-    return await showDialog<bool>(
-      context: dialogContext,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Location Permission Required'),
-          content: const Text(
-            'Location access is permanently denied. To enable automatic location suggestions, please go to Settings and enable location permission for this app.\n\nYou can still manually enter addresses.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Continue'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Go to Settings'),
-            ),
-          ],
-        );
-      },
-    ) ?? false;
-  }
 }
