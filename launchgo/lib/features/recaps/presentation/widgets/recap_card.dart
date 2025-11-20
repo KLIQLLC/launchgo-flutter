@@ -79,21 +79,23 @@ class RecapCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () => _shareRecap(recap),
-                    borderRadius: BorderRadius.circular(22),
-                    splashColor: Colors.white.withValues(alpha: 0.1),
-                    highlightColor: Colors.white.withValues(alpha: 0.05),
-                    child: SizedBox(
-                      width: 44,
-                      height: 44,
-                      child: Center(
-                        child: Icon(
-                          Icons.share,
-                          size: 20,
-                          color: Colors.white.withValues(alpha: 0.7),
+                Builder(
+                  builder: (buttonContext) => Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => _shareRecap(buttonContext, recap),
+                      borderRadius: BorderRadius.circular(22),
+                      splashColor: Colors.white.withValues(alpha: 0.1),
+                      highlightColor: Colors.white.withValues(alpha: 0.05),
+                      child: SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: Center(
+                          child: Icon(
+                            Icons.share,
+                            size: 20,
+                            color: Colors.white.withValues(alpha: 0.7),
+                          ),
                         ),
                       ),
                     ),
@@ -124,7 +126,7 @@ class RecapCard extends StatelessWidget {
     return DateFormat('MMM d, yyyy, hh:mm a').format(date);
   }
 
-  void _shareRecap(Recap recap) {
+  void _shareRecap(BuildContext context, Recap recap) async {
     final dateStr = _formatDate(recap.createdAt);
     final studentInfo = recap.studentName != null ? '\nStudent: ${recap.studentName}' : '';
     
@@ -132,10 +134,17 @@ class RecapCard extends StatelessWidget {
 $dateStr$studentInfo
 
 ${recap.notes}''';
-    
-    Share.share(
+
+    // Ensure iOS 13+ presentation from a valid source rect (iPad/large screens)
+    final box = context.findRenderObject() as RenderBox?;
+    final origin = box?.localToGlobal(Offset.zero) ?? Offset.zero;
+    final size = box?.size ?? const Size(44, 44);
+
+    final shareResult = await Share.share(
       shareText,
       subject: recap.title,
+      sharePositionOrigin: Rect.fromLTWH(origin.dx, origin.dy, size.width, size.height),
     );
+    debugPrint('📤 Share invoked, result=$shareResult');
   }
 }
