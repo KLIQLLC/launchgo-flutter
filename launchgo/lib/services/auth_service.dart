@@ -443,7 +443,7 @@ class AuthService extends ChangeNotifier {
             _selectedStudentId = savedStudentId;
             
             // Connect to Stream Chat if service is available
-            if (_streamChatService != null && _userInfo!.getStreamToken != null) {
+            if (_streamChatService != null && _userInfo!.chatGetStreamToken != null) {
               _connectMentorToStreamChat(savedStudentId);
             }
           } else {
@@ -454,7 +454,7 @@ class AuthService extends ChangeNotifier {
             await PreferencesService.saveSelectedStudentId(_selectedStudentId!);
             
             // Connect to Stream Chat if service is available
-            if (_streamChatService != null && _userInfo!.getStreamToken != null) {
+            if (_streamChatService != null && _userInfo!.chatGetStreamToken != null) {
               _connectMentorToStreamChat(_selectedStudentId!);
             }
           }
@@ -579,7 +579,7 @@ class AuthService extends ChangeNotifier {
         if (!_streamChatService!.isUserConnected) {
           await _streamChatService!.connectUser(
             userId: _userInfo!.id,
-            token: _userInfo!.getStreamToken!,
+            token: _userInfo!.chatGetStreamToken!,
             userName: _userInfo!.name,
             userImage: _userInfo!.avatarUrl,
           );
@@ -621,7 +621,7 @@ class AuthService extends ChangeNotifier {
           try {
             await _streamChatService!.connectUser(
               userId: _userInfo!.id,
-              token: _userInfo!.getStreamToken!,
+              token: _userInfo!.chatGetStreamToken!,
               userName: _userInfo!.name,
               userImage: _userInfo!.avatarUrl,
             );

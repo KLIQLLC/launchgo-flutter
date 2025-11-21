@@ -41,6 +41,18 @@ class CourseCard extends StatelessWidget {
         end: Alignment.bottomCenter,
         colors: [Color(0xFF5FD585), Color(0xFF27A353)],
       ),
+      // Fourth card: Orange gradient
+      const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFFF89E5A), Color(0xFFE78E4E)],
+      ),
+      // Fifth card: Yellow gradient
+      const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFFF0CF68), Color(0xFFE6C05E)],
+      ),
     ];
     return gradients[cardIndex % gradients.length];
   }

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../services/api_service_retrofit.dart';
 import '../../services/theme_service.dart';
 import '../../widgets/cupertino_dropdown.dart';
+import '../../widgets/schedule/location_field.dart';
 import '../../utils/time_utils.dart';
 import '../../utils/recurrence_utils.dart';
 import '../../models/event_model.dart';
@@ -29,7 +31,6 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> wit
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _descriptionController;
-  late final TextEditingController _locationController;
 
   late DateTime _selectedDate;
   late TimeOfDay _startTime;
@@ -39,6 +40,10 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> wit
   String _selectedType = 'study';
   String _recurrenceType = 'every-day';
   bool _isLoading = false;
+
+  // Location-related state
+  String? _locationAddress;
+  LatLng? _locationLatLng;
 
   final List<String> _eventTypes = [
     'lg_session',
@@ -60,34 +65,40 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> wit
       // Edit mode - initialize with existing event data
       _nameController = TextEditingController(text: widget.event!.name);
       _descriptionController = TextEditingController(text: widget.event!.description ?? '');
-      _locationController = TextEditingController(text: widget.event!.addressLocation ?? '');
-      
+
       // Extract date and time components from the local DateTime
       final localStartAt = widget.event!.startEventAt;
       final localEndAt = widget.event!.endEventAt;
-      
+
       _selectedDate = DateTime(localStartAt.year, localStartAt.month, localStartAt.day);
       _startTime = TimeOfDay.fromDateTime(localStartAt);
       _endTime = TimeOfDay.fromDateTime(localEndAt);
-      
+
       _selectedType = widget.event!.type;
       _recurrenceType = widget.event!.recurrenceType ?? 'every-day';
       _recurrenceEndDate = widget.event!.endRecurrenceAt ?? DateTime.now().add(const Duration(days: 30));
+
+      // Initialize location data
+      _locationAddress = widget.event!.addressLocation ?? '';
+      _locationLatLng = null;
     } else {
       // Add mode - initialize with defaults using smart suggestions
       _nameController = TextEditingController();
       _descriptionController = TextEditingController();
-      _locationController = TextEditingController();
-      
+
       // Set start time to current time + 1 hour, rounded to 15-minute interval
       final oneHourFromNow = DateTime.now().add(const Duration(hours: 1));
       final suggestedStart = TimeUtils.roundTo15MinuteIntervalDateTime(oneHourFromNow);
       final suggestedEnd = suggestEndTimeForStart(suggestedStart);
-      
+
       _selectedDate = DateTime(suggestedStart.year, suggestedStart.month, suggestedStart.day);
       _startTime = TimeOfDay.fromDateTime(suggestedStart);
       _endTime = TimeOfDay.fromDateTime(suggestedEnd);
       _recurrenceEndDate = EventValidationService.suggestRecurrenceEndDate(suggestedStart);
+
+      // Initialize location data
+      _locationAddress = '';
+      _locationLatLng = null;
     }
   }
 
@@ -95,7 +106,6 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> wit
   void dispose() {
     _nameController.dispose();
     _descriptionController.dispose();
-    _locationController.dispose();
     super.dispose();
   }
 
@@ -269,9 +279,12 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> wit
           eventData['description'] = _descriptionController.text.trim();
         }
         
-        if (_locationController.text.trim() != (widget.event!.addressLocation ?? '')) {
-          eventData['addressLocation'] = _locationController.text.trim();
+        if (_locationAddress != (widget.event!.addressLocation ?? '')) {
+          eventData['addressLocation'] = _locationAddress;
         }
+
+        eventData['latLocation'] = _locationLatLng != null ? _locationLatLng!.latitude.toString() : '';
+        eventData['longLocation'] = _locationLatLng != null ? _locationLatLng!.longitude.toString() : '';
         
         if (_selectedType != widget.event!.type) {
           eventData['type'] = _selectedType;
@@ -316,9 +329,9 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> wit
           'name': _nameController.text.trim(),
           'startEventAt': _startDateTime.toUtc().toIso8601String(),
           'endEventAt': _endDateTime.toUtc().toIso8601String(),
-          'addressLocation': _locationController.text.trim(),
-          'longLocation': '',
-          'latLocation': '',
+          'addressLocation': _locationAddress ?? '',
+          'longLocation': _locationLatLng != null ? _locationLatLng!.longitude.toString() : '',
+          'latLocation': _locationLatLng != null ? _locationLatLng!.latitude.toString() : '',
           'checkInLocationStatus': 'check-in-required',
           'description': _descriptionController.text.trim(),
           'recurrenceType': _recurrenceType,
@@ -408,12 +421,17 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> wit
                     const SizedBox(height: 20),
                     _buildTypeDropdown(themeService),
                     const SizedBox(height: 20),
-                    _buildTextField(
-                      controller: _locationController,
-                      label: 'Location (Optional)',
-                      hint: 'Enter event location',
+                    LocationField(
+                      initialAddress: _locationAddress,
+                      initialLatLng: _locationLatLng,
+                      onLocationChanged: (address, latLng) {
+                        setState(() {
+                          _locationAddress = address;
+                          _locationLatLng = latLng;
+                        });
+                      },
+                      isReadOnly: widget.isReadOnly,
                       themeService: themeService,
-                      readOnly: widget.isReadOnly,
                     ),
                     const SizedBox(height: 20),
                     _buildTextField(
@@ -807,5 +825,4 @@ class _RecurringEventFormScreenState extends State<RecurringEventFormScreen> wit
       ),
     );
   }
-
 }
