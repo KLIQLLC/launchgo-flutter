@@ -18,6 +18,7 @@ import 'package:launchgo/services/pending_navigation_service.dart';
 import 'package:launchgo/services/notifications_api_service.dart';
 import 'package:launchgo/services/notification_navigation_service.dart';
 import 'package:launchgo/services/weekly_notification_service.dart';
+import 'package:launchgo/services/video_call/stream_video_service.dart';
 import 'package:launchgo/widgets/splash_screen.dart';
 import 'package:launchgo/features/recaps/presentation/bloc/recap_bloc.dart';
 import 'package:launchgo/features/recaps/data/recap_repository.dart';
@@ -64,6 +65,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => AuthService()..initialize()),
         ChangeNotifierProvider(create: (_) => ThemeService()),
         ChangeNotifierProvider(create: (_) => StreamChatService()),
+        ChangeNotifierProvider(create: (_) => StreamVideoService()),
         ChangeNotifierProvider.value(value: PushNotificationService.instance),
         ChangeNotifierProvider.value(value: PendingNavigationService.instance),
         Provider(
@@ -118,6 +120,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   bool _showSplash = true;
   late final AuthService _authService;
   late final StreamChatService _streamChatService;
+  late final StreamVideoService _streamVideoService;
   late final NotificationsApiService _notificationsService;
 
   @override
@@ -125,6 +128,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     super.initState();
     _authService = context.read<AuthService>();
     _streamChatService = context.read<StreamChatService>();
+    _streamVideoService = context.read<StreamVideoService>();
     _notificationsService = context.read<NotificationsApiService>();
     _appRouter = AppRouter(_authService);
     
@@ -173,7 +177,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             userImage: _authService.userInfo!.avatarUrl,
           );
         }
-        
+
+        // Initialize Stream Video for video calls
+        if (_authService.userInfo!.callGetStreamToken != null) {
+          await _streamVideoService.initialize(_authService.userInfo!);
+          debugPrint('✅ Stream Video initialized for user: ${_authService.userInfo!.id}');
+        }
+
         // Process any pending navigation after auth is ready
         if (PendingNavigationService.instance.hasPendingNavigation) {
           debugPrint('🔄 Auth ready, processing pending navigation');
@@ -216,6 +226,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         userName: _authService.userInfo!.name,
         userImage: _authService.userInfo!.avatarUrl,
       );
+    }
+
+    // Initialize Stream Video immediately if already authenticated
+    if (_authService.userInfo != null && _authService.userInfo!.callGetStreamToken != null) {
+      _streamVideoService.initialize(_authService.userInfo!).then((_) {
+        debugPrint('✅ Stream Video initialized on startup for user: ${_authService.userInfo!.id}');
+      });
     }
     
     // Setup FCM token if already authenticated
