@@ -351,6 +351,29 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
     if (!context.mounted) return;
     final videoService = context.read<StreamVideoService>();
 
+    // Check if video service is initialized
+    if (videoService.client == null) {
+      debugPrint('⚠️ [Video Call] Video service not initialized yet, initializing now...');
+      // Try to initialize if not already done
+      final userInfo = authService.userInfo;
+      if (userInfo != null && userInfo.callGetStreamToken != null) {
+        await videoService.initialize(userInfo);
+        debugPrint('✅ [Video Call] Video service initialized on demand');
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Video service initialization failed. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    if (!context.mounted) return;
+
     final call = await videoService.createCall(
       callId: selectedStudent.id,
       recipientId: selectedStudent.id,
@@ -360,13 +383,17 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
     if (!context.mounted) return;
 
     if (call != null) {
+      debugPrint('🎥 [Video Call] Call created successfully, navigating to video call screen');
+      debugPrint('🎥 [Video Call] callId: ${selectedStudent.id}, recipientName: ${selectedStudent.name}');
       // Navigate to video call screen
       context.pushNamed(
         'video-call',
         pathParameters: {'callId': selectedStudent.id},
         queryParameters: {'recipientName': selectedStudent.name},
       );
+      debugPrint('🎥 [Video Call] Navigation completed');
     } else {
+      debugPrint('❌ [Video Call] createCall returned null');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Failed to initiate video call'),

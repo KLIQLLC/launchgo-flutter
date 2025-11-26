@@ -22,21 +22,28 @@ class VideoCallScreen extends StatefulWidget {
 }
 
 class _VideoCallScreenState extends State<VideoCallScreen> {
+  late final StreamVideoService _videoService;
+
   @override
   void initState() {
     super.initState();
+    debugPrint('🎥 [VideoCallScreen] initState called - callId: ${widget.callId}, recipientName: ${widget.recipientName}');
+    _videoService = context.read<StreamVideoService>();
+    debugPrint('🎥 [VideoCallScreen] videoService.activeCall: ${_videoService.activeCall}');
+    debugPrint('🎥 [VideoCallScreen] videoService.hasActiveCall: ${_videoService.hasActiveCall}');
     WakelockPlus.enable(); // Keep screen on during call
   }
 
   @override
   void dispose() {
     WakelockPlus.disable();
+    // End call when screen is disposed (user backs out or screen is closed)
+    _videoService.endCall(); // Don't await in dispose
     super.dispose();
   }
 
   void _endCall() async {
-    final videoService = context.read<StreamVideoService>();
-    await videoService.endCall();
+    await _videoService.endCall();
     if (mounted) {
       context.pop();
     }
@@ -47,7 +54,10 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     final videoService = context.watch<StreamVideoService>();
     final call = videoService.activeCall;
 
+    debugPrint('🎥 [VideoCallScreen] build() called - call: $call, hasActiveCall: ${videoService.hasActiveCall}');
+
     if (call == null) {
+      debugPrint('🎥 [VideoCallScreen] activeCall is NULL - showing Connecting screen');
       return Scaffold(
         backgroundColor: const Color(0xFF020817),
         body: Center(
@@ -68,6 +78,8 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       );
     }
 
+    debugPrint('🎥 [VideoCallScreen] activeCall found - showing video UI for call ${call.id}');
+
     return StreamCallContainer(
       call: call,
       callContentBuilder: (
@@ -75,6 +87,13 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         Call call,
         CallState callState,
       ) {
+        // Debug: Log call state and participants
+        debugPrint('🎥 [VideoCallScreen] callContentBuilder called');
+        debugPrint('🎥 [VideoCallScreen] Call status: ${callState.status}');
+        debugPrint('🎥 [VideoCallScreen] Participants count: ${callState.callParticipants.length}');
+        debugPrint('🎥 [VideoCallScreen] Participants: ${callState.callParticipants.map((p) => '${p.userId} (local: ${p.isLocal}, video: ${p.isVideoEnabled}, audio: ${p.isAudioEnabled})').join(', ')}');
+        debugPrint('🎥 [VideoCallScreen] Local participant: ${callState.localParticipant?.userId}');
+
         return Scaffold(
           backgroundColor: Colors.black,
           body: Stack(

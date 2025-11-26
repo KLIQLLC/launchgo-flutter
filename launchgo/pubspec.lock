@@ -622,6 +622,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.4.1"
+  flutter_callkit_incoming:
+    dependency: "direct overridden"
+    description:
+      name: flutter_callkit_incoming
+      sha256: f56301e138c539253a9d0ae3c620450a4bc8cc4bc7e83b001906cfa639183ea2
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.5.7"
   flutter_launcher_icons:
     dependency: "direct dev"
     description:

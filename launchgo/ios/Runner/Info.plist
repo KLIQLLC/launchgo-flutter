@@ -43,18 +43,20 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>This app needs access to the camera for video calls and to take and send photos in chat.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>This app uses your location to suggest nearby addresses and verify event check-ins.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app uses your location to suggest nearby addresses and verify event check-ins.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>This app needs access to the microphone for video calls and to record videos with audio in chat.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>This app needs permission to save photos and videos to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>This app needs access to photo library to allow you to upload documents and images.</string>
+	<key>NSVoIPUsageDescription</key>
+	<string>This app uses VoIP to receive incoming video calls from your mentor, even when the app is closed.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>This app uses your location to suggest nearby addresses and verify event check-ins.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>This app uses your location to suggest nearby addresses and verify event check-ins.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
@@ -63,17 +65,6 @@
 		<string>remote-notification</string>
 		<string>voip</string>
 	</array>
-	<key>FirebaseAppDelegateProxyEnabled</key>
-	<true/>
-	<key>UIUserNotificationSettings</key>
-	<dict>
-		<key>UIUserNotificationTypeBadge</key>
-		<true/>
-		<key>UIUserNotificationTypeSound</key>
-		<true/>
-		<key>UIUserNotificationTypeAlert</key>
-		<true/>
-	</dict>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
@@ -93,6 +84,15 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>UIUserNotificationSettings</key>
+	<dict>
+		<key>UIUserNotificationTypeAlert</key>
+		<true/>
+		<key>UIUserNotificationTypeBadge</key>
+		<true/>
+		<key>UIUserNotificationTypeSound</key>
+		<true/>
+	</dict>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
 </dict>
