@@ -23,6 +23,7 @@ class VideoCallScreen extends StatefulWidget {
 
 class _VideoCallScreenState extends State<VideoCallScreen> {
   late final StreamVideoService _videoService;
+  DateTime? _joinedAt;
 
   @override
   void initState() {
@@ -31,6 +32,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     _videoService = context.read<StreamVideoService>();
     debugPrint('🎥 [VideoCallScreen] videoService.activeCall: ${_videoService.activeCall}');
     debugPrint('🎥 [VideoCallScreen] videoService.hasActiveCall: ${_videoService.hasActiveCall}');
+    _joinedAt = DateTime.now();
     WakelockPlus.enable(); // Keep screen on during call
   }
 
@@ -93,6 +95,24 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         debugPrint('🎥 [VideoCallScreen] Participants count: ${callState.callParticipants.length}');
         debugPrint('🎥 [VideoCallScreen] Participants: ${callState.callParticipants.map((p) => '${p.userId} (local: ${p.isLocal}, video: ${p.isVideoEnabled}, audio: ${p.isAudioEnabled})').join(', ')}');
         debugPrint('🎥 [VideoCallScreen] Local participant: ${callState.localParticipant?.userId}');
+
+        // Check for error conditions
+        final isDisconnected = callState.status.toString().contains('Disconnected');
+        final hasLocalParticipant = callState.localParticipant != null;
+        final waitingTime = _joinedAt != null ? DateTime.now().difference(_joinedAt!) : Duration.zero;
+        final isWaitingTooLong = waitingTime > const Duration(seconds: 30);
+
+        // Show error if disconnected without ever connecting
+        if (isDisconnected && !hasLocalParticipant) {
+          debugPrint('❌ [VideoCallScreen] Call disconnected without local participant');
+          return _buildErrorScreen('Call Failed', 'The call was declined or timed out');
+        }
+
+        // Show error if waiting too long for other participant
+        if (hasLocalParticipant && callState.callParticipants.length < 2 && isWaitingTooLong) {
+          debugPrint('❌ [VideoCallScreen] Waiting too long for other participant (${waitingTime.inSeconds}s)');
+          return _buildErrorScreen('Connection Timeout', 'Unable to connect to the other participant');
+        }
 
         return Scaffold(
           backgroundColor: Colors.black,
@@ -218,6 +238,67 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       return 'Waiting for other participant...';
     }
     return 'Connected';
+  }
+
+  Widget _buildErrorScreen(String title, String message) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF020817),
+      body: SafeArea(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.error_outline,
+                color: Colors.red,
+                size: 64,
+              ),
+              const SizedBox(height: 24),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white.withAlpha(179),
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 32),
+              ElevatedButton(
+                onPressed: () {
+                  _videoService.endCall();
+                  if (mounted) {
+                    context.pop();
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white.withAlpha(26),
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                ),
+                child: const Text(
+                  'Close',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
