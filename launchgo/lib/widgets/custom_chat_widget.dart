@@ -374,8 +374,12 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
 
     if (!context.mounted) return;
 
+    // Generate unique call ID: student_id + timestamp
+    // This ensures each call has a unique ID, even to the same student
+    final uniqueCallId = '${selectedStudent.id}_${DateTime.now().millisecondsSinceEpoch}';
+
     final call = await videoService.createCall(
-      callId: selectedStudent.id,
+      callId: uniqueCallId,
       recipientId: selectedStudent.id,
       recipientName: selectedStudent.name,
     );
@@ -384,11 +388,11 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
 
     if (call != null) {
       debugPrint('🎥 [Video Call] Call created successfully, navigating to video call screen');
-      debugPrint('🎥 [Video Call] callId: ${selectedStudent.id}, recipientName: ${selectedStudent.name}');
+      debugPrint('🎥 [Video Call] callId: $uniqueCallId, recipientName: ${selectedStudent.name}');
       // Navigate to video call screen
       context.pushNamed(
         'video-call',
-        pathParameters: {'callId': selectedStudent.id},
+        pathParameters: {'callId': uniqueCallId},
         queryParameters: {'recipientName': selectedStudent.name},
       );
       debugPrint('🎥 [Video Call] Navigation completed');

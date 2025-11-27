@@ -10,6 +10,7 @@ import '../../models/user_model.dart';
 class StreamVideoService extends ChangeNotifier {
   StreamVideo? _client;
   Call? _activeCall;
+  Call? _incomingCall; // Store the actual incoming Call object
   String? _incomingCallId;
   String? _incomingCallerName;
   bool _isInitialized = false;
@@ -140,6 +141,7 @@ class StreamVideoService extends ChangeNotifier {
         if (call == null) {
           // Call was cancelled or rejected
           debugPrint('📞 Call was cancelled or rejected');
+          _incomingCall = null;
           _incomingCallId = null;
           _incomingCallerName = null;
           _lastProcessedCallId = null;
@@ -157,7 +159,8 @@ class StreamVideoService extends ChangeNotifier {
         }
 
         _lastProcessedCallId = callId;
-        _incomingCallId = callId; // Use just the ID, not the full CID value
+        _incomingCall = call; // Store the actual Call object
+        _incomingCallId = callId; // Also store ID for display
 
         // Set a default caller name immediately
         _incomingCallerName = 'Mentor';
@@ -229,22 +232,17 @@ class StreamVideoService extends ChangeNotifier {
         ringing: true, // This triggers incoming call notification
       );
 
-      debugPrint('📞 getOrCreate completed, joining call...');
+      debugPrint('📞 getOrCreate completed, now joining call...');
 
-      // Join the call immediately after creating it (mentor side)
-      try {
-        final result = await call.join();
-        debugPrint('📞 join() returned: $result');
-      } catch (e, stackTrace) {
-        debugPrint('❌ Error during call.join(): $e');
-        debugPrint('❌ Stack trace: $stackTrace');
-        rethrow;
-      }
+      // CRITICAL: Caller must explicitly join the call
+      // Without this, caller shows "Calling..." forever even if callee accepts
+      await call.join();
+      debugPrint('✅ Caller joined the call successfully');
 
       _activeCall = call;
       notifyListeners();
 
-      debugPrint('✅ Call created and joined successfully: $callId');
+      debugPrint('✅ Call created successfully: $callId');
       debugPrint('📞 Active call members: ${call.state.value.callParticipants.map((p) => p.userId).toList()}');
       return call;
     } catch (e) {
@@ -255,28 +253,36 @@ class StreamVideoService extends ChangeNotifier {
 
   /// Accept an incoming call (student only)
   Future<Call?> acceptIncomingCall() async {
-    if (_client == null || _incomingCallId == null) {
-      debugPrint('Cannot accept call: client or callId is null');
+    if (_client == null || _incomingCall == null) {
+      debugPrint('Cannot accept call: client or incoming call is null');
       return null;
     }
 
     try {
-      debugPrint('Accepting incoming call: $_incomingCallId');
+      debugPrint('Accepting incoming call: ${_incomingCall!.id}');
 
-      final call = _client!.makeCall(
-        callType: StreamCallType.defaultType(),
-        id: _incomingCallId!,
-      );
+      // CRITICAL: Use the actual Call object from the incoming call listener
+      // Don't create a new one - this ensures both sides join the SAME call
+      final call = _incomingCall!;
+
+      debugPrint('📞 Using incoming Call object, now accepting and joining...');
+
+      // CRITICAL: Callee must explicitly accept AND join the call
+      // Without this, callee doesn't connect to the caller
+      await call.accept();
+      debugPrint('✅ Call accepted');
 
       await call.join();
+      debugPrint('✅ Callee joined the call successfully');
 
       _activeCall = call;
+      _incomingCall = null;
       _incomingCallId = null;
       _incomingCallerName = null;
       _lastProcessedCallId = null; // Clear so next call can be processed
       notifyListeners();
 
-      debugPrint('Call accepted successfully');
+      debugPrint('✅ Call accepted and joined successfully - ready for StreamCallContainer');
       return call;
     } catch (e) {
       debugPrint('Error accepting call: $e');
@@ -286,21 +292,18 @@ class StreamVideoService extends ChangeNotifier {
 
   /// Decline an incoming call (student only)
   Future<void> declineIncomingCall() async {
-    if (_client == null || _incomingCallId == null) {
-      debugPrint('Cannot decline call: client or callId is null');
+    if (_client == null || _incomingCall == null) {
+      debugPrint('Cannot decline call: client or incoming call is null');
       return;
     }
 
     try {
-      debugPrint('Declining incoming call: $_incomingCallId');
+      debugPrint('Declining incoming call: ${_incomingCall!.id}');
 
-      final call = _client!.makeCall(
-        callType: StreamCallType.defaultType(),
-        id: _incomingCallId!,
-      );
+      // Use the actual Call object to reject
+      await _incomingCall!.reject();
 
-      await call.reject();
-
+      _incomingCall = null;
       _incomingCallId = null;
       _incomingCallerName = null;
       _lastProcessedCallId = null; // Clear so next call can be processed
@@ -337,6 +340,7 @@ class StreamVideoService extends ChangeNotifier {
       debugPrint('Ending call: ${_activeCall!.id}');
       await _activeCall!.leave();
       _activeCall = null;
+      _lastProcessedCallId = null; // Clear to allow next call with same ID
       notifyListeners();
       debugPrint('Call ended successfully');
 
@@ -353,6 +357,7 @@ class StreamVideoService extends ChangeNotifier {
     _incomingCallSubscription = null;
     await _client?.disconnect();
     _client = null;
+    _incomingCall = null;
     _incomingCallId = null;
     _incomingCallerName = null;
     _lastProcessedCallId = null;
