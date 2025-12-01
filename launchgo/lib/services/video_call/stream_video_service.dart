@@ -256,18 +256,25 @@ class StreamVideoService extends ChangeNotifier {
         ringing: true, // This triggers incoming call notification
       );
 
-      debugPrint('📞 getOrCreate completed, now joining call...');
+      debugPrint('📞 getOrCreate completed - setting activeCall for UI');
 
-      // CRITICAL: Caller must explicitly join the call
-      // Without this, caller shows "Calling..." forever even if callee accepts
-      await call.join();
-      debugPrint('✅ Caller joined the call successfully');
-
+      // Set activeCall immediately so mentor sees "calling" UI right away
       _activeCall = call;
       notifyListeners();
 
-      debugPrint('✅ Call created successfully: $callId');
-      debugPrint('📞 Active call members: ${call.state.value.callParticipants.map((p) => p.userId).toList()}');
+      debugPrint('✅ Call created successfully: $callId - returning immediately for UI');
+
+      // CRITICAL: Caller must explicitly join the call
+      // Start join in background so UI shows immediately
+      debugPrint('📞 Starting join in background...');
+      call.join().then((_) {
+        debugPrint('✅ Caller joined the call successfully');
+        debugPrint('📞 Active call members: ${call.state.value.callParticipants.map((p) => p.userId).toList()}');
+      }).catchError((error) {
+        debugPrint('❌ Error joining call: $error');
+      });
+
+      // Return immediately so navigation can happen without waiting for join
       return call;
     } catch (e) {
       debugPrint('❌ Error creating call: $e');
