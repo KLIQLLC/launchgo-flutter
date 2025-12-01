@@ -626,10 +626,10 @@ packages:
     dependency: "direct overridden"
     description:
       name: flutter_callkit_incoming
-      sha256: f56301e138c539253a9d0ae3c620450a4bc8cc4bc7e83b001906cfa639183ea2
+      sha256: "21d645f0bc622c3ab9c113e289abbbd169a0f9143f3eb2a05ef1fb01b729c239"
       url: "https://pub.dev"
     source: hosted
-    version: "2.5.7"
+    version: "2.5.2"
   flutter_launcher_icons:
     dependency: "direct dev"
     description:
@@ -1926,7 +1926,7 @@ packages:
     source: hosted
     version: "2.1.1"
   stream_video:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: stream_video
       sha256: cdfe7920bd967ecc4c7700e84701f3c536cbcab405009fa244bcf75d1fb2f088
@@ -1941,6 +1941,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.8.2"
+  stream_video_push_notification:
+    dependency: "direct main"
+    description:
+      name: stream_video_push_notification
+      sha256: c014b881fb9a51388bf7797b46513b0a18cce8766a92a2d1012aa3de2f73da64
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.8.4"
+  stream_video_screen_sharing:
+    dependency: "direct main"
+    description:
+      name: stream_video_screen_sharing
+      sha256: "2b98cbddd183f0d25ac75dc8d22fe4eff8f694245c93f16c8a087c5991e9f7c5"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.8.4"
   stream_webrtc_flutter:
     dependency: transitive
     description:

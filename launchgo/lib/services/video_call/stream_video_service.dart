@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:stream_video_flutter/stream_video_flutter.dart';
+import 'package:stream_video_push_notification/stream_video_push_notification.dart';
 import '../../config/environment.dart';
 import '../../models/user_model.dart';
 
@@ -99,14 +101,25 @@ class StreamVideoService extends ChangeNotifier {
           image: user.avatarUrl,
         ),
         userToken: token,
-        // TODO: Add VoIP push notifications after fixing package compilation issue
-        // For now, incoming calls work via WebSocket when app is in foreground
+        options: const StreamVideoOptions(
+          logPriority: Priority.verbose,
+        ),
+        pushNotificationManagerProvider: StreamVideoPushNotificationManager.create(
+          iosPushProvider: const StreamVideoPushProvider.apn(
+            name: 'voip_apns',//'apn',
+          ),
+          androidPushProvider: const StreamVideoPushProvider.firebase(
+            name: 'firebase',
+          ),
+        ),
       );
 
       // Connect to establish WebSocket for receiving incoming call events
       debugPrint('📞 Connecting Stream Video client...');
       await _client!.connect();
       debugPrint('✅ Stream Video client connected');
+
+      await _logVoIPToken();
 
       // Listen for incoming calls (for students)
       if (user.role == UserRole.student) {
@@ -123,6 +136,17 @@ class StreamVideoService extends ChangeNotifier {
       debugPrint('❌ [INIT] Stack trace: ${StackTrace.current}');
       // Reset the flag so initialization can be retried
       _isInitialized = false;
+    }
+  }
+
+  /// Retrieve and log VoIP device token from flutter_callkit_incoming
+  Future<void> _logVoIPToken() async {
+    try {
+      const platform = MethodChannel('flutter_callkit_incoming');
+      final String voipToken = await platform.invokeMethod('getDevicePushTokenVoIP');
+      debugPrint('📞 VoIP Device Token: $voipToken');
+    } catch (e) {
+      debugPrint('Error retrieving VoIP token: $e');
     }
   }
 

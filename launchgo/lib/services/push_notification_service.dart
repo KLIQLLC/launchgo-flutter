@@ -237,26 +237,10 @@ class PushNotificationService extends ChangeNotifier {
   /// Wait for APNS token to be available on iOS
   Future<void> _waitForApnsToken() async {
     try {
-      // On iOS, we need to wait for APNS token before getting FCM token
-      int attempts = 0;
-      const maxAttempts = 10;
-      const delay = Duration(milliseconds: 500);
-      
-      while (attempts < maxAttempts) {
-        final apnsToken = await _messaging.getAPNSToken();
-        if (apnsToken != null) {
-          debugPrint('🔔 APNS token received: ${apnsToken.substring(0, 20)}...');
-          return;
-        }
-        
-        if (attempts % 3 == 0) debugPrint('🔔 APNS token not available yet, waiting... (attempt ${attempts + 1}/$maxAttempts)');
-        await Future.delayed(delay);
-        attempts++;
-      }
-      
-      debugPrint('⚠️ APNS token not received after $maxAttempts attempts');
+      final apnsToken = await _messaging.getAPNSToken();
+      debugPrint('APNS token: $apnsToken');
     } catch (e) {
-      debugPrint('❌ Error waiting for APNS token: $e');
+      debugPrint('Error getting APNS token: $e');
     }
   }
   
