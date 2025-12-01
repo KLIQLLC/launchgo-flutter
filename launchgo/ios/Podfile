@@ -46,7 +46,14 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
   end
-  
+
+  # Force iOS 14.0 deployment target for all targets
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
+    end
+  end
+
   # Enable iOS permissions for the permission_handler plugin
   installer.pods_project.targets.each do |target|
     target.build_configurations.each do |config|
