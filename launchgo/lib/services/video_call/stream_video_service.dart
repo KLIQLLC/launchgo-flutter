@@ -46,19 +46,19 @@ class StreamVideoService extends ChangeNotifier {
       debugPrint('📞 [INIT] API Key exists: ${apiKey.isNotEmpty}');
 
       // Get token from user's API data
-      String token = user.callGetStreamToken ?? '';
+      String callGetStreamToken = user.callGetStreamToken ?? '';
 
-      debugPrint('📞 [INIT] Has video token: ${token.isNotEmpty}');
+      debugPrint('📞 [INIT] Has video token: ${callGetStreamToken.isNotEmpty}');
 
-      if (token.isEmpty) {
+      if (callGetStreamToken.isEmpty) {
         debugPrint('❌ [INIT] No video call token found for user ${user.id}');
         return;
       }
 
-      if (token.isNotEmpty) {
+      if (callGetStreamToken.isNotEmpty) {
         try {
           // Decode JWT to check expiration (basic parsing, not validation)
-          final parts = token.split('.');
+          final parts = callGetStreamToken.split('.');
           if (parts.length == 3) {
             final payload = parts[1];
             // Add padding if needed
@@ -100,7 +100,7 @@ class StreamVideoService extends ChangeNotifier {
           name: user.name,
           image: user.avatarUrl,
         ),
-        userToken: token,
+        userToken: callGetStreamToken,
         options: const StreamVideoOptions(
           logPriority: Priority.verbose,
         ),
@@ -392,6 +392,7 @@ class StreamVideoService extends ChangeNotifier {
     _incomingCallId = null;
     _incomingCallerName = null;
     _lastProcessedCallId = null;
+    _isInitialized = false; // Reset so new user can initialize
     notifyListeners();
     debugPrint('StreamVideoService disconnected');
   }
