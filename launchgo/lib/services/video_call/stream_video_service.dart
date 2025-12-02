@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
+import 'package:flutter_callkit_incoming/entities/entities.dart' as callkit_entities;
 import 'package:stream_video_flutter/stream_video_flutter.dart';
 import 'package:stream_video_push_notification/stream_video_push_notification.dart';
 import '../../config/environment.dart';
@@ -18,6 +20,8 @@ class StreamVideoService extends ChangeNotifier {
   bool _isInitialized = false;
   StreamSubscription<Call?>? _incomingCallSubscription; // Track the subscription to prevent duplicates
   String? _lastProcessedCallId; // Track the last call we processed to prevent duplicates
+  String? _pendingCallId; // Call ID when app wakes from terminated state via CallKit
+  StreamSubscription? _callKitSubscription; // CallKit event listener
 
   StreamVideo? get client => _client;
   Call? get activeCall => _activeCall;
@@ -125,8 +129,17 @@ class StreamVideoService extends ChangeNotifier {
       if (user.role == UserRole.student) {
         debugPrint('📞 User is a student, setting up incoming call listener');
         _listenForIncomingCalls();
+        _setupCallKitListener(); // Listen for CallKit events (accept/decline from native UI)
       } else {
         debugPrint('📞 User is a mentor, skipping incoming call listener');
+      }
+
+      // Process any pending call from CallKit (app woke from terminated state)
+      if (_pendingCallId != null) {
+        final pendingId = _pendingCallId!;
+        _pendingCallId = null;
+        debugPrint('📞 Processing pending call from CallKit: $pendingId');
+        await handleCallKitAccept(pendingId);
       }
 
       notifyListeners();
@@ -283,23 +296,40 @@ class StreamVideoService extends ChangeNotifier {
   }
 
   /// Accept an incoming call (student only)
-  Future<Call?> acceptIncomingCall() async {
-    if (_client == null || _incomingCall == null) {
-      debugPrint('Cannot accept call: client or incoming call is null');
+  /// [callId] - Optional call ID to use when _incomingCall is null (e.g., app was terminated)
+  Future<Call?> acceptIncomingCall({String? callId}) async {
+    if (_client == null) {
+      debugPrint('❌ Cannot accept call: client is null');
       return null;
     }
 
     try {
-      debugPrint('Accepting incoming call: ${_incomingCall!.id}');
+      Call call;
 
-      // CRITICAL: Use the actual Call object from the incoming call listener
-      // Don't create a new one - this ensures both sides join the SAME call
-      final call = _incomingCall!;
+      if (_incomingCall != null) {
+        // Best case: Use the actual Call object from the incoming call listener
+        call = _incomingCall!;
+        debugPrint('📞 Using incoming Call object: ${call.id}');
+      } else if (callId != null) {
+        // App was terminated - fetch call by ID
+        debugPrint('📞 _incomingCall is null, fetching call by ID: $callId');
 
-      debugPrint('📞 Using incoming Call object, now accepting and joining...');
+        call = _client!.makeCall(
+          callType: StreamCallType.defaultType(),
+          id: callId,
+        );
+
+        // Get the existing call
+        await call.getOrCreate();
+        debugPrint('📞 Call fetched successfully: ${call.id}');
+      } else {
+        debugPrint('❌ Cannot accept call: no incoming call and no callId provided');
+        return null;
+      }
+
+      debugPrint('📞 Now accepting and joining call...');
 
       // CRITICAL: Callee must explicitly accept AND join the call
-      // Without this, callee doesn't connect to the caller
       await call.accept();
       debugPrint('✅ Call accepted');
 
@@ -310,13 +340,13 @@ class StreamVideoService extends ChangeNotifier {
       _incomingCall = null;
       _incomingCallId = null;
       _incomingCallerName = null;
-      _lastProcessedCallId = null; // Clear so next call can be processed
+      _lastProcessedCallId = null;
       notifyListeners();
 
-      debugPrint('✅ Call accepted and joined successfully - ready for StreamCallContainer');
+      debugPrint('✅ Call accepted and joined - ready for StreamCallContainer');
       return call;
     } catch (e) {
-      debugPrint('Error accepting call: $e');
+      debugPrint('❌ Error accepting call: $e');
       return null;
     }
   }
@@ -368,7 +398,9 @@ class StreamVideoService extends ChangeNotifier {
     }
 
     try {
-      debugPrint('Ending call: ${_activeCall!.id}');
+      final callId = _activeCall!.id;
+      debugPrint('Ending call: $callId');
+
       await _activeCall!.leave();
       _activeCall = null;
       _lastProcessedCallId = null; // Clear to allow next call with same ID
@@ -386,15 +418,106 @@ class StreamVideoService extends ChangeNotifier {
     await endCall();
     await _incomingCallSubscription?.cancel();
     _incomingCallSubscription = null;
+    await _callKitSubscription?.cancel();
+    _callKitSubscription = null;
     await _client?.disconnect();
     _client = null;
     _incomingCall = null;
     _incomingCallId = null;
     _incomingCallerName = null;
     _lastProcessedCallId = null;
+    _pendingCallId = null;
     _isInitialized = false; // Reset so new user can initialize
     notifyListeners();
     debugPrint('StreamVideoService disconnected');
+  }
+
+  /// Setup CallKit event listener for native iOS call UI
+  void _setupCallKitListener() {
+    debugPrint('📞 Setting up CallKit event listener');
+
+    // Cancel existing subscription
+    _callKitSubscription?.cancel();
+
+    _callKitSubscription = FlutterCallkitIncoming.onEvent.listen((callkit_entities.CallEvent? event) {
+      if (event == null) return;
+
+      debugPrint('📞 CallKit event received: ${event.event}');
+      debugPrint('📞 CallKit event body: ${event.body}');
+
+      final callId = event.body['id'] as String?;
+      if (callId == null) {
+        debugPrint('⚠️ CallKit event has no call ID');
+        return;
+      }
+
+      switch (event.event) {
+        case callkit_entities.Event.actionCallAccept:
+          debugPrint('📞 CallKit: User accepted call $callId');
+          handleCallKitAccept(callId);
+          break;
+        case callkit_entities.Event.actionCallDecline:
+          debugPrint('📞 CallKit: User declined call $callId');
+          handleCallKitDecline(callId);
+          break;
+        case callkit_entities.Event.actionCallEnded:
+          debugPrint('📞 CallKit: Call ended $callId');
+          break;
+        case callkit_entities.Event.actionCallTimeout:
+          debugPrint('📞 CallKit: Call timeout $callId');
+          break;
+        default:
+          debugPrint('📞 CallKit: Unhandled event ${event.event}');
+          break;
+      }
+    });
+
+    debugPrint('✅ CallKit event listener setup complete');
+  }
+
+  /// Handle CallKit accept action (user accepted from native iOS call UI)
+  Future<void> handleCallKitAccept(String callId) async {
+    debugPrint('📞 handleCallKitAccept called for call: $callId');
+
+    // If client isn't initialized yet, store the pending call for later
+    if (_client == null) {
+      debugPrint('📞 Client not ready, storing pending call: $callId');
+      _pendingCallId = callId;
+      return;
+    }
+
+    // Accept and join the call using existing method
+    final call = await acceptIncomingCall(callId: callId);
+    if (call != null) {
+      debugPrint('✅ Call accepted from CallKit: $callId');
+      // Navigation will be handled by the listener in main.dart
+    } else {
+      debugPrint('❌ Failed to accept call from CallKit: $callId');
+    }
+  }
+
+  /// Handle CallKit decline action (user declined from native iOS call UI)
+  Future<void> handleCallKitDecline(String callId) async {
+    debugPrint('📞 handleCallKitDecline called for call: $callId');
+
+    if (_client == null) {
+      debugPrint('⚠️ Client not initialized, cannot decline call');
+      return;
+    }
+
+    try {
+      // Create call object to reject
+      final call = _client!.makeCall(
+        callType: StreamCallType.defaultType(),
+        id: callId,
+      );
+      await call.getOrCreate();
+      await call.reject();
+
+      debugPrint('✅ Call declined from CallKit: $callId');
+    } catch (e) {
+      debugPrint('❌ Error declining call from CallKit: $e');
+    }
   }
 
   @override

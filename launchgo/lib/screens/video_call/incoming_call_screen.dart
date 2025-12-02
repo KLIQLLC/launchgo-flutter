@@ -68,10 +68,10 @@ class IncomingCallScreen extends StatelessWidget {
     }
     debugPrint('✅ [Incoming Call] All permissions granted');
 
-    // Now accept the call
+    // Now accept the call (pass callId for background app scenarios)
     if (!context.mounted) return;
     final videoService = context.read<StreamVideoService>();
-    final call = await videoService.acceptIncomingCall();
+    final call = await videoService.acceptIncomingCall(callId: callId);
 
     if (call != null && context.mounted) {
       // Navigate to video call screen

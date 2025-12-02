@@ -19,6 +19,7 @@ import 'package:launchgo/services/notifications_api_service.dart';
 import 'package:launchgo/services/notification_navigation_service.dart';
 import 'package:launchgo/services/weekly_notification_service.dart';
 import 'package:launchgo/services/video_call/stream_video_service.dart';
+import 'package:launchgo/services/video_call/video_call_push_handler.dart';
 import 'package:launchgo/widgets/splash_screen.dart';
 import 'package:launchgo/features/recaps/presentation/bloc/recap_bloc.dart';
 import 'package:launchgo/features/recaps/data/recap_repository.dart';
@@ -162,6 +163,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
     // Initialize NotificationNavigationService for local notification tap handling
     NotificationNavigationService.instance.initialize(_appRouter.router, _authService);
+
+    // Initialize VideoCallPushHandler for handling video call push notifications
+    VideoCallPushHandler.instance.initialize(
+      _appRouter.router,
+      _authService,
+      _streamVideoService,
+    );
 
     // Listen for incoming video calls and active call changes
     _streamVideoService.addListener(() {
