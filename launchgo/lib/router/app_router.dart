@@ -222,9 +222,11 @@ class AppRouter {
           builder: (context, state) {
             final callId = state.pathParameters['callId']!;
             final recipientName = state.uri.queryParameters['recipientName'] ?? 'User';
+            final callAlreadyJoined = state.uri.queryParameters['callAlreadyJoined'] == 'true';
             return VideoCallScreen(
               callId: callId,
               recipientName: recipientName,
+              callAlreadyJoined: callAlreadyJoined,
             );
           },
         ),

@@ -171,6 +171,29 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       _streamVideoService,
     );
 
+    // Set up ringing events callback for navigation when call is accepted
+    // This is called when user accepts via CallKit (iOS) or push notification
+    // The call is ALREADY JOINED when this callback fires
+    _streamVideoService.setOnCallAcceptedCallback((call) {
+      debugPrint('📞 Call accepted callback - call is already joined, navigating to video call screen');
+      debugPrint('📞 CallId: ${call.id}');
+
+      // Check if we haven't already navigated to this call
+      if (_lastNavigatedCallId != call.id) {
+        _lastNavigatedCallId = call.id;
+        _appRouter.router.pushNamed(
+          'video-call',
+          pathParameters: {'callId': call.id},
+          queryParameters: {
+            'recipientName': 'Mentor',
+            'callAlreadyJoined': 'true', // Tell VideoCallScreen the call is already joined
+          },
+        );
+      } else {
+        debugPrint('📞 Already navigated to call: ${call.id}');
+      }
+    });
+
     // Listen for incoming video calls and active call changes
     _streamVideoService.addListener(() {
       debugPrint('📞 StreamVideoService listener triggered');
@@ -207,20 +230,21 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         _lastIncomingCallId = null;
       }
 
-      // Handle when call becomes active (user accepted from CallKit on iOS)
+      // Handle when call becomes active via foreground accept (acceptIncomingCall from IncomingCallScreen)
+      // Skip if the call was accepted via ringing events (CallKit) - navigation happens via callback
       if (_streamVideoService.hasActiveCall &&
           _authService.userInfo != null &&
           _authService.userInfo!.isStudent) {
         final activeCall = _streamVideoService.activeCall;
+        // Only navigate if we haven't already navigated to this call
+        // (prevents duplicate navigation from both listener and callback)
         if (activeCall != null && _lastNavigatedCallId != activeCall.id) {
-          debugPrint('📞 Call accepted, navigating to video call screen');
-          _lastNavigatedCallId = activeCall.id; // Track to prevent duplicate navigation
-          // Navigate to video call screen when call becomes active
-          _appRouter.router.pushNamed(
-            'video-call',
-            pathParameters: {'callId': activeCall.id},
-            queryParameters: {'recipientName': _streamVideoService.incomingCallerName ?? 'Mentor'},
-          );
+          debugPrint('📞 Active call detected, but navigation handled by IncomingCallScreen or callback');
+          // Note: Navigation is handled by:
+          // 1. IncomingCallScreen._acceptCall() for foreground accepts
+          // 2. setOnCallAcceptedCallback for CallKit/ringing events accepts
+          // So we just track the ID here to prevent duplicates
+          _lastNavigatedCallId = activeCall.id;
         }
       } else if (!_streamVideoService.hasActiveCall) {
         // Reset when no active call
