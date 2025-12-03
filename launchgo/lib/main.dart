@@ -18,6 +18,8 @@ import 'package:launchgo/services/pending_navigation_service.dart';
 import 'package:launchgo/services/notifications_api_service.dart';
 import 'package:launchgo/services/notification_navigation_service.dart';
 import 'package:launchgo/services/weekly_notification_service.dart';
+import 'package:launchgo/services/video_call/stream_video_service.dart';
+import 'package:launchgo/services/video_call/video_call_push_handler.dart';
 import 'package:launchgo/widgets/splash_screen.dart';
 import 'package:launchgo/features/recaps/presentation/bloc/recap_bloc.dart';
 import 'package:launchgo/features/recaps/data/recap_repository.dart';
@@ -64,6 +66,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => AuthService()..initialize()),
         ChangeNotifierProvider(create: (_) => ThemeService()),
         ChangeNotifierProvider(create: (_) => StreamChatService()),
+        ChangeNotifierProvider(create: (_) => StreamVideoService()),
         ChangeNotifierProvider.value(value: PushNotificationService.instance),
         ChangeNotifierProvider.value(value: PendingNavigationService.instance),
         Provider(
@@ -118,13 +121,17 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   bool _showSplash = true;
   late final AuthService _authService;
   late final StreamChatService _streamChatService;
+  late final StreamVideoService _streamVideoService;
   late final NotificationsApiService _notificationsService;
+  String? _lastNavigatedCallId; // Track last call we navigated to (video call screen)
+  String? _lastIncomingCallId; // Track last incoming call to prevent duplicate screens
 
   @override
   void initState() {
     super.initState();
     _authService = context.read<AuthService>();
     _streamChatService = context.read<StreamChatService>();
+    _streamVideoService = context.read<StreamVideoService>();
     _notificationsService = context.read<NotificationsApiService>();
     _appRouter = AppRouter(_authService);
     
@@ -147,16 +154,104 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     
     // Set NotificationsApiService reference in PushNotificationService for badge updates
     PushNotificationService.instance.setNotificationsService(_notificationsService);
-    
+
     // Set router and auth service for AndroidNotificationDisplayService for tap navigation (Android only)
     if (Platform.isAndroid) {
       AndroidNotificationDisplayService.instance.setRouter(_appRouter.router);
       AndroidNotificationDisplayService.instance.setAuthService(_authService);
     }
-    
+
     // Initialize NotificationNavigationService for local notification tap handling
     NotificationNavigationService.instance.initialize(_appRouter.router, _authService);
-    
+
+    // Initialize VideoCallPushHandler for handling video call push notifications
+    VideoCallPushHandler.instance.initialize(
+      _appRouter.router,
+      _authService,
+      _streamVideoService,
+    );
+
+    // Set up ringing events callback for navigation when call is accepted
+    // This is called when user accepts via CallKit (iOS) or push notification
+    // The call is ALREADY JOINED when this callback fires
+    _streamVideoService.setOnCallAcceptedCallback((call) {
+      debugPrint('📞 Call accepted callback - call is already joined, navigating to video call screen');
+      debugPrint('📞 CallId: ${call.id}');
+
+      // Check if we haven't already navigated to this call
+      if (_lastNavigatedCallId != call.id) {
+        _lastNavigatedCallId = call.id;
+        _appRouter.router.pushNamed(
+          'video-call',
+          pathParameters: {'callId': call.id},
+          queryParameters: {
+            'recipientName': 'Mentor',
+            'callAlreadyJoined': 'true', // Tell VideoCallScreen the call is already joined
+          },
+        );
+      } else {
+        debugPrint('📞 Already navigated to call: ${call.id}');
+      }
+    });
+
+    // Listen for incoming video calls and active call changes
+    _streamVideoService.addListener(() {
+      debugPrint('📞 StreamVideoService listener triggered');
+      debugPrint('📞 incomingCallId: ${_streamVideoService.incomingCallId}');
+      debugPrint('📞 incomingCallerName: ${_streamVideoService.incomingCallerName}');
+      debugPrint('📞 hasActiveCall: ${_streamVideoService.hasActiveCall}');
+      debugPrint('📞 User role: ${_authService.userInfo?.role}');
+
+      // Handle incoming calls
+      if (_streamVideoService.incomingCallId != null &&
+          _streamVideoService.incomingCallerName != null &&
+          _authService.userInfo != null &&
+          _authService.userInfo!.isStudent) {
+        final currentCallId = _streamVideoService.incomingCallId!;
+
+        // Only navigate if this is a new incoming call (prevent duplicate screens)
+        if (_lastIncomingCallId != currentCallId) {
+          debugPrint('📞 Incoming video call from: ${_streamVideoService.incomingCallerName}');
+          _lastIncomingCallId = currentCallId; // Track to prevent duplicate navigation
+
+          // For now, show custom incoming call screen on both platforms
+          // CallKit requires VoIP push notifications which aren't configured yet
+          debugPrint('📞 Navigating to incoming-call screen');
+          _appRouter.router.pushNamed(
+            'incoming-call',
+            pathParameters: {'callId': currentCallId},
+            queryParameters: {'callerName': _streamVideoService.incomingCallerName!},
+          );
+        } else {
+          debugPrint('📞 Incoming call screen already shown for call: $currentCallId');
+        }
+      } else if (_streamVideoService.incomingCallId == null) {
+        // Reset tracking when no incoming call
+        _lastIncomingCallId = null;
+      }
+
+      // Handle when call becomes active via foreground accept (acceptIncomingCall from IncomingCallScreen)
+      // Skip if the call was accepted via ringing events (CallKit) - navigation happens via callback
+      if (_streamVideoService.hasActiveCall &&
+          _authService.userInfo != null &&
+          _authService.userInfo!.isStudent) {
+        final activeCall = _streamVideoService.activeCall;
+        // Only navigate if we haven't already navigated to this call
+        // (prevents duplicate navigation from both listener and callback)
+        if (activeCall != null && _lastNavigatedCallId != activeCall.id) {
+          debugPrint('📞 Active call detected, but navigation handled by IncomingCallScreen or callback');
+          // Note: Navigation is handled by:
+          // 1. IncomingCallScreen._acceptCall() for foreground accepts
+          // 2. setOnCallAcceptedCallback for CallKit/ringing events accepts
+          // So we just track the ID here to prevent duplicates
+          _lastNavigatedCallId = activeCall.id;
+        }
+      } else if (!_streamVideoService.hasActiveCall) {
+        // Reset when no active call
+        _lastNavigatedCallId = null;
+      }
+    });
+
     // Add app lifecycle observer
     WidgetsBinding.instance.addObserver(this);
     
@@ -173,7 +268,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             userImage: _authService.userInfo!.avatarUrl,
           );
         }
-        
+
+        // Initialize Stream Video for video calls
+        if (_authService.userInfo!.callGetStreamToken != null) {
+          await _streamVideoService.initialize(_authService.userInfo!);
+          debugPrint('✅ Stream Video initialized for user: ${_authService.userInfo!.id}');
+        }
+
         // Process any pending navigation after auth is ready
         if (PendingNavigationService.instance.hasPendingNavigation) {
           debugPrint('🔄 Auth ready, processing pending navigation');
@@ -185,6 +286,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         // Request FCM permissions and setup token for push notifications
         if (_authService.isAuthenticated) {
           Future.microtask(() async {
+            // Check if user is still authenticated (might have signed out)
+            if (!_authService.isAuthenticated || _authService.userInfo == null) {
+              debugPrint('⚠️ User signed out during async operation, skipping setup');
+              return;
+            }
+
             // Request FCM permissions and setup token
             final success = await PushNotificationService.instance.requestPermissionsAndSetupToken();
             if (success) {
@@ -194,13 +301,15 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             } else {
               debugPrint('❌ FCM token setup failed');
             }
-            
+
             // Load notifications
             _notificationsService.fetchNotifications();
-            
+
             // Initialize and schedule weekly notifications for authenticated users
-            await WeeklyNotificationService.instance.initialize();
-            await WeeklyNotificationService.instance.scheduleWeeklyRecapNotification(_authService.userInfo);
+            if (_authService.userInfo != null) {
+              await WeeklyNotificationService.instance.initialize();
+              await WeeklyNotificationService.instance.scheduleWeeklyRecapNotification(_authService.userInfo);
+            }
           });
         }
       }
@@ -216,6 +325,17 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         userName: _authService.userInfo!.name,
         userImage: _authService.userInfo!.avatarUrl,
       );
+    }
+
+    // Initialize Stream Video immediately if already authenticated
+    if (_authService.userInfo != null && _authService.userInfo!.callGetStreamToken != null) {
+      Future.microtask(() async {
+        // Double-check user is still authenticated
+        if (_authService.userInfo != null) {
+          await _streamVideoService.initialize(_authService.userInfo!);
+          debugPrint('✅ Stream Video initialized on startup for user: ${_authService.userInfo!.id}');
+        }
+      });
     }
     
     // Setup FCM token if already authenticated

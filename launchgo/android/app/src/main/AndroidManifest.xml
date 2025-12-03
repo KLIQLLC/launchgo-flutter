@@ -82,9 +82,21 @@
     
     <!-- Internet permission for file uploads -->
     <uses-permission android:name="android.permission.INTERNET"/>
-    
-    <!-- Record audio permission for videos with sound -->
-    <!-- <uses-permission android:name="android.permission.RECORD_AUDIO"/> -->
+
+    <!-- Record audio permission for videos with sound and video calls -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+
+    <!-- Modify audio settings for video calls -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+
+    <!-- Network state permissions for video calls -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>
+
+    <!-- Bluetooth permissions for video call audio routing -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
     
     <!-- Push notification permissions -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>

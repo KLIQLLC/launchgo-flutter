@@ -29,6 +29,8 @@ import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/widgets/app_drawer.dart';
 import 'package:launchgo/widgets/custom_icon.dart';
 import 'package:launchgo/widgets/notification_badge_widget.dart';
+import 'package:launchgo/screens/video_call/video_call_screen.dart';
+import 'package:launchgo/screens/video_call/incoming_call_screen.dart';
 
 class AppRouter {
   final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -212,6 +214,32 @@ class AppRouter {
           builder: (context, state) {
             final recap = state.extra as Recap;
             return RecapFormScreen(recap: recap);
+          },
+        ),
+        GoRoute(
+          path: '/video-call/:callId',
+          name: 'video-call',
+          builder: (context, state) {
+            final callId = state.pathParameters['callId']!;
+            final recipientName = state.uri.queryParameters['recipientName'] ?? 'User';
+            final callAlreadyJoined = state.uri.queryParameters['callAlreadyJoined'] == 'true';
+            return VideoCallScreen(
+              callId: callId,
+              recipientName: recipientName,
+              callAlreadyJoined: callAlreadyJoined,
+            );
+          },
+        ),
+        GoRoute(
+          path: '/incoming-call/:callId',
+          name: 'incoming-call',
+          builder: (context, state) {
+            final callId = state.pathParameters['callId']!;
+            final callerName = state.uri.queryParameters['callerName'] ?? 'Unknown';
+            return IncomingCallScreen(
+              callId: callId,
+              callerName: callerName,
+            );
           },
         ),
         ShellRoute(

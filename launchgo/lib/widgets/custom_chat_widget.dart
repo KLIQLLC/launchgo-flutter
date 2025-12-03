@@ -3,7 +3,9 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'package:stream_chat_flutter/stream_chat_flutter.dart';
 import 'package:go_router/go_router.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../services/auth_service.dart';
+import '../services/video_call/stream_video_service.dart';
 import 'chat/custom_attachment_handler.dart';
 import 'dart:async';
 
@@ -280,6 +282,131 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
     super.dispose();
   }
 
+  void _showPermissionSettingsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('Permissions Required'),
+        content: const Text(
+          'Camera and microphone permissions are required for video calls. '
+          'Please enable them in Settings.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              openAppSettings();
+            },
+            child: const Text('Open Settings'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _initiateVideoCall(BuildContext context, AuthService authService) async {
+    debugPrint('🎥 [Video Call] Initiating video call...');
+
+    // Request permissions immediately - this will trigger iOS system dialogs
+    debugPrint('🎥 [Video Call] Requesting camera and microphone permissions...');
+    final Map<Permission, PermissionStatus> statuses = await [
+      Permission.camera,
+      Permission.microphone,
+    ].request();
+
+    debugPrint('🎥 [Video Call] Permission request results:');
+    debugPrint('   Camera: ${statuses[Permission.camera]}');
+    debugPrint('   Microphone: ${statuses[Permission.microphone]}');
+
+    // Check if all permissions are granted
+    final allGranted = statuses.values.every((status) => status.isGranted);
+
+    if (!allGranted) {
+      debugPrint('❌ [Video Call] Not all permissions granted - showing settings dialog');
+      if (context.mounted) {
+        _showPermissionSettingsDialog(context);
+      }
+      return;
+    }
+    debugPrint('✅ [Video Call] All permissions granted');
+
+    final selectedStudent = authService.getSelectedStudent();
+    if (selectedStudent == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No student selected'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Get video service and create call
+    if (!context.mounted) return;
+    final videoService = context.read<StreamVideoService>();
+
+    // Check if video service is initialized
+    if (videoService.client == null) {
+      debugPrint('⚠️ [Video Call] Video service not initialized yet, initializing now...');
+      // Try to initialize if not already done
+      final userInfo = authService.userInfo;
+      if (userInfo != null && userInfo.callGetStreamToken != null) {
+        await videoService.initialize(userInfo);
+        debugPrint('✅ [Video Call] Video service initialized on demand');
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Video service initialization failed. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    if (!context.mounted) return;
+
+    // Generate unique call ID: student_id + timestamp
+    // This ensures each call has a unique ID, even to the same student
+    final uniqueCallId = '${selectedStudent.id}_${DateTime.now().millisecondsSinceEpoch}';
+
+    final call = await videoService.createCall(
+      callId: uniqueCallId,
+      recipientId: selectedStudent.id,
+      recipientName: selectedStudent.name,
+    );
+
+    if (!context.mounted) return;
+
+    if (call != null) {
+      debugPrint('🎥 [Video Call] Call created successfully, navigating to video call screen');
+      debugPrint('🎥 [Video Call] callId: $uniqueCallId, recipientName: ${selectedStudent.name}');
+      // Navigate to video call screen
+      context.pushNamed(
+        'video-call',
+        pathParameters: {'callId': uniqueCallId},
+        queryParameters: {'recipientName': selectedStudent.name},
+      );
+      debugPrint('🎥 [Video Call] Navigation completed');
+    } else {
+      debugPrint('❌ [Video Call] createCall returned null');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to initiate video call'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -318,6 +445,18 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
               ],
             ),
             const Spacer(),
+            // Video call button (mentor only)
+            Consumer<AuthService>(
+              builder: (context, authService, _) {
+                final isMentor = authService.userInfo?.isMentor ?? false;
+                if (!isMentor) return const SizedBox.shrink();
+
+                return IconButton(
+                  icon: const Icon(Icons.videocam, color: Colors.white),
+                  onPressed: () => _initiateVideoCall(context, authService),
+                );
+              },
+            ),
             IconButton(
               icon: const Icon(Icons.close, color: Colors.white),
               onPressed: () {

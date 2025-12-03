@@ -89,7 +89,14 @@ dependencies:
   ## User Preferences (UserDefaults for iOS, SharedPreferences for Android)
   shared_preferences: ^2.2.2
   stream_chat_flutter: ^8.3.0
-  
+
+  ## Stream Video
+  stream_video: ^0.8.2
+  stream_video_flutter: ^0.8.2
+  stream_video_push_notification: ^0.8.2
+  stream_video_screen_sharing: ^0.8.2
+  wakelock_plus: ^1.2.8
+
   ## App Icon Badge
   app_badge_plus: ^1.1.5
 
@@ -119,6 +126,7 @@ dev_dependencies:
 
 dependency_overrides:
   image_gallery_saver_plus: ^4.0.1
+  flutter_callkit_incoming: 2.5.2  # Compatible with stream_video_push_notification 0.8.x
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

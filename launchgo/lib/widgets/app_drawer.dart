@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/chat/stream_chat_service.dart';
+import 'package:launchgo/services/video_call/stream_video_service.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/theme/app_colors.dart';
 import 'package:launchgo/widgets/cupertino_dropdown.dart';
@@ -304,7 +305,18 @@ class _AppDrawerState extends State<AppDrawer> {
         // StreamChatService might not be available in all contexts
         debugPrint('🟡 [LOGOUT] StreamChatService not available: $e');
       }
-      
+
+      // Disconnect Stream Video on logout
+      if (context.mounted) {
+        try {
+          final streamVideoService = Provider.of<StreamVideoService>(context, listen: false);
+          await streamVideoService.disconnect();
+          debugPrint('📞 [LOGOUT] StreamVideoService disconnected');
+        } catch (e) {
+          debugPrint('🟡 [LOGOUT] StreamVideoService not available: $e');
+        }
+      }
+
       await authService.signOut(streamChatService: streamChatService);
       if (context.mounted) {
         context.go('/login');

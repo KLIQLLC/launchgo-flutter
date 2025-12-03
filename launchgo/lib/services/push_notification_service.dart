@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'notification_navigation_service.dart';
 import 'android_notification_display_service.dart';
 import 'notification_parser.dart';
+import 'video_call/video_call_push_handler.dart';
 
 /// Service for handling FCM token lifecycle and device registration
 class PushNotificationService extends ChangeNotifier {
@@ -237,26 +238,10 @@ class PushNotificationService extends ChangeNotifier {
   /// Wait for APNS token to be available on iOS
   Future<void> _waitForApnsToken() async {
     try {
-      // On iOS, we need to wait for APNS token before getting FCM token
-      int attempts = 0;
-      const maxAttempts = 10;
-      const delay = Duration(milliseconds: 500);
-      
-      while (attempts < maxAttempts) {
-        final apnsToken = await _messaging.getAPNSToken();
-        if (apnsToken != null) {
-          debugPrint('🔔 APNS token received: ${apnsToken.substring(0, 20)}...');
-          return;
-        }
-        
-        if (attempts % 3 == 0) debugPrint('🔔 APNS token not available yet, waiting... (attempt ${attempts + 1}/$maxAttempts)');
-        await Future.delayed(delay);
-        attempts++;
-      }
-      
-      debugPrint('⚠️ APNS token not received after $maxAttempts attempts');
+      final apnsToken = await _messaging.getAPNSToken();
+      debugPrint('APNS token: $apnsToken');
     } catch (e) {
-      debugPrint('❌ Error waiting for APNS token: $e');
+      debugPrint('Error getting APNS token: $e');
     }
   }
   
@@ -308,7 +293,14 @@ Screen value: ${message.data['screen']}
   /// Parse message and execute direct navigation
   void _storeNavigationFromMessage(RemoteMessage message) {
     final data = message.data;
-    
+
+    // Handle video call notifications first (highest priority)
+    if (VideoCallPushHandler.isVideoCallNotification(data)) {
+      debugPrint('📞 Video call notification detected in push');
+      VideoCallPushHandler.instance.handleVideoCallPush(data);
+      return;
+    }
+
     // First try to handle via NotificationNavigationService for structured notifications
     if (data.containsKey('eventType')) {
       final eventType = data['eventType'] as String;
@@ -426,10 +418,19 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint('🔔 Background message received: ${message.notification?.title}');
   debugPrint('🔔 Background message data: ${message.data}');
   debugPrint('🔔 Background message body: ${message.notification?.body}');
-  
+
+  // Handle video call notifications - CallKit handles the native UI
+  // On iOS: VoIP push triggers CallKit automatically via StreamVideoPKDelegateManager
+  // On Android: Stream Video SDK handles FCM and shows full-screen notification
+  if (VideoCallPushHandler.isVideoCallNotification(message.data)) {
+    debugPrint('📞 Background video call notification - native SDK will handle');
+    // Don't process further - CallKit/Stream SDK handles video calls natively
+    return;
+  }
+
   // Handle background message
   // This runs when app is terminated or in background
-  
+
   // For Stream Chat data-only notifications, we need to show them manually
   if (NotificationParser.isStreamChatMessage(message.data)) {
     final chatData = NotificationParser.parseStreamChatData(message.data);
