@@ -45,8 +45,8 @@ class StreamVideoService extends ChangeNotifier {
     debugPrint('📞 [INIT] StreamVideoService.initialize() called for user: ${user.id}');
     debugPrint('📞 [INIT] User role: ${user.role}');
 
-    // Skip if already initialized
-    if (_isInitialized) {
+    // Skip if already initialized AND client exists
+    if (_isInitialized && _client != null) {
       debugPrint('⚠️ StreamVideoService already initialized, skipping');
       return;
     }
@@ -66,6 +66,7 @@ class StreamVideoService extends ChangeNotifier {
 
       if (callGetStreamToken.isEmpty) {
         debugPrint('❌ [INIT] No video call token found for user ${user.id}');
+        _isInitialized = false; // Reset so initialization can be retried
         return;
       }
 
@@ -98,6 +99,7 @@ class StreamVideoService extends ChangeNotifier {
               if (isExpired) {
                 debugPrint('❌ [INIT] Stream Video token has EXPIRED! Token expired at: $expTime, Current time: $now');
                 debugPrint('❌ [INIT] No valid token available. User needs to re-authenticate.');
+                _isInitialized = false; // Reset so initialization can be retried
                 return;
               }
             }
