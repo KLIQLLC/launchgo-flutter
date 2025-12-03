@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
+import 'package:flutter_callkit_incoming/entities/entities.dart' as callkit_entities;
 import 'package:rxdart/rxdart.dart';
 import 'package:stream_video_flutter/stream_video_flutter.dart';
 import 'package:stream_video_push_notification/stream_video_push_notification.dart';
@@ -23,6 +25,7 @@ class StreamVideoService extends ChangeNotifier {
   StreamSubscription<Call?>? _incomingCallSubscription; // Track the subscription to prevent duplicates
   String? _lastProcessedCallId; // Track the last call we processed to prevent duplicates
   CompositeSubscription? _ringingEventsSubscription; // Subscription for ringing events (CallKit/push)
+  StreamSubscription<callkit_entities.CallEvent?>? _callKitSubscription; // Direct CallKit listener
   OnCallAcceptedCallback? _onCallAcceptedCallback; // Callback for navigation after call is accepted
 
   StreamVideo? get client => _client;
@@ -104,6 +107,11 @@ class StreamVideoService extends ChangeNotifier {
         }
       }
 
+      // Reset any existing StreamVideo singleton state before creating new instance
+      // This is required for proper re-initialization after logout/login
+      await StreamVideo.reset();
+      debugPrint('📞 StreamVideo singleton reset');
+
       _client = StreamVideo(
         apiKey,
         user: User.regular(
@@ -137,7 +145,9 @@ class StreamVideoService extends ChangeNotifier {
       if (user.role == UserRole.student) {
         debugPrint('📞 User is a student, setting up incoming call listener');
         _listenForIncomingCalls();
-        _observeRingingEvents(); // Use Stream's official ringing events observer
+        _setupCallKitListener(); // Listen for CallKit accept/decline from native iOS UI
+        // NOTE: _observeRingingEvents() disabled - it requires VoIP push to be fully configured
+        // (com.apple.developer.pushkit.voip entitlement + VoIP cert on Stream dashboard)
       } else {
         debugPrint('📞 User is a mentor, skipping incoming call listener');
       }
@@ -199,6 +209,120 @@ class StreamVideoService extends ChangeNotifier {
     );
 
     debugPrint('✅ Ringing events observer setup complete');
+  }
+
+  /// Setup direct CallKit event listener using FlutterCallkitIncoming
+  /// This handles accept/decline when user interacts with native iOS CallKit UI
+  /// Works even when app was terminated and wakes up from CallKit
+  void _setupCallKitListener() {
+    debugPrint('📞 Setting up direct CallKit event listener');
+
+    // Cancel existing subscription
+    _callKitSubscription?.cancel();
+
+    _callKitSubscription = FlutterCallkitIncoming.onEvent.listen((callkit_entities.CallEvent? event) {
+      if (event == null) return;
+
+      debugPrint('📞 [CallKit] Event received: ${event.event}');
+      debugPrint('📞 [CallKit] Event body: ${event.body}');
+
+      // Extract call ID from event body
+      // Stream Video sends call_cid in format "type:callId" (e.g., "default:abc123")
+      String? callId;
+      final body = event.body;
+      if (body is Map) {
+        // Try different possible keys for call ID
+        final extraData = body['extra'] as Map<String, dynamic>?;
+        if (extraData != null) {
+          final callCid = extraData['call_cid'] as String?;
+          if (callCid != null && callCid.contains(':')) {
+            callId = callCid.split(':').last;
+          }
+        }
+        // Fallback to id field
+        callId ??= body['id'] as String?;
+      }
+
+      if (callId == null) {
+        debugPrint('⚠️ [CallKit] Could not extract call ID from event');
+        return;
+      }
+
+      debugPrint('📞 [CallKit] Call ID: $callId');
+
+      switch (event.event) {
+        case callkit_entities.Event.actionCallAccept:
+          debugPrint('📞 [CallKit] User ACCEPTED call via native UI: $callId');
+          _handleCallKitAccept(callId);
+          break;
+        case callkit_entities.Event.actionCallDecline:
+          debugPrint('📞 [CallKit] User DECLINED call via native UI: $callId');
+          _handleCallKitDecline(callId);
+          break;
+        case callkit_entities.Event.actionCallEnded:
+          debugPrint('📞 [CallKit] Call ended: $callId');
+          break;
+        case callkit_entities.Event.actionCallTimeout:
+          debugPrint('📞 [CallKit] Call timeout: $callId');
+          break;
+        default:
+          debugPrint('📞 [CallKit] Unhandled event: ${event.event}');
+          break;
+      }
+    });
+
+    debugPrint('✅ Direct CallKit event listener setup complete');
+  }
+
+  /// Handle CallKit accept action - user accepted via native iOS call UI
+  Future<void> _handleCallKitAccept(String callId) async {
+    debugPrint('📞 [CallKit] Handling accept for call: $callId');
+
+    // If client isn't ready yet, we need to wait for initialization
+    if (_client == null) {
+      debugPrint('⚠️ [CallKit] Client not ready - call will be handled after init');
+      // The call should be handled by the VideoCallPushHandler or after init
+      return;
+    }
+
+    try {
+      // Accept and get the call
+      final call = await acceptIncomingCall(callId: callId);
+      if (call != null) {
+        debugPrint('✅ [CallKit] Call accepted successfully: $callId');
+        // Invoke callback for navigation
+        if (_onCallAcceptedCallback != null) {
+          debugPrint('📞 [CallKit] Invoking navigation callback');
+          _onCallAcceptedCallback!(call);
+        }
+      } else {
+        debugPrint('❌ [CallKit] Failed to accept call: $callId');
+      }
+    } catch (e) {
+      debugPrint('❌ [CallKit] Error accepting call: $e');
+    }
+  }
+
+  /// Handle CallKit decline action - user declined via native iOS call UI
+  Future<void> _handleCallKitDecline(String callId) async {
+    debugPrint('📞 [CallKit] Handling decline for call: $callId');
+
+    if (_client == null) {
+      debugPrint('⚠️ [CallKit] Client not ready for decline');
+      return;
+    }
+
+    try {
+      final call = _client!.makeCall(
+        callType: StreamCallType.defaultType(),
+        id: callId,
+      );
+      await call.getOrCreate();
+      await call.reject();
+      debugPrint('✅ [CallKit] Call declined: $callId');
+    } catch (e) {
+      debugPrint('❌ [CallKit] Error declining call: $e');
+    }
   }
 
   /// Listen for incoming calls (students only) - for foreground UI
@@ -304,7 +428,8 @@ class StreamVideoService extends ChangeNotifier {
 
       await call.getOrCreate(
         memberIds: [recipientId],
-        ringing: true, // This triggers incoming call notification
+        ringing: true, // VoIP Push → CallKit UI (native call screen)
+        notify: false,  // Standard APN Push → text banner (fallback if VoIP fails)
       );
 
       debugPrint('📞 getOrCreate completed - setting activeCall for UI');
@@ -468,6 +593,8 @@ class StreamVideoService extends ChangeNotifier {
     _incomingCallSubscription = null;
     _ringingEventsSubscription?.cancel();
     _ringingEventsSubscription = null;
+    await _callKitSubscription?.cancel();
+    _callKitSubscription = null;
     await _client?.disconnect();
     _client = null;
     _incomingCall = null;

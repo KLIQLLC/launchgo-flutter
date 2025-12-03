@@ -12,7 +12,6 @@ Real-time video calling system using [Stream Video](https://getstream.io/video/)
 - I want to end the call when our session is complete
 
 ### As a Student
-- I want to receive incoming call notifications from my mentor even when the app is closed
 - I want to see the native phone call UI (like regular calls) when receiving a video call
 - I want to accept or decline incoming video calls from the lock screen
 - I want to see my mentor during an active call
@@ -45,8 +44,10 @@ Real-time video calling system using [Stream Video](https://getstream.io/video/)
 - **Acceptance Criteria:**
   - **iOS:** Native CallKit UI appears for incoming calls (like regular phone calls)
   - **Android:** High-priority notification wakes device and shows full-screen incoming call UI
-  - Works when app is in foreground, background, or completely terminated
+  - Works when app is in background or completely terminated
+  - **IMPORTANT:** Native CallKit UI should **NOT** be displayed when app is in foreground - use custom in-app UI instead
   - Accepting call launches app (if terminated) and connects to call
+  - Accepting call via CallKit should navigate directly to video call screen WITHOUT showing in-app incoming call UI again (no double-accept)
   - Declining call notifies mentor without launching app
   - Call rings for configurable timeout (e.g., 30-60 seconds) before auto-decline
 
@@ -232,10 +233,20 @@ When app receives incoming call while terminated/closed:
    OR Student declines → mentor notified
 ```
 
+### Incoming Call UI Summary (iOS)
+
+| App State | UI Shown | Accept Action |
+|-----------|----------|---------------|
+| **Foreground** | Custom in-app UI (red/green buttons) | Joins call directly |
+| **Background** | Native iOS CallKit UI | App opens → joins call (no in-app incoming UI) |
+| **Terminated** | Native iOS CallKit UI | App launches → joins call (no in-app incoming UI) |
+
+**Key Requirement:** Native CallKit should NEVER appear when app is in foreground.
+
 ### Student Receiving Call (App in Foreground)
 ```
-1. Incoming call detected via SDK listener
-2. Incoming call screen displayed automatically
+1. Incoming call detected via SDK WebSocket listener
+2. Custom in-app incoming call screen displayed (NOT CallKit)
 3. Student taps Accept:
    a. Permissions requested (if not granted)
    b. If granted: join call, navigate to call screen
