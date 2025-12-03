@@ -229,6 +229,7 @@
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
 				34DDA1FF3C477AD4519F07D1 /* [CP] Embed Pods Frameworks */,
 				DC38B77E3E3352E913CAAC55 /* [CP] Copy Pods Resources */,
+				CD0CRASHLYTICS0DSYM001 /* [firebase_crashlytics] Upload dSYM */,
 			);
 			buildRules = (
 			);
@@ -427,6 +428,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "\"${PROJECT_DIR}/Scripts/copy_google_service_info.sh\"\n";
+		};
+		CD0CRASHLYTICS0DSYM001 /* [firebase_crashlytics] Upload dSYM */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}",
+				"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Resources/DWARF/${PRODUCT_NAME}",
+				"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Info.plist",
+				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
+			);
+			name = "[firebase_crashlytics] Upload dSYM";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/FirebaseCrashlytics/run\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
