@@ -9,6 +9,7 @@ import 'package:stream_video_flutter/stream_video_flutter.dart';
 import 'package:stream_video_push_notification/stream_video_push_notification.dart';
 import '../../config/environment.dart';
 import '../../models/user_model.dart';
+import '../secure_storage_service.dart';
 
 /// Callback type for when a call is accepted (already joined) - used for navigation
 typedef OnCallAcceptedCallback = void Function(Call call);
@@ -140,6 +141,14 @@ class StreamVideoService extends ChangeNotifier {
       debugPrint('📞 Connecting Stream Video client...');
       await _client!.connect();
       debugPrint('✅ Stream Video client connected');
+
+      // Save credentials for background push handling (Android)
+      await SecureStorageService.saveVideoCallCredentials(
+        userId: user.id,
+        userName: user.name,
+        token: callGetStreamToken,
+      );
+      debugPrint('📞 Video call credentials saved for background handling');
 
       await _logVoIPToken();
 

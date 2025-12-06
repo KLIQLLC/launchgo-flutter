@@ -1,7 +1,10 @@
 import 'dart:io';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:stream_video_flutter/stream_video_flutter.dart';
+import 'package:stream_video_push_notification/stream_video_push_notification.dart';
 import 'api_service_retrofit.dart';
 import 'notifications_api_service.dart';
 import 'pending_navigation_service.dart';
@@ -11,6 +14,8 @@ import 'notification_navigation_service.dart';
 import 'android_notification_display_service.dart';
 import 'notification_parser.dart';
 import 'video_call/video_call_push_handler.dart';
+import 'secure_storage_service.dart';
+import '../config/environment.dart';
 
 /// Service for handling FCM token lifecycle and device registration
 class PushNotificationService extends ChangeNotifier {
@@ -419,12 +424,59 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint('🔔 Background message data: ${message.data}');
   debugPrint('🔔 Background message body: ${message.notification?.body}');
 
-  // Handle video call notifications - CallKit handles the native UI
-  // On iOS: VoIP push triggers CallKit automatically via StreamVideoPKDelegateManager
-  // On Android: Stream Video SDK handles FCM and shows full-screen notification
+  // Initialize Firebase for background isolate
+  await Firebase.initializeApp();
+
+  // Handle video call notifications
+  // This is critical for showing incoming call UI when app is terminated
   if (VideoCallPushHandler.isVideoCallNotification(message.data)) {
-    debugPrint('📞 Background video call notification - native SDK will handle');
-    // Don't process further - CallKit/Stream SDK handles video calls natively
+    debugPrint('📞 Background video call notification detected');
+
+    try {
+      // Get stored video call credentials
+      final credentials = await SecureStorageService.getVideoCallCredentials();
+      if (credentials == null) {
+        debugPrint('❌ No video call credentials stored, cannot handle push');
+        return;
+      }
+
+      debugPrint('📞 Creating StreamVideo instance for background handling');
+
+      // Initialize environment config for API key
+      EnvironmentConfig.init();
+      final apiKey = EnvironmentConfig.streamVideoApiKey;
+
+      // Create StreamVideo instance for background handling
+      final streamVideo = StreamVideo(
+        apiKey,
+        user: User.regular(
+          userId: credentials['userId']!,
+          name: credentials['userName']!,
+        ),
+        userToken: credentials['token']!,
+        options: const StreamVideoOptions(
+          logPriority: Priority.verbose,
+        ),
+        pushNotificationManagerProvider: StreamVideoPushNotificationManager.create(
+          iosPushProvider: const StreamVideoPushProvider.apn(
+            name: 'voip_apns',
+          ),
+          androidPushProvider: const StreamVideoPushProvider.firebase(
+            name: 'firebase',
+          ),
+        ),
+      );
+
+      // Connect and handle the ringing flow
+      await streamVideo.connect();
+      debugPrint('📞 StreamVideo connected in background, handling ringing flow');
+
+      // This is the key call that shows the incoming call notification
+      final handled = await streamVideo.handleRingingFlowNotifications(message.data);
+      debugPrint('📞 Ringing flow handled: $handled');
+    } catch (e) {
+      debugPrint('❌ Error handling video call push in background: $e');
+    }
     return;
   }
 

@@ -16,6 +16,11 @@ class SecureStorageService {
   static String get _accessTokenKey => _getEnvironmentKey('access_token');
   static String get _refreshTokenKey => _getEnvironmentKey('refresh_token');
   static String get _tokenExpiryKey => _getEnvironmentKey('token_expiry');
+
+  // Video call credentials keys (for background push handling)
+  static String get _videoCallUserIdKey => _getEnvironmentKey('video_call_user_id');
+  static String get _videoCallUserNameKey => _getEnvironmentKey('video_call_user_name');
+  static String get _videoCallTokenKey => _getEnvironmentKey('video_call_token');
   
   /// Save access token
   static Future<void> saveAccessToken(String token) async {
@@ -65,12 +70,47 @@ class SecureStorageService {
   static Future<void> deleteTokenExpiry() async {
     await _storage.delete(key: _tokenExpiryKey);
   }
-  
+
+  /// Save video call credentials (for background push handling)
+  static Future<void> saveVideoCallCredentials({
+    required String userId,
+    required String userName,
+    required String token,
+  }) async {
+    await _storage.write(key: _videoCallUserIdKey, value: userId);
+    await _storage.write(key: _videoCallUserNameKey, value: userName);
+    await _storage.write(key: _videoCallTokenKey, value: token);
+  }
+
+  /// Get video call credentials (for background push handling)
+  static Future<Map<String, String>?> getVideoCallCredentials() async {
+    final userId = await _storage.read(key: _videoCallUserIdKey);
+    final userName = await _storage.read(key: _videoCallUserNameKey);
+    final token = await _storage.read(key: _videoCallTokenKey);
+
+    if (userId != null && userName != null && token != null) {
+      return {
+        'userId': userId,
+        'userName': userName,
+        'token': token,
+      };
+    }
+    return null;
+  }
+
+  /// Delete video call credentials
+  static Future<void> deleteVideoCallCredentials() async {
+    await _storage.delete(key: _videoCallUserIdKey);
+    await _storage.delete(key: _videoCallUserNameKey);
+    await _storage.delete(key: _videoCallTokenKey);
+  }
+
   /// Clear all auth data for current environment
   static Future<void> clearAllAuthData() async {
     await _storage.delete(key: _accessTokenKey);
     await _storage.delete(key: _refreshTokenKey);
     await _storage.delete(key: _tokenExpiryKey);
+    await deleteVideoCallCredentials();
   }
   
   /// Clear all auth data for ALL environments
@@ -79,12 +119,18 @@ class SecureStorageService {
     await _storage.delete(key: 'access_token_stage');
     await _storage.delete(key: 'refresh_token_stage');
     await _storage.delete(key: 'token_expiry_stage');
-    
+    await _storage.delete(key: 'video_call_user_id_stage');
+    await _storage.delete(key: 'video_call_user_name_stage');
+    await _storage.delete(key: 'video_call_token_stage');
+
     // Clear prod tokens
     await _storage.delete(key: 'access_token_prod');
     await _storage.delete(key: 'refresh_token_prod');
     await _storage.delete(key: 'token_expiry_prod');
-    
+    await _storage.delete(key: 'video_call_user_id_prod');
+    await _storage.delete(key: 'video_call_user_name_prod');
+    await _storage.delete(key: 'video_call_token_prod');
+
     // Clear legacy non-environment-specific tokens
     await _storage.delete(key: 'access_token');
     await _storage.delete(key: 'refresh_token');

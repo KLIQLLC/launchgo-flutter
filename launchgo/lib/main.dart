@@ -25,6 +25,7 @@ import 'package:launchgo/features/recaps/presentation/bloc/recap_bloc.dart';
 import 'package:launchgo/features/recaps/data/recap_repository.dart';
 import 'package:provider/provider.dart';
 import 'package:stream_chat_flutter/stream_chat_flutter.dart';
+import 'package:stream_video_flutter/stream_video_flutter.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -334,6 +335,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         if (_authService.userInfo != null) {
           await _streamVideoService.initialize(_authService.userInfo!);
           debugPrint('✅ Stream Video initialized on startup for user: ${_authService.userInfo!.id}');
+
+          // Handle calls accepted from terminated state (Android only)
+          _tryConsumingIncomingCallFromTerminatedState();
         }
       });
     }
@@ -406,6 +410,34 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     }
     // Note: Stream Chat automatically sets users offline when WebSocket disconnects
     // No manual offline handling needed
+  }
+
+  /// Handle calls that were accepted while the app was terminated (Android only)
+  /// This consumes the call from the native notification and navigates to the call screen
+  void _tryConsumingIncomingCallFromTerminatedState() {
+    // Only needed for Android - iOS uses CallKit which handles this differently
+    if (Platform.isIOS) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      StreamVideo.instance.consumeAndAcceptActiveCall(
+        onCallAccepted: (call) {
+          debugPrint('📞 Consuming call from terminated state: ${call.id}');
+
+          // Track this call to prevent duplicate navigation
+          if (_lastNavigatedCallId != call.id) {
+            _lastNavigatedCallId = call.id;
+            _appRouter.router.pushNamed(
+              'video-call',
+              pathParameters: {'callId': call.id},
+              queryParameters: {
+                'recipientName': 'Mentor',
+                'callAlreadyJoined': 'true',
+              },
+            );
+          }
+        },
+      );
+    });
   }
 
   @override

@@ -32,3 +32,26 @@
 # Keep all model classes (adjust package name as needed)
 -keep class com.launchgo.** { *; }
 -keep class launchgo.** { *; }
+
+# Stream Video SDK
+-keep class io.getstream.video.** { *; }
+-keep class io.getstream.webrtc.** { *; }
+-dontwarn io.getstream.video.**
+-dontwarn io.getstream.webrtc.**
+
+# Stream Chat SDK
+-keep class io.getstream.chat.** { *; }
+-dontwarn io.getstream.chat.**
+
+# WebRTC
+-keep class org.webrtc.** { *; }
+-dontwarn org.webrtc.**
+
+# Flutter CallKit Incoming (for incoming call notifications)
+-keep class com.hiennv.flutter_callkit_incoming.** { *; }
+-dontwarn com.hiennv.flutter_callkit_incoming.**
+
+# Jackson databind (used by Stream SDK)
+-dontwarn java.beans.ConstructorProperties
+-dontwarn java.beans.Transient
+-dontwarn org.w3c.dom.bootstrap.DOMImplementationRegistry

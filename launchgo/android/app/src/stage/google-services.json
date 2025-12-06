@@ -83,6 +83,14 @@
           }
         },
         {
+          "client_id": "481027521494-am1clkv0n95jnmn4nqc34bp7v77u5cat.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.launchgo.stage",
+            "certificate_hash": "354976e31420ef92645c7900ea41cc51452089e7"
+          }
+        },
+        {
           "client_id": "481027521494-rv1fvmls22rhbnvq6v65gt23g4c8i30k.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
