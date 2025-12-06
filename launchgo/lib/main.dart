@@ -13,6 +13,7 @@ import 'package:launchgo/services/api_service.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/services/chat/stream_chat_service.dart';
 import 'package:launchgo/services/push_notification_service.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:launchgo/services/android_notification_display_service.dart';
 import 'package:launchgo/services/pending_navigation_service.dart';
 import 'package:launchgo/services/notifications_api_service.dart';
@@ -35,7 +36,11 @@ void main() async {
   
   // Initialize Firebase
   await Firebase.initializeApp();
-  
+
+  // CRITICAL: Register background message handler BEFORE runApp()
+  // This is required for push notifications to work when app is terminated
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
   // Don't initialize push notifications here - will be done after router is ready
   
   // Set up Crashlytics
@@ -174,20 +179,21 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
     // Set up ringing events callback for navigation when call is accepted
     // This is called when user accepts via CallKit (iOS) or push notification
-    // The call is ALREADY JOINED when this callback fires
+    // The call is accept()ed but NOT join()ed - VideoCallScreen's StreamCallContainer handles join()
     _streamVideoService.setOnCallAcceptedCallback((call) {
-      debugPrint('📞 Call accepted callback - call is already joined, navigating to video call screen');
+      debugPrint('📞 Call accepted callback - navigating to video call screen');
       debugPrint('📞 CallId: ${call.id}');
 
       // Check if we haven't already navigated to this call
       if (_lastNavigatedCallId != call.id) {
         _lastNavigatedCallId = call.id;
+        // NOTE: Don't pass callAlreadyJoined: true - the call is only accept()ed, not join()ed
+        // StreamCallContainer will handle calling join() to establish the media connection
         _appRouter.router.pushNamed(
           'video-call',
           pathParameters: {'callId': call.id},
           queryParameters: {
             'recipientName': 'Mentor',
-            'callAlreadyJoined': 'true', // Tell VideoCallScreen the call is already joined
           },
         );
       } else {
@@ -426,12 +432,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           // Track this call to prevent duplicate navigation
           if (_lastNavigatedCallId != call.id) {
             _lastNavigatedCallId = call.id;
+            // NOTE: Don't assume call is already joined - let StreamCallContainer handle join()
             _appRouter.router.pushNamed(
               'video-call',
               pathParameters: {'callId': call.id},
               queryParameters: {
                 'recipientName': 'Mentor',
-                'callAlreadyJoined': 'true',
               },
             );
           }

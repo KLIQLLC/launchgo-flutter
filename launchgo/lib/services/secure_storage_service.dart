@@ -105,6 +105,41 @@ class SecureStorageService {
     await _storage.delete(key: _videoCallTokenKey);
   }
 
+  // Pending accepted call storage (for handling call accept from terminated state)
+  static const String _pendingCallIdKey = 'pending_accepted_call_id';
+  // Pending ringing call storage (tracks incoming call shown via push)
+  static const String _pendingRingingCallIdKey = 'pending_ringing_call_id';
+
+  /// Save pending accepted call ID (when user accepts call while app is starting)
+  static Future<void> savePendingAcceptedCallId(String callId) async {
+    await _storage.write(key: _pendingCallIdKey, value: callId);
+  }
+
+  /// Get pending accepted call ID
+  static Future<String?> getPendingAcceptedCallId() async {
+    return await _storage.read(key: _pendingCallIdKey);
+  }
+
+  /// Delete pending accepted call ID
+  static Future<void> deletePendingAcceptedCallId() async {
+    await _storage.delete(key: _pendingCallIdKey);
+  }
+
+  /// Save pending ringing call ID (when incoming call UI is shown from push)
+  static Future<void> savePendingRingingCallId(String callId) async {
+    await _storage.write(key: _pendingRingingCallIdKey, value: callId);
+  }
+
+  /// Get pending ringing call ID
+  static Future<String?> getPendingRingingCallId() async {
+    return await _storage.read(key: _pendingRingingCallIdKey);
+  }
+
+  /// Delete pending ringing call ID
+  static Future<void> deletePendingRingingCallId() async {
+    await _storage.delete(key: _pendingRingingCallIdKey);
+  }
+
   /// Clear all auth data for current environment
   static Future<void> clearAllAuthData() async {
     await _storage.delete(key: _accessTokenKey);

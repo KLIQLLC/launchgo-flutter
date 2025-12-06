@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
@@ -29,6 +30,14 @@ class StreamVideoService extends ChangeNotifier {
   StreamSubscription<callkit_entities.CallEvent?>? _callKitSubscription; // Direct CallKit listener
   OnCallAcceptedCallback? _onCallAcceptedCallback; // Callback for navigation after call is accepted
 
+  // Static pending call data for when app is launched from terminated state
+  // This stores the call ID that was accepted via push notification before client was ready
+  static String? _pendingAcceptedCallId;
+  static String? _pendingAcceptedCallCid; // Full call CID (e.g., "default:callId")
+
+  // Static lock to prevent concurrent initialization
+  static bool _isInitializing = false;
+
   StreamVideo? get client => _client;
   Call? get activeCall => _activeCall;
   bool get hasActiveCall => _activeCall != null;
@@ -37,8 +46,41 @@ class StreamVideoService extends ChangeNotifier {
   bool get isInitialized => _isInitialized;
 
   /// Set callback for when a call is accepted (call is already joined) - for navigation
+  /// IMPORTANT: If there's already an active call (e.g., from pending call processed during init),
+  /// the callback will be invoked immediately to trigger navigation
   void setOnCallAcceptedCallback(OnCallAcceptedCallback? callback) {
     _onCallAcceptedCallback = callback;
+
+    // Check if there's already an active call that needs navigation
+    // This handles the race condition where pending call was processed during initialize()
+    // before the UI had a chance to set the callback
+    if (callback != null && _activeCall != null) {
+      debugPrint('📞 [Callback] Active call exists, checking if it needs navigation');
+      debugPrint('📞 [Callback] Active call ID: ${_activeCall!.id}');
+
+      // Validate the call is in a state that warrants navigation
+      // Only invoke callback if call is actually connected/connecting/incoming
+      final callStatus = _activeCall!.state.value.status;
+      final isValidForNavigation = callStatus is CallStatusConnected ||
+          callStatus is CallStatusConnecting ||
+          callStatus is CallStatusIncoming;
+
+      debugPrint('📞 [Callback] Call status: ${callStatus.runtimeType}, isValidForNavigation: $isValidForNavigation');
+
+      if (isValidForNavigation) {
+        debugPrint('📞 [Callback] Invoking callback immediately for navigation');
+        // Use Future.microtask to avoid calling callback synchronously during setState
+        Future.microtask(() {
+          if (_activeCall != null && _onCallAcceptedCallback != null) {
+            _onCallAcceptedCallback!(_activeCall!);
+          }
+        });
+      } else {
+        debugPrint('📞 [Callback] Call status not valid for navigation - clearing active call');
+        // If call is in an invalid state (e.g., stale data), clear it
+        _activeCall = null;
+      }
+    }
   }
 
   /// Initialize the video client for the authenticated user
@@ -46,11 +88,25 @@ class StreamVideoService extends ChangeNotifier {
     debugPrint('📞 [INIT] StreamVideoService.initialize() called for user: ${user.id}');
     debugPrint('📞 [INIT] User role: ${user.role}');
 
+    // EARLY: Set up CallKit listener immediately for students to catch accept events
+    // This must happen BEFORE any async operations that might delay catching the event
+    if (user.role == UserRole.student && _callKitSubscription == null) {
+      debugPrint('📞 [INIT] Setting up CallKit listener EARLY for students');
+      _setupCallKitListener();
+    }
+
     // Skip if already initialized AND client exists
     if (_isInitialized && _client != null) {
       debugPrint('⚠️ StreamVideoService already initialized, skipping');
       return;
     }
+
+    // Prevent concurrent initialization attempts using static lock
+    if (_isInitializing) {
+      debugPrint('⚠️ [INIT] Another initialization is in progress, skipping');
+      return;
+    }
+    _isInitializing = true;
 
     // Set initialized flag immediately to prevent concurrent initialization attempts
     _isInitialized = true;
@@ -110,12 +166,20 @@ class StreamVideoService extends ChangeNotifier {
         }
       }
 
-      // Reset any existing StreamVideo singleton state before creating new instance
-      // This is required for proper re-initialization after logout/login
-      await StreamVideo.reset();
-      debugPrint('📞 StreamVideo singleton reset');
+      // Check if StreamVideo singleton already exists (e.g., from background push handler)
+      // If so, use it instead of creating a new one to avoid conflicts
+      try {
+        final existingInstance = StreamVideo.instance;
+        debugPrint('📞 Found existing StreamVideo instance, reusing it');
+        _client = existingInstance;
+        // Skip creating a new instance since we already have one
+      } catch (e) {
+        // No existing instance, need to reset and create new
+        debugPrint('📞 No existing StreamVideo instance, creating new one');
+        await StreamVideo.reset();
+        debugPrint('📞 StreamVideo singleton reset');
 
-      _client = StreamVideo(
+        _client = StreamVideo(
         apiKey,
         user: User.regular(
           userId: user.id,
@@ -136,6 +200,7 @@ class StreamVideoService extends ChangeNotifier {
           ),
         ),
       );
+      }
 
       // Connect to establish WebSocket for receiving incoming call events
       debugPrint('📞 Connecting Stream Video client...');
@@ -155,10 +220,31 @@ class StreamVideoService extends ChangeNotifier {
       // Listen for incoming calls (for students)
       if (user.role == UserRole.student) {
         debugPrint('📞 User is a student, setting up incoming call listener');
+
+        // Request call-related permissions for Android
+        await _requestCallPermissions();
+
         _listenForIncomingCalls();
-        _setupCallKitListener(); // Listen for CallKit accept/decline from native iOS UI
+        // NOTE: _setupCallKitListener() is now called EARLY at the start of initialize()
         // NOTE: _observeRingingEvents() disabled - it requires VoIP push to be fully configured
         // (com.apple.developer.pushkit.voip entitlement + VoIP cert on Stream dashboard)
+
+        // Check for pending accepted calls (from terminated app state)
+        // This must be done AFTER client is initialized
+        debugPrint('📞 Checking for pending/active calls after initialization...');
+        await _checkForActiveCallKitCalls();
+        await _processPendingAcceptedCall();
+        // Fallback: Check pendingRingingCallId if we didn't find a pending accepted call
+        // This handles the case where user accepted but we didn't catch the event
+        await _processPendingRingingCall();
+
+        // IMPORTANT: Clean up any stale pending call data if we didn't end up with an active call
+        // This prevents stale data from previous sessions from causing issues
+        if (_activeCall == null) {
+          debugPrint('📞 [INIT] No active call after pending checks - clearing any stale pending data');
+          await SecureStorageService.deletePendingAcceptedCallId();
+          await SecureStorageService.deletePendingRingingCallId();
+        }
       } else {
         debugPrint('📞 User is a mentor, skipping incoming call listener');
       }
@@ -170,6 +256,9 @@ class StreamVideoService extends ChangeNotifier {
       debugPrint('❌ [INIT] Stack trace: ${StackTrace.current}');
       // Reset the flag so initialization can be retried
       _isInitialized = false;
+    } finally {
+      // Always reset the initialization lock
+      _isInitializing = false;
     }
   }
 
@@ -181,6 +270,35 @@ class StreamVideoService extends ChangeNotifier {
       debugPrint('📞 VoIP Device Token: $voipToken');
     } catch (e) {
       debugPrint('Error retrieving VoIP token: $e');
+    }
+  }
+
+  /// Request permissions required for incoming call notifications on Android
+  /// - Notification permission (Android 13+)
+  /// - Full-screen intent permission (Android 10+)
+  /// - Display over other apps (SYSTEM_ALERT_WINDOW) for full-screen call UI
+  Future<void> _requestCallPermissions() async {
+    if (!Platform.isAndroid) {
+      debugPrint('📞 Skipping Android-specific call permissions on iOS');
+      return;
+    }
+
+    debugPrint('📞 Requesting call-related permissions for Android...');
+
+    try {
+      // Request notification permission (required for Android 13+)
+      await FlutterCallkitIncoming.requestNotificationPermission({
+        'rationaleMessagePermission': 'Notification permission is required for incoming call alerts',
+        'postNotificationMessageRequired': 'Please allow notifications to receive incoming calls',
+      });
+      debugPrint('✅ Notification permission requested');
+
+      // Request full-screen intent permission (Android 10+)
+      // This allows the app to show full-screen incoming call UI
+      await FlutterCallkitIncoming.requestFullIntentPermission();
+      debugPrint('✅ Full-screen intent permission requested');
+    } catch (e) {
+      debugPrint('⚠️ Error requesting call permissions: $e');
     }
   }
 
@@ -285,18 +403,26 @@ class StreamVideoService extends ChangeNotifier {
     debugPrint('✅ Direct CallKit event listener setup complete');
   }
 
-  /// Handle CallKit accept action - user accepted via native iOS call UI
+  /// Handle CallKit accept action - user accepted via native iOS call UI or Android notification
   Future<void> _handleCallKitAccept(String callId) async {
     debugPrint('📞 [CallKit] Handling accept for call: $callId');
 
-    // If client isn't ready yet, we need to wait for initialization
+    // If client isn't ready yet, store the pending call ID for processing after init
+    // Store both in memory (for same isolate) and persistent storage (for cross-isolate)
     if (_client == null) {
-      debugPrint('⚠️ [CallKit] Client not ready - call will be handled after init');
-      // The call should be handled by the VideoCallPushHandler or after init
+      debugPrint('⚠️ [CallKit] Client not ready - storing pending call ID for later: $callId');
+      _pendingAcceptedCallId = callId;
+      _pendingAcceptedCallCid = 'default:$callId'; // Store full CID
+      // Also save to persistent storage in case this is from a different isolate
+      await SecureStorageService.savePendingAcceptedCallId(callId);
+      debugPrint('📞 [CallKit] Saved pending call ID to persistent storage');
       return;
     }
 
     try {
+      // Clear any pending call from storage since we're handling it now
+      await SecureStorageService.deletePendingAcceptedCallId();
+
       // Accept and get the call
       final call = await acceptIncomingCall(callId: callId);
       if (call != null) {
@@ -311,6 +437,190 @@ class StreamVideoService extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('❌ [CallKit] Error accepting call: $e');
+    }
+  }
+
+  /// Check for and process any pending accepted call after initialization
+  /// This handles the case where user accepted a call from push notification
+  /// while the app was terminated and the client wasn't ready yet
+  Future<void> _processPendingAcceptedCall() async {
+    // First check memory (same isolate)
+    String? callId = _pendingAcceptedCallId;
+
+    // If not in memory, check persistent storage (cross-isolate)
+    if (callId == null) {
+      debugPrint('📞 [Pending] Checking persistent storage for pending call...');
+      callId = await SecureStorageService.getPendingAcceptedCallId();
+    }
+
+    if (callId == null) {
+      debugPrint('📞 [Pending] No pending accepted call to process');
+      return;
+    }
+
+    debugPrint('📞 [Pending] Processing pending accepted call: $callId');
+
+    // Clear the pending call ID immediately to prevent reprocessing
+    _pendingAcceptedCallId = null;
+    _pendingAcceptedCallCid = null;
+    await SecureStorageService.deletePendingAcceptedCallId();
+
+    if (_client == null) {
+      debugPrint('❌ [Pending] Client still not ready, cannot process pending call');
+      return;
+    }
+
+    try {
+      // Accept and get the call
+      final call = await acceptIncomingCall(callId: callId);
+      if (call != null) {
+        debugPrint('✅ [Pending] Pending call accepted successfully: $callId');
+        // Invoke callback for navigation
+        if (_onCallAcceptedCallback != null) {
+          debugPrint('📞 [Pending] Invoking navigation callback');
+          _onCallAcceptedCallback!(call);
+        }
+      } else {
+        debugPrint('❌ [Pending] Failed to accept pending call: $callId');
+      }
+    } catch (e) {
+      debugPrint('❌ [Pending] Error accepting pending call: $e');
+    }
+  }
+
+  /// Check for pending ringing call that was shown via push notification
+  /// This is a fallback for when user accepted but we didn't catch the event
+  /// The background handler saves the call ID when push arrives, and we check if the call is still valid
+  Future<void> _processPendingRingingCall() async {
+    // Skip if we already have an active call (previous checks succeeded)
+    if (_activeCall != null) {
+      debugPrint('📞 [PendingRinging] Already have active call, skipping ringing check');
+      // Clear any pending ringing call since we already have a call
+      await SecureStorageService.deletePendingRingingCallId();
+      return;
+    }
+
+    final ringingCallId = await SecureStorageService.getPendingRingingCallId();
+    if (ringingCallId == null) {
+      debugPrint('📞 [PendingRinging] No pending ringing call found');
+      return;
+    }
+
+    debugPrint('📞 [PendingRinging] Found pending ringing call: $ringingCallId');
+
+    // Clear the ringing call ID to prevent reprocessing
+    await SecureStorageService.deletePendingRingingCallId();
+
+    if (_client == null) {
+      debugPrint('❌ [PendingRinging] Client not ready');
+      return;
+    }
+
+    try {
+      // Query Stream for this call to see if it's still active/ringing
+      debugPrint('📞 [PendingRinging] Querying Stream for call status...');
+      final call = _client!.makeCall(
+        callType: StreamCallType.defaultType(),
+        id: ringingCallId,
+      );
+
+      // Get the call from Stream to check its status
+      await call.getOrCreate();
+      debugPrint('📞 [PendingRinging] Call fetched, state: ${call.state.value.status}');
+
+      // Check if the call is still in a state where we can join
+      // If the user accepted via native UI, the call should be in a joinable state
+      final callStatus = call.state.value.status;
+
+      // CallStatus is an abstract class with subclasses:
+      // - CallStatusIdle, CallStatusOutgoing, CallStatusIncoming
+      // - CallStatusConnecting, CallStatusConnected, CallStatusReconnecting
+      final isIncoming = callStatus is CallStatusIncoming;
+      final isConnected = callStatus is CallStatusConnected;
+      final isConnecting = callStatus is CallStatusConnecting;
+
+      debugPrint('📞 [PendingRinging] Call status type: ${callStatus.runtimeType}');
+      debugPrint('📞 [PendingRinging] isIncoming: $isIncoming, isConnected: $isConnected, isConnecting: $isConnecting');
+
+      // If call is incoming (ringing) or already connected/connecting, we should join it
+      // The user likely accepted but we didn't catch the event
+      if (isIncoming || isConnected || isConnecting) {
+        debugPrint('📞 [PendingRinging] Call is joinable - accepting and joining...');
+
+        // Accept the call (in case it's still ringing)
+        if (isIncoming) {
+          await call.accept();
+          debugPrint('📞 [PendingRinging] Call accepted');
+        }
+
+        _activeCall = call;
+        _incomingCall = null;
+        _incomingCallId = null;
+        _incomingCallerName = null;
+        notifyListeners();
+
+        // Invoke callback for navigation
+        if (_onCallAcceptedCallback != null) {
+          debugPrint('📞 [PendingRinging] Invoking navigation callback');
+          _onCallAcceptedCallback!(call);
+        }
+
+        debugPrint('✅ [PendingRinging] Successfully joined pending ringing call');
+      } else {
+        debugPrint('📞 [PendingRinging] Call status is $callStatus - not joining');
+      }
+    } catch (e) {
+      debugPrint('❌ [PendingRinging] Error processing pending ringing call: $e');
+    }
+  }
+
+  /// Check for active CallKit calls that may have been accepted while app was launching
+  /// This uses FlutterCallkitIncoming.activeCalls() to find calls in progress
+  Future<void> _checkForActiveCallKitCalls() async {
+    debugPrint('📞 [ActiveCalls] Checking for active CallKit calls...');
+
+    try {
+      final activeCalls = await FlutterCallkitIncoming.activeCalls();
+      debugPrint('📞 [ActiveCalls] Found ${activeCalls?.length ?? 0} active calls');
+
+      if (activeCalls == null || activeCalls.isEmpty) {
+        debugPrint('📞 [ActiveCalls] No active calls found');
+        return;
+      }
+
+      // Process the first active call (there should typically only be one)
+      for (final callData in activeCalls) {
+        debugPrint('📞 [ActiveCalls] Active call data: $callData');
+
+        // Extract call ID from the call data
+        String? callId;
+        String? callCid;
+
+        if (callData is Map) {
+          // Try to get call_cid from extra data
+          final extra = callData['extra'] as Map<String, dynamic>?;
+          if (extra != null) {
+            callCid = extra['callCid'] as String?;
+            if (callCid != null && callCid.contains(':')) {
+              callId = callCid.split(':').last;
+            }
+          }
+          // Fallback to id field
+          callId ??= callData['id'] as String?;
+
+          // Check if call was accepted (isAccepted flag)
+          final isAccepted = callData['isAccepted'] == true;
+          debugPrint('📞 [ActiveCalls] Call $callId isAccepted: $isAccepted');
+
+          if (isAccepted && callId != null) {
+            debugPrint('📞 [ActiveCalls] Found accepted call, processing: $callId');
+            await _handleCallKitAccept(callId);
+            break; // Only process one call
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ [ActiveCalls] Error checking active calls: $e');
     }
   }
 

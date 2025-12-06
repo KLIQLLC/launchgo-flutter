@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
+import 'package:flutter_callkit_incoming/entities/entities.dart' as callkit_entities;
 import 'package:path_provider/path_provider.dart';
 import 'package:stream_video_flutter/stream_video_flutter.dart';
 import 'package:stream_video_push_notification/stream_video_push_notification.dart';
@@ -95,7 +97,9 @@ class PushNotificationService extends ChangeNotifier {
     try {
       // Setup message handlers without requesting permissions
       // Handle background messages
-      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+      // NOTE: Background handler is now registered in main.dart before runApp()
+      // This is required for terminated state to work
+      // FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
       
       // Handle foreground messages
       FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
@@ -417,8 +421,9 @@ Screen value: ${message.data['screen']}
 }
 
 /// Background message handler (must be top-level function)
+/// IMPORTANT: Must be registered in main() BEFORE runApp() for terminated state to work
 @pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // 🛑 BREAKPOINT: Set breakpoint here to inspect background notifications
   debugPrint('🔔 Background message received: ${message.notification?.title}');
   debugPrint('🔔 Background message data: ${message.data}');
@@ -433,17 +438,75 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     debugPrint('📞 Background video call notification detected');
 
     try {
-      // Get stored video call credentials
+      // IMPORTANT: Initialize environment config FIRST before accessing any environment-specific storage
+      // SecureStorageService uses EnvironmentConfig to get the correct storage keys
+      EnvironmentConfig.init();
+      debugPrint('📞 EnvironmentConfig initialized: ${EnvironmentConfig.environmentName}');
+
+      // Get stored video call credentials (requires EnvironmentConfig to be initialized)
       final credentials = await SecureStorageService.getVideoCallCredentials();
       if (credentials == null) {
         debugPrint('❌ No video call credentials stored, cannot handle push');
         return;
       }
 
-      debugPrint('📞 Creating StreamVideo instance for background handling');
+      // Extract call ID from push data BEFORE setting up listeners
+      // This ensures we have the call ID available when user accepts
+      String? callIdFromPush;
+      final callCid = message.data['call_cid'] as String?;
+      if (callCid != null && callCid.contains(':')) {
+        callIdFromPush = callCid.split(':').last;
+        debugPrint('📞 [Background] Extracted call ID from push: $callIdFromPush');
 
-      // Initialize environment config for API key
-      EnvironmentConfig.init();
+        // Save the ringing call ID immediately so the foreground app can find it later
+        // This tracks which call was shown to the user via push notification
+        await SecureStorageService.savePendingRingingCallId(callIdFromPush);
+        debugPrint('📞 [Background] Saved pending ringing call ID to storage');
+      }
+
+      // Set up CallKit listener in background to catch accept/decline events
+      // This listener will save the call ID to persistent storage when user accepts
+      debugPrint('📞 [Background] Setting up CallKit listener for accept/decline');
+      FlutterCallkitIncoming.onEvent.listen((callkit_entities.CallEvent? event) async {
+        if (event == null) return;
+
+        debugPrint('📞 [Background CallKit] Event: ${event.event}, body: ${event.body}');
+
+        final eventName = event.event;
+        final body = event.body;
+        String? callId = body['id'] as String?;
+
+        // Try to get call ID from extra if not in body
+        if (callId == null) {
+          final extra = body['extra'] as Map<String, dynamic>?;
+          if (extra != null) {
+            final cid = extra['callCid'] as String?;
+            if (cid != null && cid.contains(':')) {
+              callId = cid.split(':').last;
+            }
+          }
+        }
+
+        // Use the call ID from push if we couldn't get it from event
+        callId ??= callIdFromPush;
+
+        if (callId != null) {
+          if (eventName == callkit_entities.Event.actionCallAccept) {
+            debugPrint('📞 [Background CallKit] ACCEPT detected for call: $callId');
+            // Save to persistent storage so foreground app can pick it up
+            await SecureStorageService.savePendingAcceptedCallId(callId);
+            debugPrint('📞 [Background CallKit] Saved pending accepted call ID to storage');
+          } else if (eventName == callkit_entities.Event.actionCallDecline) {
+            debugPrint('📞 [Background CallKit] DECLINE detected for call: $callId');
+            // Clear any pending call since user declined
+            await SecureStorageService.deletePendingAcceptedCallId();
+          } else if (eventName == callkit_entities.Event.actionCallEnded) {
+            debugPrint('📞 [Background CallKit] ENDED detected for call: $callId');
+          }
+        }
+      });
+
+      debugPrint('📞 Creating StreamVideo instance for background handling');
       final apiKey = EnvironmentConfig.streamVideoApiKey;
 
       // Create StreamVideo instance for background handling
@@ -474,6 +537,13 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       // This is the key call that shows the incoming call notification
       final handled = await streamVideo.handleRingingFlowNotifications(message.data);
       debugPrint('📞 Ringing flow handled: $handled');
+
+      // Keep the isolate alive for a short time to allow CallKit events to be processed
+      // The user needs time to see the incoming call and tap accept/decline
+      // Note: On Android, the native incoming call screen stays visible even after this returns
+      debugPrint('📞 [Background] Waiting briefly for potential CallKit events...');
+      await Future.delayed(const Duration(seconds: 2));
+      debugPrint('📞 [Background] Background handler completing');
     } catch (e) {
       debugPrint('❌ Error handling video call push in background: $e');
     }
