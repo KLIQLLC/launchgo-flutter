@@ -363,23 +363,19 @@ class StreamVideoService extends ChangeNotifier {
         _incomingCall = call; // Store the actual Call object
         _incomingCallId = callId; // Also store ID for display
 
-        // Set a default caller name immediately
-        _incomingCallerName = 'Mentor';
+        // Get caller name from callParticipants (the mentor who initiated the call)
+        final participants = call.state.value.callParticipants;
+        if (participants.isNotEmpty && participants.first.name.isNotEmpty) {
+          _incomingCallerName = participants.first.name;
+          debugPrint('📞 Caller name from callParticipants: $_incomingCallerName');
+        } else {
+          _incomingCallerName = 'Mentor'; // Fallback
+          debugPrint('📞 Using fallback caller name: $_incomingCallerName');
+        }
 
         // Notify immediately so the incoming call screen appears
         notifyListeners();
         debugPrint('📞 Notified listeners of incoming call - incomingCallId: $_incomingCallId');
-
-        // Try to get actual caller name from call state (this updates the name if available)
-        call.state.listen((callState) {
-          final remoteParticipants = callState.callParticipants.where((p) => !p.isLocal).toList();
-
-          if (remoteParticipants.isNotEmpty && remoteParticipants.first.name.isNotEmpty) {
-            _incomingCallerName = remoteParticipants.first.name;
-            notifyListeners();
-            debugPrint('📞 Updated caller name: $_incomingCallerName');
-          }
-        });
       },
       onError: (error) {
         debugPrint('❌ Error in incoming call listener: $error');
