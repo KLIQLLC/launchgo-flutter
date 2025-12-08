@@ -1,7 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
+import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:uuid/uuid.dart';
 import 'api_service_retrofit.dart';
 import 'notifications_api_service.dart';
 import 'pending_navigation_service.dart';
@@ -419,12 +422,20 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint('🔔 Background message data: ${message.data}');
   debugPrint('🔔 Background message body: ${message.notification?.body}');
 
-  // Handle video call notifications - CallKit handles the native UI
+  // Handle video call notifications
   // On iOS: VoIP push triggers CallKit automatically via StreamVideoPKDelegateManager
-  // On Android: Stream Video SDK handles FCM and shows full-screen notification
+  // On Android: We need to manually show the incoming call UI when app is terminated
   if (VideoCallPushHandler.isVideoCallNotification(message.data)) {
-    debugPrint('📞 Background video call notification - native SDK will handle');
-    // Don't process further - CallKit/Stream SDK handles video calls natively
+    debugPrint('📞 Background video call notification detected');
+
+    // On Android, we need to manually show the incoming call notification
+    // because Stream Video SDK is not initialized in the background isolate
+    if (Platform.isAndroid) {
+      debugPrint('📞 Android: Showing incoming call notification manually');
+      await _showAndroidIncomingCallNotification(message.data);
+    } else {
+      debugPrint('📞 iOS: CallKit will handle via VoIP push');
+    }
     return;
   }
 
@@ -447,4 +458,65 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   } else {
     debugPrint('🔔 Data-only notification received, no automatic display');
   }
+}
+
+/// Show incoming call notification on Android when app is terminated
+/// Uses flutter_callkit_incoming to display full-screen incoming call UI
+@pragma('vm:entry-point')
+Future<void> _showAndroidIncomingCallNotification(Map<String, dynamic> data) async {
+  debugPrint('📞 [Android Background] Showing incoming call notification');
+  debugPrint('📞 [Android Background] Data: $data');
+
+  // Extract call ID from push data
+  // Stream Video sends call_cid in format "type:callId" (e.g., "default:abc123")
+  String? callId;
+  final callCid = data['call_cid'] as String?;
+  if (callCid != null && callCid.contains(':')) {
+    callId = callCid.split(':').last;
+  }
+  callId ??= data['call_id'] as String? ?? data['id'] as String?;
+
+  if (callId == null) {
+    debugPrint('❌ [Android Background] No call ID found in push data');
+    return;
+  }
+
+  // Extract caller name
+  final callerName = data['caller_name'] as String? ??
+      data['created_by_display_name'] as String? ??
+      data['sender_name'] as String? ??
+      'Mentor';
+
+  debugPrint('📞 [Android Background] Call ID: $callId, Caller: $callerName');
+
+  // Generate a unique UUID for this call notification
+  final uuid = const Uuid().v4();
+
+  // Configure the incoming call notification
+  final params = CallKitParams(
+    id: uuid,
+    nameCaller: callerName,
+    appName: 'launchgo',
+    type: 0, // 0 = video call, 1 = audio call
+    textAccept: 'Accept',
+    textDecline: 'Decline',
+    duration: 30000, // Ring for 30 seconds
+    extra: <String, dynamic>{
+      'call_cid': callCid ?? 'default:$callId',
+      'call_id': callId,
+    },
+    android: const AndroidParams(
+      isCustomNotification: true,
+      isShowLogo: false,
+      ringtonePath: 'system_ringtone_default',
+      backgroundColor: '#0955fa',
+      actionColor: '#4CAF50',
+      isShowFullLockedScreen: true,
+      isShowCallID: false,
+    ),
+  );
+
+  debugPrint('📞 [Android Background] Calling FlutterCallkitIncoming.showCallkitIncoming');
+  await FlutterCallkitIncoming.showCallkitIncoming(params);
+  debugPrint('✅ [Android Background] Incoming call notification shown');
 }
