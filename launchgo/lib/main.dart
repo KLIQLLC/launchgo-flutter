@@ -172,26 +172,23 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     );
 
     // Set up ringing events callback for navigation when call is accepted
-    // This is called when user accepts via CallKit (iOS) or push notification
+    // This is called when user accepts via CallKit (iOS) or Android Intent
     // The call is ALREADY JOINED when this callback fires
     _streamVideoService.setOnCallAcceptedCallback((call) {
       debugPrint('📞 Call accepted callback - call is already joined, navigating to video call screen');
       debugPrint('📞 CallId: ${call.id}');
 
-      // Check if we haven't already navigated to this call
-      if (_lastNavigatedCallId != call.id) {
-        _lastNavigatedCallId = call.id;
-        _appRouter.router.pushNamed(
-          'video-call',
-          pathParameters: {'callId': call.id},
-          queryParameters: {
-            'recipientName': 'Mentor',
-            'callAlreadyJoined': 'true', // Tell VideoCallScreen the call is already joined
-          },
-        );
-      } else {
-        debugPrint('📞 Already navigated to call: ${call.id}');
-      }
+      // Always navigate when this callback fires - it means call was accepted via CallKit/Intent
+      // Don't check _lastNavigatedCallId here because this is the primary navigation path
+      _lastNavigatedCallId = call.id;
+      _appRouter.router.pushNamed(
+        'video-call',
+        pathParameters: {'callId': call.id},
+        queryParameters: {
+          'recipientName': 'Mentor',
+          'callAlreadyJoined': 'true', // Tell VideoCallScreen the call is already joined
+        },
+      );
     });
 
     // Listen for incoming video calls and active call changes

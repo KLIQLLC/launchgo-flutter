@@ -27,6 +27,8 @@ class StreamVideoService extends ChangeNotifier {
   CompositeSubscription? _ringingEventsSubscription; // Subscription for ringing events (CallKit/push)
   StreamSubscription<callkit_entities.CallEvent?>? _callKitSubscription; // Direct CallKit listener
   OnCallAcceptedCallback? _onCallAcceptedCallback; // Callback for navigation after call is accepted
+  String? _pendingCallKitAcceptId; // Store call ID that was accepted via CallKit before client was initialized
+  static const _platform = MethodChannel('com.launchgo/video_call'); // MethodChannel for Android Intent handling
 
   StreamVideo? get client => _client;
   Call? get activeCall => _activeCall;
@@ -148,6 +150,7 @@ class StreamVideoService extends ChangeNotifier {
         debugPrint('📞 User is a student, setting up incoming call listener');
         _listenForIncomingCalls();
         _setupCallKitListener(); // Listen for CallKit accept/decline from native iOS UI
+        _setupAndroidIntentHandler(); // Listen for Android Intent with call ID when app launches from accept
         // NOTE: _observeRingingEvents() disabled - it requires VoIP push to be fully configured
         // (com.apple.developer.pushkit.voip entitlement + VoIP cert on Stream dashboard)
       } else {
@@ -156,6 +159,14 @@ class StreamVideoService extends ChangeNotifier {
 
       notifyListeners();
       debugPrint('✅ [INIT] StreamVideoService initialized for user: ${user.id} (role: ${user.role})');
+
+      // Process pending CallKit accept if app was terminated and call was accepted before init
+      if (_pendingCallKitAcceptId != null) {
+        final pendingId = _pendingCallKitAcceptId;
+        _pendingCallKitAcceptId = null; // Clear before processing
+        debugPrint('📞 [INIT] Processing pending CallKit accept for call: $pendingId');
+        Future.microtask(() => _handleCallKitAccept(pendingId!));
+      }
     } catch (e) {
       debugPrint('❌ [INIT] Error initializing StreamVideoService: $e');
       debugPrint('❌ [INIT] Stack trace: ${StackTrace.current}');
@@ -173,6 +184,47 @@ class StreamVideoService extends ChangeNotifier {
     } catch (e) {
       debugPrint('Error retrieving VoIP token: $e');
     }
+  }
+
+  /// Setup Android Intent handler to receive call ID when app is launched from CallKit accept action
+  /// This solves the race condition where accept happens before Flutter listener is ready
+  void _setupAndroidIntentHandler() {
+    debugPrint('📞 [Android Intent] Setting up MethodChannel handler');
+
+    _platform.setMethodCallHandler((call) async {
+      debugPrint('📞 [Android Intent] Received method call: ${call.method}');
+
+      if (call.method == 'onCallAcceptedFromIntent') {
+        final callId = call.arguments['callId'] as String?;
+        if (callId != null) {
+          debugPrint('📞 [Android Intent] ========================================');
+          debugPrint('📞 [Android Intent] Call accepted via Intent: $callId');
+          debugPrint('📞 [Android Intent] ========================================');
+
+          // Process the call immediately
+          await _handleCallKitAccept(callId);
+        } else {
+          debugPrint('❌ [Android Intent] No call ID in arguments');
+        }
+      }
+    });
+
+    // Also check if there's a pending call ID from MainActivity
+    Future.microtask(() async {
+      try {
+        final pendingCallId = await _platform.invokeMethod('getPendingCallId');
+        if (pendingCallId != null && pendingCallId is String) {
+          debugPrint('📞 [Android Intent] Found pending call ID from MainActivity: $pendingCallId');
+          await _handleCallKitAccept(pendingCallId);
+        } else {
+          debugPrint('📞 [Android Intent] No pending call ID');
+        }
+      } catch (e) {
+        debugPrint('⚠️ [Android Intent] Error getting pending call ID: $e');
+      }
+    });
+
+    debugPrint('✅ [Android Intent] MethodChannel handler setup complete');
   }
 
   /// Observe ringing events using Stream's official pattern
@@ -222,6 +274,34 @@ class StreamVideoService extends ChangeNotifier {
     // Cancel existing subscription
     _callKitSubscription?.cancel();
 
+    // Check for active calls that may have been accepted before listener was set up (race condition fix)
+    // When app is terminated and user accepts call, the accept happens before we set up the listener
+    Future.microtask(() async {
+      try {
+        final activeCalls = await FlutterCallkitIncoming.activeCalls();
+        debugPrint('📞 [CallKit] Checking for active calls on startup: ${activeCalls.length} found');
+
+        if (activeCalls.isNotEmpty) {
+          for (var call in activeCalls) {
+            debugPrint('📞 [CallKit] Active call found: ${call['id']}');
+            debugPrint('📞 [CallKit] Active call extra: ${call['extra']}');
+
+            // Extract call ID from the active call data
+            final extra = call['extra'] as Map<String, dynamic>?;
+            if (extra != null) {
+              final callId = extra['call_id'] as String?;
+              if (callId != null) {
+                debugPrint('📞 [CallKit] Processing active call that was accepted before listener: $callId');
+                _handleCallKitAccept(callId);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ [CallKit] Error checking active calls: $e');
+      }
+    });
+
     _callKitSubscription = FlutterCallkitIncoming.onEvent.listen((callkit_entities.CallEvent? event) {
       if (event == null) return;
 
@@ -236,13 +316,24 @@ class StreamVideoService extends ChangeNotifier {
         // Try different possible keys for call ID
         final extraData = body['extra'] as Map<String, dynamic>?;
         if (extraData != null) {
-          final callCid = extraData['call_cid'] as String?;
-          if (callCid != null && callCid.contains(':')) {
-            callId = callCid.split(':').last;
+          // First try call_id directly (clean ID without prefix)
+          callId = extraData['call_id'] as String?;
+          debugPrint('📞 [CallKit] Extracted call_id from extra: $callId');
+
+          // If not found, try extracting from call_cid (has "default:" prefix)
+          if (callId == null) {
+            final callCid = extraData['call_cid'] as String?;
+            if (callCid != null && callCid.contains(':')) {
+              callId = callCid.split(':').last;
+              debugPrint('📞 [CallKit] Extracted call_id from call_cid: $callId');
+            }
           }
         }
-        // Fallback to id field
-        callId ??= body['id'] as String?;
+        // Fallback to id field (UUID - last resort)
+        if (callId == null) {
+          callId = body['id'] as String?;
+          debugPrint('⚠️ [CallKit] Using body[id] as fallback: $callId');
+        }
       }
 
       if (callId == null) {
@@ -280,10 +371,10 @@ class StreamVideoService extends ChangeNotifier {
   Future<void> _handleCallKitAccept(String callId) async {
     debugPrint('📞 [CallKit] Handling accept for call: $callId');
 
-    // If client isn't ready yet, we need to wait for initialization
+    // If client isn't ready yet, store the call ID to process after initialization
     if (_client == null) {
-      debugPrint('⚠️ [CallKit] Client not ready - call will be handled after init');
-      // The call should be handled by the VideoCallPushHandler or after init
+      debugPrint('⚠️ [CallKit] Client not ready - storing call ID for processing after init: $callId');
+      _pendingCallKitAcceptId = callId;
       return;
     }
 
@@ -451,6 +542,12 @@ class StreamVideoService extends ChangeNotifier {
 
   /// Accept an incoming call (student only) - for foreground accept via button
   Future<Call?> acceptIncomingCall({String? callId}) async {
+    debugPrint('📞 ========================================');
+    debugPrint('📞 acceptIncomingCall called with callId: $callId');
+    debugPrint('📞 _incomingCall exists: ${_incomingCall != null}');
+    debugPrint('📞 _incomingCallId: $_incomingCallId');
+    debugPrint('📞 ========================================');
+
     if (_client == null) {
       debugPrint('❌ Cannot accept call: client is null');
       return null;
@@ -487,25 +584,35 @@ class StreamVideoService extends ChangeNotifier {
       } else if (callId != null) {
         // No cached call - fetch by ID (app was terminated or WebSocket disconnected)
         debugPrint('📞 No cached _incomingCall, fetching by ID: $callId');
+        debugPrint('📞 Creating call with makeCall(callType: default, id: $callId)');
 
         call = _client!.makeCall(
           callType: StreamCallType.defaultType(),
           id: callId,
         );
 
+        debugPrint('📞 Calling getOrCreate() for call: ${call.id}');
         await call.getOrCreate();
-        debugPrint('📞 Fresh call fetched successfully: ${call.id}');
+        debugPrint('📞 Fresh call fetched successfully - call.id: ${call.id}, call.callCid: ${call.callCid}');
       } else {
         debugPrint('❌ Cannot accept call: no incoming call and no callId provided');
         return null;
       }
 
-      debugPrint('📞 Accepting call (StreamCallContainer will handle join)...');
+      debugPrint('📞 ========================================');
+      debugPrint('📞 About to join call with:');
+      debugPrint('📞   call.id: ${call.id}');
+      debugPrint('📞   call.callCid: ${call.callCid}');
+      debugPrint('📞   callId parameter: $callId');
+      debugPrint('📞 ========================================');
+      debugPrint('📞 Joining call (student joining mentor\'s existing call)...');
 
-      // Only call accept() - StreamCallContainer will handle join()
-      // Calling join() twice (here and in StreamCallContainer) can cause connection issues
-      await call.accept();
-      debugPrint('✅ Call accepted - StreamCallContainer will join');
+      // For students joining an existing call created by mentor:
+      // We should ONLY call join(), not accept()
+      // accept() is for when the call is ringing and needs to be answered
+      // join() is for when the call already exists and we're joining it
+      await call.join();
+      debugPrint('✅ Call joined successfully');
 
       _activeCall = call;
       _incomingCall = null;
@@ -514,7 +621,7 @@ class StreamVideoService extends ChangeNotifier {
       _lastProcessedCallId = null;
       notifyListeners();
 
-      debugPrint('✅ Call accepted - navigating to VideoCallScreen with StreamCallContainer');
+      debugPrint('✅ Call accepted and joined - ready for VideoCallScreen');
       return call;
     } catch (e) {
       debugPrint('❌ Error accepting call: $e');
@@ -599,6 +706,7 @@ class StreamVideoService extends ChangeNotifier {
     _incomingCallId = null;
     _incomingCallerName = null;
     _lastProcessedCallId = null;
+    _pendingCallKitAcceptId = null; // Clear pending accept
     _isInitialized = false; // Reset so new user can initialize
     notifyListeners();
     debugPrint('StreamVideoService disconnected');

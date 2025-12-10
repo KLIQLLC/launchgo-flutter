@@ -469,10 +469,16 @@ Future<void> _showAndroidIncomingCallNotification(Map<String, dynamic> data) asy
 
   // Extract call ID from push data
   // Stream Video sends call_cid in format "type:callId" (e.g., "default:abc123")
+  debugPrint('📞 [Android Background] Raw push data keys: ${data.keys.toList()}');
+  debugPrint('📞 [Android Background] call_cid from push: ${data['call_cid']}');
+  debugPrint('📞 [Android Background] call_id from push: ${data['call_id']}');
+  debugPrint('📞 [Android Background] id from push: ${data['id']}');
+
   String? callId;
   final callCid = data['call_cid'] as String?;
   if (callCid != null && callCid.contains(':')) {
     callId = callCid.split(':').last;
+    debugPrint('📞 [Android Background] Extracted callId from call_cid: $callId');
   }
   callId ??= data['call_id'] as String? ?? data['id'] as String?;
 
@@ -487,7 +493,8 @@ Future<void> _showAndroidIncomingCallNotification(Map<String, dynamic> data) asy
       data['sender_name'] as String? ??
       'Mentor';
 
-  debugPrint('📞 [Android Background] Call ID: $callId, Caller: $callerName');
+  debugPrint('📞 [Android Background] FINAL Call ID to use: $callId, Caller: $callerName');
+  debugPrint('📞 [Android Background] Storing in extra - call_cid: ${callCid ?? 'default:$callId'}, call_id: $callId');
 
   // Generate a unique UUID for this call notification
   final uuid = const Uuid().v4();
