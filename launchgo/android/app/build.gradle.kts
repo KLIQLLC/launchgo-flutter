@@ -54,13 +54,23 @@ android {
             decodedDefines.forEach { define ->
                 val pair = define.split("=", limit = 2)
                 if (pair.size == 2) {
-                    buildConfigField("String", pair[0], "\"${pair[1]}\"")
+                    // Only add valid Java identifiers (no dots or special characters)
+                    val fieldName = pair[0].replace(".", "_").replace("-", "_")
+                    if (fieldName.matches(Regex("^[a-zA-Z_][a-zA-Z0-9_]*$"))) {
+                        buildConfigField("String", fieldName, "\"${pair[1]}\"")
+                    }
                 }
             }
         }
     }
 
     signingConfigs {
+        getByName("debug") {
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+            storeFile = file("keystore/debug.keystore")
+            storePassword = "android"
+        }
         create("release") {
             keyAlias = keystoreProperties["keyAlias"] as String
             keyPassword = keystoreProperties["keyPassword"] as String
@@ -83,6 +93,9 @@ android {
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
+        }
         release {
             signingConfig = signingConfigs.getByName("release")
         }
