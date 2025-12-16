@@ -1,3 +1,4 @@
+// screens/video_call/incoming_call_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -6,7 +7,7 @@ import '../../services/video_call/stream_video_service.dart';
 
 /// Incoming call screen for students
 /// Shows caller name and accept/decline options
-class IncomingCallScreen extends StatelessWidget {
+class IncomingCallScreen extends StatefulWidget {
   final String callId;
   final String callerName;
 
@@ -16,10 +17,44 @@ class IncomingCallScreen extends StatelessWidget {
     required this.callerName,
   });
 
-  void _showPermissionSettingsDialog(BuildContext context) {
+  @override
+  State<IncomingCallScreen> createState() => _IncomingCallScreenState();
+}
+
+class _IncomingCallScreenState extends State<IncomingCallScreen> {
+  late final StreamVideoService _videoService;
+
+  @override
+  void initState() {
+    super.initState();
+    _videoService = context.read<StreamVideoService>();
+    // Listen for call cancellation (caller hangs up before we answer)
+    _videoService.addListener(_onServiceChanged);
+  }
+
+  @override
+  void dispose() {
+    _videoService.removeListener(_onServiceChanged);
+    super.dispose();
+  }
+
+  void _onServiceChanged() {
+    // If incoming call is cleared (caller cancelled), pop this screen
+    if (_videoService.incomingCallId == null && mounted) {
+      debugPrint(
+        '🎥 [IncomingCallScreen] Call cancelled by caller - dismissing',
+      );
+      context.pop();
+    }
+  }
+
+  String get callId => widget.callId;
+  String get callerName => widget.callerName;
+
+  void _showPermissionSettingsDialog() {
     showDialog(
       context: context,
-      builder: (BuildContext context) => AlertDialog(
+      builder: (BuildContext ctx) => AlertDialog(
         title: const Text('Permissions Required'),
         content: const Text(
           'Camera and microphone permissions are required for video calls. '
@@ -27,12 +62,12 @@ class IncomingCallScreen extends StatelessWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(ctx).pop(),
             child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () {
-              Navigator.of(context).pop();
+              Navigator.of(ctx).pop();
               openAppSettings();
             },
             child: const Text('Open Settings'),
@@ -42,11 +77,13 @@ class IncomingCallScreen extends StatelessWidget {
     );
   }
 
-  void _acceptCall(BuildContext context) async {
+  void _acceptCall() async {
     debugPrint('🎥 [Incoming Call] Student accepting call...');
 
     // Request permissions immediately - this will trigger iOS system dialogs
-    debugPrint('🎥 [Incoming Call] Requesting camera and microphone permissions...');
+    debugPrint(
+      '🎥 [Incoming Call] Requesting camera and microphone permissions...',
+    );
     final Map<Permission, PermissionStatus> statuses = await [
       Permission.camera,
       Permission.microphone,
@@ -60,34 +97,38 @@ class IncomingCallScreen extends StatelessWidget {
     final allGranted = statuses.values.every((status) => status.isGranted);
 
     if (!allGranted) {
-      debugPrint('❌ [Incoming Call] Not all permissions granted - showing settings dialog');
-      if (context.mounted) {
-        _showPermissionSettingsDialog(context);
+      debugPrint(
+        '❌ [Incoming Call] Not all permissions granted - showing settings dialog',
+      );
+      if (mounted) {
+        _showPermissionSettingsDialog();
       }
       return;
     }
     debugPrint('✅ [Incoming Call] All permissions granted');
 
     // Now accept the call (pass callId for background app scenarios)
-    if (!context.mounted) return;
-    final videoService = context.read<StreamVideoService>();
-    final call = await videoService.acceptIncomingCall(callId: callId);
+    if (!mounted) return;
+    final call = await _videoService.acceptIncomingCall(callId: callId);
 
-    if (call != null && context.mounted) {
+    if (call != null && mounted) {
       // Navigate to video call screen
+      // Pass callAlreadyJoined: true since we already accepted and joined in acceptIncomingCall()
       context.pushReplacementNamed(
         'video-call',
         pathParameters: {'callId': callId},
-        queryParameters: {'recipientName': callerName},
+        queryParameters: {
+          'recipientName': callerName,
+          'callAlreadyJoined': 'true',
+        },
       );
     }
   }
 
-  void _declineCall(BuildContext context) async {
-    final videoService = context.read<StreamVideoService>();
-    await videoService.declineIncomingCall();
+  void _declineCall() async {
+    await _videoService.declineIncomingCall();
 
-    if (context.mounted) {
+    if (mounted) {
       context.pop();
     }
   }
@@ -137,10 +178,7 @@ class IncomingCallScreen extends StatelessWidget {
               // Call status
               const Text(
                 'Incoming video call',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 16,
-                ),
+                style: TextStyle(color: Colors.white70, fontSize: 16),
               ),
 
               const SizedBox(height: 64),
@@ -160,7 +198,7 @@ class IncomingCallScreen extends StatelessWidget {
                         child: IconButton(
                           iconSize: 40,
                           icon: const Icon(Icons.call_end, color: Colors.white),
-                          onPressed: () => _declineCall(context),
+                          onPressed: _declineCall,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -184,7 +222,7 @@ class IncomingCallScreen extends StatelessWidget {
                         child: IconButton(
                           iconSize: 40,
                           icon: const Icon(Icons.videocam, color: Colors.white),
-                          onPressed: () => _acceptCall(context),
+                          onPressed: _acceptCall,
                         ),
                       ),
                       const SizedBox(height: 8),

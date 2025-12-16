@@ -1,3 +1,4 @@
+// screens/video_call/video_call_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:stream_video_flutter/stream_video_flutter.dart';
@@ -10,7 +11,8 @@ import '../../services/video_call/stream_video_service.dart';
 class VideoCallScreen extends StatefulWidget {
   final String callId;
   final String recipientName;
-  final bool callAlreadyJoined; // True if call was joined via CallKit/ringing events
+  final bool
+  callAlreadyJoined; // True if call was joined via CallKit/ringing events
 
   const VideoCallScreen({
     super.key,
@@ -28,25 +30,35 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   Call? _call;
   bool _isLoading = true;
   String? _error;
+  bool _isNavigatingAway =
+      false; // Prevent duplicate navigation and endCall in dispose
 
   @override
   void initState() {
     super.initState();
-    debugPrint('🎥 [VideoCallScreen] initState called - callId: ${widget.callId}, recipientName: ${widget.recipientName}, callAlreadyJoined: ${widget.callAlreadyJoined}');
+    debugPrint(
+      '🎥 [VideoCallScreen] initState called - callId: ${widget.callId}, recipientName: ${widget.recipientName}, callAlreadyJoined: ${widget.callAlreadyJoined}',
+    );
     _videoService = context.read<StreamVideoService>();
     WakelockPlus.enable(); // Keep screen on during call
     _initializeCall();
   }
 
   Future<void> _initializeCall() async {
-    debugPrint('🎥 [VideoCallScreen] _initializeCall starting for callId: ${widget.callId}');
+    debugPrint(
+      '🎥 [VideoCallScreen] _initializeCall starting for callId: ${widget.callId}',
+    );
 
     // First check if we have an activeCall from the service (set during createCall or acceptIncomingCall)
     final existingCall = _videoService.activeCall;
-    debugPrint('🎥 [VideoCallScreen] Existing activeCall from service: $existingCall');
+    debugPrint(
+      '🎥 [VideoCallScreen] Existing activeCall from service: $existingCall',
+    );
 
     if (existingCall != null && existingCall.id == widget.callId) {
-      debugPrint('🎥 [VideoCallScreen] Using existing activeCall: ${existingCall.id}');
+      debugPrint(
+        '🎥 [VideoCallScreen] Using existing activeCall: ${existingCall.id}',
+      );
       if (mounted) {
         setState(() {
           _call = existingCall;
@@ -57,7 +69,9 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     }
 
     // If no activeCall, try to get the call from the client using the callId
-    debugPrint('🎥 [VideoCallScreen] No matching activeCall, fetching call by ID: ${widget.callId}');
+    debugPrint(
+      '🎥 [VideoCallScreen] No matching activeCall, fetching call by ID: ${widget.callId}',
+    );
     final client = _videoService.client;
 
     if (client == null) {
@@ -102,13 +116,18 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   void dispose() {
     WakelockPlus.disable();
     // End call when screen is disposed (user backs out or screen is closed)
-    _videoService.endCall(); // Don't await in dispose
+    // Skip if already navigating away (call already ended by remote party)
+    if (!_isNavigatingAway) {
+      _videoService.endCall(); // Don't await in dispose
+    }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('🎥 [VideoCallScreen] build() called - _call: $_call, _isLoading: $_isLoading, _error: $_error');
+    debugPrint(
+      '🎥 [VideoCallScreen] build() called - _call: $_call, _isLoading: $_isLoading, _error: $_error',
+    );
 
     if (_isLoading) {
       return Scaffold(
@@ -155,12 +174,16 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       );
     }
 
-    debugPrint('🎥 [VideoCallScreen] Call ready - callAlreadyJoined: ${widget.callAlreadyJoined}');
+    debugPrint(
+      '🎥 [VideoCallScreen] Call ready - callAlreadyJoined: ${widget.callAlreadyJoined}',
+    );
 
     // If call was already joined (via CallKit/ringing events), use StreamCallContent directly
     // to avoid StreamCallContainer calling join() again
     if (widget.callAlreadyJoined) {
-      debugPrint('🎥 [VideoCallScreen] Using StreamCallContent (call already joined)');
+      debugPrint(
+        '🎥 [VideoCallScreen] Using StreamCallContent (call already joined)',
+      );
       // Use StreamBuilder to listen to call state changes and rebuild UI accordingly
       // This ensures the video streams update when participants join/leave
       return StreamBuilder<CallState>(
@@ -168,18 +191,46 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         initialData: _call!.state.value,
         builder: (context, snapshot) {
           final callState = snapshot.data ?? _call!.state.value;
-          debugPrint('🎥 [VideoCallScreen] StreamBuilder rebuild - status: ${callState.status}');
+          debugPrint(
+            '🎥 [VideoCallScreen] StreamBuilder rebuild - status: ${callState.status}',
+          );
+
+          // Check if call has ended (other party ended the call)
+          if (callState.status.isDisconnected && !_isNavigatingAway) {
+            debugPrint(
+              '🎥 [VideoCallScreen] Call disconnected - navigating away',
+            );
+            _isNavigatingAway = true;
+            // Schedule navigation after build completes
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                context.pop();
+              }
+            });
+            // Show "Call ended" message while navigating
+            return const Scaffold(
+              backgroundColor: Color(0xFF020817),
+              body: Center(
+                child: Text(
+                  'Call ended',
+                  style: TextStyle(color: Colors.white70, fontSize: 18),
+                ),
+              ),
+            );
+          }
 
           return StreamCallContent(
             call: _call!,
             callState: callState,
             onBackPressed: () {
+              _isNavigatingAway = true;
               _videoService.endCall();
               if (mounted) {
                 context.pop();
               }
             },
             onLeaveCallTap: () {
+              _isNavigatingAway = true;
               _videoService.endCall();
               if (mounted) {
                 context.pop();
@@ -190,13 +241,16 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       );
     }
 
-    debugPrint('🎥 [VideoCallScreen] Using StreamCallContainer for call ${_call!.id}');
+    debugPrint(
+      '🎥 [VideoCallScreen] Using StreamCallContainer for call ${_call!.id}',
+    );
 
     // Use StreamCallContainer with default UI (following Stream's official sample pattern)
     // This handles call join, participant management, UI controls automatically
     return StreamCallContainer(
       call: _call!,
       onBackPressed: () {
+        _isNavigatingAway = true;
         _videoService.endCall();
         if (mounted) {
           context.pop();
