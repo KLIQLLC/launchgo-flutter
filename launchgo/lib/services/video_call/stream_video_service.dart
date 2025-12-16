@@ -314,7 +314,7 @@ class StreamVideoService extends ChangeNotifier {
       final body = event.body;
       if (body is Map) {
         // Try different possible keys for call ID
-        final extraData = body['extra'] as Map<String, dynamic>?;
+        final extraData = body['extra'] as Map<dynamic, dynamic>?;
         if (extraData != null) {
           // First try call_id directly (clean ID without prefix)
           callId = extraData['call_id'] as String?;

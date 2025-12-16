@@ -32,3 +32,6 @@
 # Keep all model classes (adjust package name as needed)
 -keep class com.launchgo.** { *; }
 -keep class launchgo.** { *; }
+
+# Flutter CallKit Incoming
+-keep class com.hiennv.flutter_callkit_incoming.** { *; }
