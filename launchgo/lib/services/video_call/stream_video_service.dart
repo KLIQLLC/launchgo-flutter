@@ -36,6 +36,8 @@ class StreamVideoService extends ChangeNotifier {
   _onCallAcceptedCallback; // Callback for navigation after call is accepted
   String?
   _pendingCallKitAcceptId; // Store call ID that was accepted via CallKit before client was initialized
+  StreamSubscription<CallState>?
+  _activeCallStateSubscription; // Listener to detect when active call ends remotely
   static const _platform = MethodChannel(
     'com.launchgo/video_call',
   ); // MethodChannel for Android Intent handling
@@ -287,6 +289,7 @@ class StreamVideoService extends ChangeNotifier {
 
         // The call is already joined by the SDK - just update state and navigate
         _activeCall = callToJoin;
+        _setupActiveCallStateListener(callToJoin);
         _incomingCall = null;
         _incomingCallId = null;
         _incomingCallerName = null;
@@ -585,6 +588,7 @@ class StreamVideoService extends ChangeNotifier {
 
       // Set activeCall IMMEDIATELY so mentor sees "calling" UI right away
       _activeCall = call;
+      _setupActiveCallStateListener(call);
       notifyListeners();
 
       debugPrint('✅ Call created: $callId - UI can navigate now');
@@ -687,6 +691,7 @@ class StreamVideoService extends ChangeNotifier {
       debugPrint('✅ Call joined successfully');
 
       _activeCall = call;
+      _setupActiveCallStateListener(call);
       _incomingCall = null;
       _incomingCallId = null;
       _incomingCallerName = null;
@@ -733,11 +738,52 @@ class StreamVideoService extends ChangeNotifier {
     try {
       await call.join();
       _activeCall = call;
+      _setupActiveCallStateListener(call);
       notifyListeners();
       debugPrint('Joined call successfully');
     } catch (e) {
       debugPrint('Error joining call: $e');
     }
+  }
+
+  /// Set up a listener on the active call's state to detect when it ends remotely
+  void _setupActiveCallStateListener(Call call) {
+    // Cancel any existing subscription
+    _activeCallStateSubscription?.cancel();
+    
+    debugPrint('📞 [CallStateListener] Setting up listener for call: ${call.id}');
+    
+    _activeCallStateSubscription = call.state.asStream().listen((callState) {
+      final status = callState.status;
+      
+      // Check if call was ended remotely
+      if (status.isDisconnected || callState.endedAt != null || status.isIdle) {
+        debugPrint('📞 [CallStateListener] Call ended - status: $status, endedAt: ${callState.endedAt}');
+        _clearActiveCall();
+        return;
+      }
+      
+      // Also check if we're alone in the call (other party left)
+      final participantCount = callState.callParticipants.length;
+      if (participantCount <= 1 && status.isConnected && _activeCall != null) {
+        debugPrint('📞 [CallStateListener] Alone in call (participants: $participantCount) - ending');
+        _clearActiveCall();
+      }
+    }, onError: (error) {
+      debugPrint('❌ [CallStateListener] Error: $error');
+    });
+  }
+  
+  /// Clear the active call and notify listeners
+  void _clearActiveCall() {
+    if (_activeCall == null) return;
+    
+    debugPrint('📞 [CallStateListener] Clearing active call');
+    _activeCallStateSubscription?.cancel();
+    _activeCallStateSubscription = null;
+    _activeCall = null;
+    _lastProcessedCallId = null;
+    notifyListeners();
   }
 
   /// End the active call for all participants
@@ -749,7 +795,11 @@ class StreamVideoService extends ChangeNotifier {
 
     try {
       final callId = _activeCall!.id;
-      debugPrint('Ending call for all participants: $callId');
+      debugPrint('📞 Ending call for all participants: $callId');
+
+      // Cancel state listener first to avoid duplicate notifications
+      _activeCallStateSubscription?.cancel();
+      _activeCallStateSubscription = null;
 
       // Use end() instead of leave() to terminate the call for ALL participants
       // leave() only removes you from the call, others can stay
@@ -775,6 +825,8 @@ class StreamVideoService extends ChangeNotifier {
     _ringingEventsSubscription = null;
     await _callKitSubscription?.cancel();
     _callKitSubscription = null;
+    _activeCallStateSubscription?.cancel();
+    _activeCallStateSubscription = null;
     await _client?.disconnect();
     _client = null;
     _incomingCall = null;

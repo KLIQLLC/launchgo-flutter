@@ -41,7 +41,22 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     );
     _videoService = context.read<StreamVideoService>();
     WakelockPlus.enable(); // Keep screen on during call
+
+    // Listen to service for remote call end detection
+    _videoService.addListener(_onVideoServiceChanged);
+
     _initializeCall();
+  }
+
+  /// Called when video service state changes - detect if call ended by remote party
+  void _onVideoServiceChanged() {
+    // If we had a call but now the service has no active call, the call was ended
+    if (_call != null && !_videoService.hasActiveCall && !_isNavigatingAway) {
+      debugPrint(
+        '🎥 [VideoCallScreen] Service reports no active call - navigating away',
+      );
+      _navigateAway();
+    }
   }
 
   Future<void> _initializeCall() async {
@@ -114,6 +129,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   @override
   void dispose() {
+    _videoService.removeListener(_onVideoServiceChanged);
     WakelockPlus.disable();
     // End call when screen is disposed (user backs out or screen is closed)
     // Skip if already navigating away (call already ended by remote party)
@@ -121,6 +137,25 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       _videoService.endCall(); // Don't await in dispose
     }
     super.dispose();
+  }
+
+  /// Safely navigate away from the call screen
+  void _navigateAway() {
+    if (_isNavigatingAway) return;
+    _isNavigatingAway = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      try {
+        // Simply pop back to previous screen
+        context.pop();
+      } catch (e) {
+        // Safety fallback if pop fails (shouldn't happen in normal flow)
+        debugPrint('🎥 [VideoCallScreen] Pop failed, going to schedule: $e');
+        GoRouter.of(context).go('/schedule');
+      }
+    });
   }
 
   @override
@@ -165,7 +200,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
               ),
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: () => context.pop(),
+                onPressed: _navigateAway,
                 child: const Text('Go Back'),
               ),
             ],
@@ -200,14 +235,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             debugPrint(
               '🎥 [VideoCallScreen] Call disconnected - navigating away',
             );
-            _isNavigatingAway = true;
-            // Schedule navigation after build completes
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                context.pop();
-              }
-            });
-            // Show "Call ended" message while navigating
+            _navigateAway();
             return const Scaffold(
               backgroundColor: Color(0xFF020817),
               body: Center(
@@ -223,18 +251,12 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             call: _call!,
             callState: callState,
             onBackPressed: () {
-              _isNavigatingAway = true;
               _videoService.endCall();
-              if (mounted) {
-                context.pop();
-              }
+              _navigateAway();
             },
             onLeaveCallTap: () {
-              _isNavigatingAway = true;
               _videoService.endCall();
-              if (mounted) {
-                context.pop();
-              }
+              _navigateAway();
             },
           );
         },
@@ -250,11 +272,14 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     return StreamCallContainer(
       call: _call!,
       onBackPressed: () {
-        _isNavigatingAway = true;
         _videoService.endCall();
-        if (mounted) {
-          context.pop();
-        }
+        _navigateAway();
+      },
+      // Important: Wire onLeaveCallTap to use endCall() which terminates for ALL participants
+      // Default Stream behavior uses leave() which only removes local user
+      onLeaveCallTap: () {
+        _videoService.endCall();
+        _navigateAway();
       },
     );
   }
