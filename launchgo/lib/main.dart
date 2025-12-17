@@ -171,15 +171,20 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       _streamVideoService,
     );
 
-    // Set up ringing events callback for navigation when call is accepted
-    // This is called when user accepts via CallKit (iOS) or Android Intent
-    // The call is ALREADY JOINED when this callback fires
+    // Set up ringing events callback for navigation when call is accepted via CallKit/ringing events
+    // The call is ALREADY JOINED when this callback fires (Stream SDK handles accept/join)
     _streamVideoService.setOnCallAcceptedCallback((call) {
       debugPrint('📞 Call accepted callback - call is already joined, navigating to video call screen');
       debugPrint('📞 CallId: ${call.id}');
 
-      // Always navigate when this callback fires - it means call was accepted via CallKit/Intent
-      // Don't check _lastNavigatedCallId here because this is the primary navigation path
+      // Check if we're already on the video call screen (foreground accept via StreamCallContainer)
+      // In that case, don't navigate again
+      if (_lastNavigatedCallId == call.id) {
+        debugPrint('📞 Already on video call screen for this call - skipping navigation');
+        return;
+      }
+
+      // Navigate when call accepted via CallKit (background/terminated app)
       _lastNavigatedCallId = call.id;
       _appRouter.router.pushNamed(
         'video-call',
@@ -200,6 +205,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       debugPrint('📞 User role: ${_authService.userInfo?.role}');
 
       // Handle incoming calls
+      // iOS: CallKit handles incoming call UI - we just wait for accept callback
+      // Android: Show custom IncomingCallScreen
       if (_streamVideoService.incomingCallId != null &&
           _streamVideoService.incomingCallerName != null &&
           _authService.userInfo != null &&
@@ -211,14 +218,19 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           debugPrint('📞 Incoming video call from: ${_streamVideoService.incomingCallerName}');
           _lastIncomingCallId = currentCallId; // Track to prevent duplicate navigation
 
-          // For now, show custom incoming call screen on both platforms
-          // CallKit requires VoIP push notifications which aren't configured yet
-          debugPrint('📞 Navigating to incoming-call screen');
-          _appRouter.router.pushNamed(
-            'incoming-call',
-            pathParameters: {'callId': currentCallId},
-            queryParameters: {'callerName': _streamVideoService.incomingCallerName!},
-          );
+          // iOS: Do NOT navigate - CallKit handles accept/decline
+          // When user accepts via CallKit, _onCallAcceptedCallback will navigate to VideoCallScreen
+          if (Platform.isIOS) {
+            debugPrint('📞 [iOS] CallKit will handle incoming call UI - waiting for accept callback');
+          } else {
+            // Android: Show custom IncomingCallScreen
+            debugPrint('📞 [Android] Navigating to incoming-call screen');
+            _appRouter.router.pushNamed(
+              'incoming-call',
+              pathParameters: {'callId': currentCallId},
+              queryParameters: {'callerName': _streamVideoService.incomingCallerName!},
+            );
+          }
         } else {
           debugPrint('📞 Incoming call screen already shown for call: $currentCallId');
         }
@@ -227,23 +239,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         _lastIncomingCallId = null;
       }
 
-      // Handle when call becomes active via foreground accept (acceptIncomingCall from IncomingCallScreen)
-      // Skip if the call was accepted via ringing events (CallKit) - navigation happens via callback
-      if (_streamVideoService.hasActiveCall &&
-          _authService.userInfo != null &&
-          _authService.userInfo!.isStudent) {
-        final activeCall = _streamVideoService.activeCall;
-        // Only navigate if we haven't already navigated to this call
-        // (prevents duplicate navigation from both listener and callback)
-        if (activeCall != null && _lastNavigatedCallId != activeCall.id) {
-          debugPrint('📞 Active call detected, but navigation handled by IncomingCallScreen or callback');
-          // Note: Navigation is handled by:
-          // 1. IncomingCallScreen._acceptCall() for foreground accepts
-          // 2. setOnCallAcceptedCallback for CallKit/ringing events accepts
-          // So we just track the ID here to prevent duplicates
-          _lastNavigatedCallId = activeCall.id;
-        }
-      } else if (!_streamVideoService.hasActiveCall) {
+      // Handle when no active call - reset tracking
+      // DON'T set _lastNavigatedCallId here when call becomes active
+      // because that would prevent the callback from navigating!
+      if (!_streamVideoService.hasActiveCall) {
         // Reset when no active call
         _lastNavigatedCallId = null;
       }
@@ -273,11 +272,23 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         }
 
         // Process any pending navigation after auth is ready
+        // BUT skip if there's an active video call (user accepted via CallKit)
         if (PendingNavigationService.instance.hasPendingNavigation) {
-          debugPrint('🔄 Auth ready, processing pending navigation');
-          Future.delayed(const Duration(milliseconds: 500), () {
-            PendingNavigationService.instance.processPendingNavigation();
-          });
+          if (_streamVideoService.hasActiveCall) {
+            debugPrint('🔄 Auth ready with pending navigation, but video call is active - skipping');
+            PendingNavigationService.instance.clearPendingNavigation();
+          } else {
+            debugPrint('🔄 Auth ready, processing pending navigation');
+            Future.delayed(const Duration(milliseconds: 500), () {
+              // Double-check no video call started in the meantime
+              if (!_streamVideoService.hasActiveCall) {
+                PendingNavigationService.instance.processPendingNavigation();
+              } else {
+                debugPrint('🔄 Video call became active - skipping pending navigation');
+                PendingNavigationService.instance.clearPendingNavigation();
+              }
+            });
+          }
         }
         
         // Request FCM permissions and setup token for push notifications
@@ -394,10 +405,29 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       }
       
       // Check for pending navigation when app resumes
+      // BUT skip if there's an active video call (user accepted via CallKit)
       if (PendingNavigationService.instance.hasPendingNavigation) {
-        debugPrint('🔄 App resumed with pending navigation');
-        Future.delayed(const Duration(milliseconds: 800), () {
-          PendingNavigationService.instance.processPendingNavigation();
+        if (_streamVideoService.hasActiveCall) {
+          debugPrint('🔄 App resumed with pending navigation, but video call is active - skipping');
+          PendingNavigationService.instance.clearPendingNavigation();
+        } else {
+          debugPrint('🔄 App resumed with pending navigation');
+          Future.delayed(const Duration(milliseconds: 800), () {
+            // Double-check no video call started in the meantime
+            if (!_streamVideoService.hasActiveCall) {
+              PendingNavigationService.instance.processPendingNavigation();
+            } else {
+              debugPrint('🔄 Video call became active - skipping pending navigation');
+              PendingNavigationService.instance.clearPendingNavigation();
+            }
+          });
+        }
+      }
+
+      // If user accepted via CallKit and app just resumed, ensure Stream Video reconnects/joins.
+      if (_streamVideoService.hasActiveCall) {
+        Future.microtask(() async {
+          await _streamVideoService.ensureActiveCallConnected(reason: 'app_resumed');
         });
       }
     }

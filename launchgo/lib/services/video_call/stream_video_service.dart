@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart'
     as callkit_entities;
+import 'package:permission_handler/permission_handler.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:stream_video_flutter/stream_video_flutter.dart';
 import 'package:stream_video_push_notification/stream_video_push_notification.dart';
@@ -36,6 +37,8 @@ class StreamVideoService extends ChangeNotifier {
   _onCallAcceptedCallback; // Callback for navigation after call is accepted
   String?
   _pendingCallKitAcceptId; // Store call ID that was accepted via CallKit before client was initialized
+  String?
+  _pendingCallKitDeclineId; // Store call ID that was declined via CallKit before client was initialized
   StreamSubscription<CallState>?
   _activeCallStateSubscription; // Listener to detect when active call ends remotely
   StreamSubscription<CoordinatorEvent>?
@@ -178,10 +181,9 @@ class StreamVideoService extends ChangeNotifier {
         debugPrint('📞 User is a student, setting up incoming call listener');
         _listenForIncomingCalls();
         _listenForCoordinatorEvents(); // Listen for call rejected by initiator
-        _setupCallKitListener(); // Listen for CallKit accept/decline from native iOS UI
+        _observeRingingEvents(); // Stream's official CallKit handling - call is ALREADY JOINED in callback
+        _setupCallKitListener(); // Backup: direct CallKit listener for edge cases
         _setupAndroidIntentHandler(); // Listen for Android Intent with call ID when app launches from accept
-        // NOTE: _observeRingingEvents() disabled - it requires VoIP push to be fully configured
-        // (com.apple.developer.pushkit.voip entitlement + VoIP cert on Stream dashboard)
       } else {
         debugPrint('📞 User is a mentor, skipping incoming call listener');
       }
@@ -199,6 +201,16 @@ class StreamVideoService extends ChangeNotifier {
           '📞 [INIT] Processing pending CallKit accept for call: $pendingId',
         );
         Future.microtask(() => _handleCallKitAccept(pendingId!));
+      }
+
+      // Process pending CallKit decline if app was terminated and user declined before init
+      if (_pendingCallKitDeclineId != null) {
+        final pendingId = _pendingCallKitDeclineId;
+        _pendingCallKitDeclineId = null; // Clear before processing
+        debugPrint(
+          '📞 [INIT] Processing pending CallKit decline for call: $pendingId',
+        );
+        Future.microtask(() => _handleCallKitDecline(pendingId!));
       }
     } catch (e) {
       debugPrint('❌ [INIT] Error initializing StreamVideoService: $e');
@@ -287,11 +299,13 @@ class StreamVideoService extends ChangeNotifier {
     _ringingEventsSubscription = _client?.observeCoreCallKitEvents(
       onCallAccepted: (callToJoin) {
         debugPrint(
-          '📞 [RingingEvents] Call accepted - call is already joined!',
+          '📞 [RingingEvents] Call accepted (CallKit/ringing events)',
         );
         debugPrint('📞 [RingingEvents] Call ID: ${callToJoin.id}');
 
-        // The call is already joined by the SDK - just update state and navigate
+        // Update state and navigate. Note: depending on platform/version, the SDK may
+        // not have fully joined the call yet when this callback fires, so we run a
+        // safety "ensure connected" pass in the background.
         _activeCall = callToJoin;
         _setupActiveCallStateListener(callToJoin);
         // Clear incoming call state since call is now active
@@ -300,6 +314,11 @@ class StreamVideoService extends ChangeNotifier {
         _incomingCallerName = null;
         _lastProcessedCallId = null;
         notifyListeners();
+
+        // Ensure the client/call are actually connected (resume-from-CallKit case)
+        Future.microtask(() async {
+          await ensureActiveCallConnected(reason: 'ringing_events_onCallAccepted');
+        });
 
         // Invoke callback for navigation
         if (_onCallAcceptedCallback != null) {
@@ -310,6 +329,46 @@ class StreamVideoService extends ChangeNotifier {
     );
 
     debugPrint('✅ Ringing events observer setup complete');
+  }
+
+  /// Ensure the Stream client is connected and (if needed) accept/join the active call.
+  ///
+  /// This is primarily to handle the "user accepts via CallKit, app resumes" flow on iOS,
+  /// where the SDK may deliver the accept event before the call is fully joined.
+  Future<void> ensureActiveCallConnected({String? reason}) async {
+    final call = _activeCall;
+    final client = _client;
+    if (client == null || call == null) return;
+
+    try {
+      debugPrint(
+        '📞 [EnsureConnected] Ensuring connection (reason: ${reason ?? 'unknown'}) for call: ${call.id}',
+      );
+
+      // Ensure WebSocket is connected
+      await client.connect();
+
+      final state = call.state.value;
+      final status = state.status;
+      debugPrint('📞 [EnsureConnected] Current call status: $status');
+
+      // If already connected/reconnecting, do nothing.
+      if (status.isConnected || status.isReconnecting) return;
+
+      // Try accept() first (safe no-op if already accepted)
+      try {
+        await call.accept();
+        debugPrint('📞 [EnsureConnected] accept() ok');
+      } catch (e) {
+        debugPrint('📞 [EnsureConnected] accept() skipped/failed (likely already accepted): $e');
+      }
+
+      // Then join()
+      await call.join();
+      debugPrint('📞 [EnsureConnected] join() ok');
+    } catch (e) {
+      debugPrint('❌ [EnsureConnected] Failed to ensure active call connected: $e');
+    }
   }
 
   /// Setup direct CallKit event listener using FlutterCallkitIncoming
@@ -362,7 +421,9 @@ class StreamVideoService extends ChangeNotifier {
       debugPrint('📞 [CallKit] Event body: ${event.body}');
 
       // Extract call ID from event body
-      // Stream Video sends call_cid in format "type:callId" (e.g., "default:abc123")
+      // IMPORTANT:
+      // - CallKit provides its own UUID in body['id'] / body['uuid'] (NOT a Stream call id)
+      // - Stream call id must be extracted from extra['callCid'] / extra['call_cid'] / extra['call_id']
       String? callId;
       final body = event.body;
       if (body is Map) {
@@ -373,9 +434,12 @@ class StreamVideoService extends ChangeNotifier {
           callId = extraData['call_id'] as String?;
           debugPrint('📞 [CallKit] Extracted call_id from extra: $callId');
 
-          // If not found, try extracting from call_cid (has "default:" prefix)
+          // If not found, try extracting from callCid/call_cid (has "default:" prefix)
           if (callId == null) {
-            final callCid = extraData['call_cid'] as String?;
+            final callCid =
+                (extraData['callCid'] as String?) ??
+                (extraData['call_cid'] as String?) ??
+                (extraData['callCid'.toLowerCase()] as String?);
             if (callCid != null && callCid.contains(':')) {
               callId = callCid.split(':').last;
               debugPrint(
@@ -384,15 +448,14 @@ class StreamVideoService extends ChangeNotifier {
             }
           }
         }
-        // Fallback to id field (UUID - last resort)
-        if (callId == null) {
-          callId = body['id'] as String?;
-          debugPrint('⚠️ [CallKit] Using body[id] as fallback: $callId');
-        }
       }
 
       if (callId == null) {
-        debugPrint('⚠️ [CallKit] Could not extract call ID from event');
+        // Never use CallKit UUID as a Stream call id.
+        // Without a Stream call id we cannot accept/decline correctly.
+        debugPrint(
+          '⚠️ [CallKit] Could not extract Stream callId from event (extra.callCid/call_cid/call_id missing). Ignoring.',
+        );
         return;
       }
 
@@ -423,33 +486,65 @@ class StreamVideoService extends ChangeNotifier {
   }
 
   /// Handle CallKit accept action - user accepted via native iOS call UI
+  /// NOTE: This is a backup handler. Primary handling is done by observeCoreCallKitEvents
+  /// which automatically accepts/joins the call and fires onCallAccepted callback.
   Future<void> _handleCallKitAccept(String callId) async {
-    debugPrint('📞 [CallKit] Handling accept for call: $callId');
+    debugPrint('📞 [CallKit-Backup] Handling accept for call: $callId');
+
+    // Check if call is already active (observeCoreCallKitEvents might have handled it)
+    if (_activeCall != null && _activeCall!.id == callId) {
+      debugPrint('📞 [CallKit-Backup] Call already active - skipping (handled by observeCoreCallKitEvents)');
+      // Still invoke navigation callback if it hasn't been done
+      if (_onCallAcceptedCallback != null) {
+        debugPrint('📞 [CallKit-Backup] Invoking navigation callback for already active call');
+        _onCallAcceptedCallback!(_activeCall!);
+      }
+      return;
+    }
 
     // If client isn't ready yet, store the call ID to process after initialization
     if (_client == null) {
       debugPrint(
-        '⚠️ [CallKit] Client not ready - storing call ID for processing after init: $callId',
+        '⚠️ [CallKit-Backup] Client not ready - storing call ID for processing after init: $callId',
       );
       _pendingCallKitAcceptId = callId;
       return;
     }
 
     try {
+      // Request camera and microphone permissions (required for video call)
+      debugPrint('📞 [CallKit-Backup] Requesting camera and microphone permissions...');
+      final Map<Permission, PermissionStatus> statuses = await [
+        Permission.camera,
+        Permission.microphone,
+      ].request();
+
+      debugPrint('📞 [CallKit-Backup] Permission results:');
+      debugPrint('   Camera: ${statuses[Permission.camera]}');
+      debugPrint('   Microphone: ${statuses[Permission.microphone]}');
+
+      // Check if all permissions are granted
+      final allGranted = statuses.values.every((status) => status.isGranted);
+      if (!allGranted) {
+        debugPrint('⚠️ [CallKit-Backup] Not all permissions granted - continuing anyway');
+        // On iOS with CallKit, we should still try to join even without permissions
+        // The system will show permission dialogs when needed
+      }
+
       // Accept and get the call
       final call = await acceptIncomingCall(callId: callId);
       if (call != null) {
-        debugPrint('✅ [CallKit] Call accepted successfully: $callId');
+        debugPrint('✅ [CallKit-Backup] Call accepted successfully: $callId');
         // Invoke callback for navigation
         if (_onCallAcceptedCallback != null) {
-          debugPrint('📞 [CallKit] Invoking navigation callback');
+          debugPrint('📞 [CallKit-Backup] Invoking navigation callback');
           _onCallAcceptedCallback!(call);
         }
       } else {
-        debugPrint('❌ [CallKit] Failed to accept call: $callId');
+        debugPrint('❌ [CallKit-Backup] Failed to accept call: $callId');
       }
     } catch (e) {
-      debugPrint('❌ [CallKit] Error accepting call: $e');
+      debugPrint('❌ [CallKit-Backup] Error accepting call: $e');
     }
   }
 
@@ -457,12 +552,22 @@ class StreamVideoService extends ChangeNotifier {
   Future<void> _handleCallKitDecline(String callId) async {
     debugPrint('📞 [CallKit] Handling decline for call: $callId');
 
+    // Clear incoming call state regardless of whether reject succeeds
+    // This ensures UI updates even if the API call fails
+    _clearIncomingCallState();
+
     if (_client == null) {
-      debugPrint('⚠️ [CallKit] Client not ready for decline');
+      debugPrint(
+        '⚠️ [CallKit] Client not ready for decline - storing call ID for processing after init: $callId',
+      );
+      _pendingCallKitDeclineId = callId;
       return;
     }
 
     try {
+      // Ensure WebSocket is connected so the reject reaches the coordinator.
+      await _client!.connect();
+
       final call = _client!.makeCall(
         callType: StreamCallType.defaultType(),
         id: callId,
@@ -470,9 +575,22 @@ class StreamVideoService extends ChangeNotifier {
       await call.getOrCreate();
       await call.reject();
       debugPrint('✅ [CallKit] Call declined: $callId');
+      _dismissCallKitIfAny(reason: 'callkit_declined');
     } catch (e) {
       debugPrint('❌ [CallKit] Error declining call: $e');
     }
+  }
+
+  /// Clear incoming call state, dismiss CallKit, and notify listeners
+  void _clearIncomingCallState() {
+    debugPrint('📞 [CallKit] Clearing incoming call state');
+    _incomingCall = null;
+    _incomingCallId = null;
+    _incomingCallerName = null;
+    _lastProcessedCallId = null;
+    // Dismiss CallKit UI when incoming call state is cleared
+    _dismissCallKitIfAny(reason: 'incoming_call_state_cleared');
+    notifyListeners();
   }
 
   /// Listen for incoming calls (students only) - for foreground UI
@@ -512,6 +630,9 @@ class StreamVideoService extends ChangeNotifier {
         _lastProcessedCallId = callId;
         _incomingCall = call; // Store the actual Call object
         _incomingCallId = callId; // Also store ID for display
+
+        // On iOS: CallKit handles the incoming call UI (triggered by VoIP push)
+        // On Android: main.dart listener navigates to IncomingCallScreen
 
         // Get caller name from callParticipants (the mentor who initiated the call)
         final participants = call.state.value.callParticipants;
@@ -575,7 +696,7 @@ class StreamVideoService extends ChangeNotifier {
     debugPrint('✅ Coordinator events listener setup complete');
   }
 
-  /// Clear incoming call state and notify listeners
+  /// Clear incoming call state, dismiss CallKit, and notify listeners
   void _clearIncomingCall() {
     if (_incomingCall == null && _incomingCallId == null) return;
     debugPrint('📞 Clearing incoming call state');
@@ -583,6 +704,8 @@ class StreamVideoService extends ChangeNotifier {
     _incomingCallId = null;
     _incomingCallerName = null;
     _lastProcessedCallId = null;
+    // IMPORTANT: Dismiss CallKit UI when incoming call is cleared (e.g., initiator cancelled)
+    _dismissCallKitIfAny(reason: 'incoming_call_cleared');
     notifyListeners();
   }
 
@@ -802,13 +925,35 @@ class StreamVideoService extends ChangeNotifier {
     
     debugPrint('📞 [CallStateListener] Setting up listener for call: ${call.id}');
     
+    // Track if we've seen a connected state - only clear after being connected
+    bool wasConnected = false;
+    
     _activeCallStateSubscription = call.state.asStream().listen((callState) {
       final status = callState.status;
       
-      // Check if call was ended remotely
-      if (status.isDisconnected || callState.endedAt != null || status.isIdle) {
-        debugPrint('📞 [CallStateListener] Call ended - status: $status, endedAt: ${callState.endedAt}');
+      debugPrint('📞 [CallStateListener] State update - status: $status, wasConnected: $wasConnected');
+      
+      // Always clear if the call is disconnected/ended (even if it never reached Connected).
+      // This is critical for "callee declined" / "caller cancelled" flows.
+      if (status.isDisconnected || callState.endedAt != null) {
+        debugPrint(
+          '📞 [CallStateListener] Call ended/disconnected - status: $status, endedAt: ${callState.endedAt}',
+        );
+        _dismissCallKitIfAny(reason: 'call_state_disconnected');
         _clearActiveCall();
+        return;
+      }
+
+      // Mark as connected when we reach connected state
+      if (status.isConnected) {
+        wasConnected = true;
+        debugPrint('📞 [CallStateListener] Call is now connected');
+      }
+      
+      // Only check for end conditions if we were previously connected
+      // This prevents false positives during initial connection
+      if (!wasConnected) {
+        debugPrint('📞 [CallStateListener] Skipping end check - not yet connected');
         return;
       }
       
@@ -816,10 +961,24 @@ class StreamVideoService extends ChangeNotifier {
       final participantCount = callState.callParticipants.length;
       if (participantCount <= 1 && status.isConnected && _activeCall != null) {
         debugPrint('📞 [CallStateListener] Alone in call (participants: $participantCount) - ending');
+        _dismissCallKitIfAny(reason: 'call_state_alone');
         _clearActiveCall();
       }
     }, onError: (error) {
       debugPrint('❌ [CallStateListener] Error: $error');
+    });
+  }
+
+  void _dismissCallKitIfAny({required String reason}) {
+    // Only meaningful on iOS; safe no-op elsewhere.
+    if (defaultTargetPlatform != TargetPlatform.iOS) return;
+    Future.microtask(() async {
+      try {
+        debugPrint('📞 [CallKit] Dismissing CallKit UI (reason: $reason)');
+        await FlutterCallkitIncoming.endAllCalls();
+      } catch (e) {
+        debugPrint('⚠️ [CallKit] Failed to dismiss CallKit UI: $e');
+      }
     });
   }
   
@@ -885,6 +1044,7 @@ class StreamVideoService extends ChangeNotifier {
     _incomingCallerName = null;
     _lastProcessedCallId = null;
     _pendingCallKitAcceptId = null; // Clear pending accept
+    _pendingCallKitDeclineId = null; // Clear pending decline
     _isInitialized = false; // Reset so new user can initialize
     notifyListeners();
     debugPrint('StreamVideoService disconnected');

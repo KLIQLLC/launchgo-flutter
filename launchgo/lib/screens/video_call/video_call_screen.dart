@@ -50,12 +50,31 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   /// Called when video service state changes - detect if call ended by remote party
   void _onVideoServiceChanged() {
-    // If we had a call but now the service has no active call, the call was ended
-    if (_call != null && !_videoService.hasActiveCall && !_isNavigatingAway) {
-      debugPrint(
-        '🎥 [VideoCallScreen] Service reports no active call - navigating away',
-      );
-      _navigateAway();
+    // Only navigate away if:
+    // 1. We had a local _call object set
+    // 2. The service no longer has an active call
+    // 3. We're not already navigating away
+    // 4. The call was actually connected (not just initializing)
+    if (_call != null &&
+        !_videoService.hasActiveCall &&
+        !_isNavigatingAway &&
+        !_isLoading) {
+      // Don't navigate away during initial loading
+      // Additional check: make sure the call state is actually disconnected
+      final callState = _call!.state.valueOrNull;
+      final isDisconnected = callState?.status.isDisconnected ?? false;
+      final hasEnded = callState?.endedAt != null;
+
+      if (isDisconnected || hasEnded) {
+        debugPrint(
+          '🎥 [VideoCallScreen] Call ended (disconnected: $isDisconnected, hasEnded: $hasEnded) - navigating away',
+        );
+        _navigateAway();
+      } else {
+        debugPrint(
+          '🎥 [VideoCallScreen] Service has no active call but call state not disconnected - waiting',
+        );
+      }
     }
   }
 
@@ -110,6 +129,44 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       await call.getOrCreate();
       debugPrint('🎥 [VideoCallScreen] Call fetched successfully: ${call.id}');
 
+      // If callAlreadyJoined is true but we had to fetch the call (activeCall was null),
+      // it means there was a race condition - we need to join the call now
+      if (widget.callAlreadyJoined) {
+        debugPrint(
+          '🎥 [VideoCallScreen] callAlreadyJoined=true but had to fetch call - joining now',
+        );
+        // Ensure client WebSocket is connected (app may have just resumed from background)
+        try {
+          await client.connect();
+        } catch (e) {
+          debugPrint(
+            '⚠️ [VideoCallScreen] client.connect() failed/ignored: $e',
+          );
+        }
+
+        final callState = call.state.value;
+        // Only join if not already connected
+        if (!callState.status.isConnected && !callState.status.isReconnecting) {
+          debugPrint(
+            '🎥 [VideoCallScreen] Call not connected, calling accept() and join()...',
+          );
+          try {
+            await call.accept();
+            debugPrint('🎥 [VideoCallScreen] Call accepted');
+          } catch (e) {
+            debugPrint(
+              '⚠️ [VideoCallScreen] Accept failed (might already be accepted): $e',
+            );
+          }
+          await call.join();
+          debugPrint('🎥 [VideoCallScreen] Call joined successfully');
+        } else {
+          debugPrint(
+            '🎥 [VideoCallScreen] Call already connected: ${callState.status}',
+          );
+        }
+      }
+
       if (mounted) {
         setState(() {
           _call = call;
@@ -117,7 +174,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         });
       }
     } catch (e) {
-      debugPrint('❌ [VideoCallScreen] Error fetching call: $e');
+      debugPrint('❌ [VideoCallScreen] Error fetching/joining call: $e');
       if (mounted) {
         setState(() {
           _error = 'Failed to connect to call';
