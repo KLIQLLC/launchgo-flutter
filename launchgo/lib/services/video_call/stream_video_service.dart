@@ -38,8 +38,6 @@ class StreamVideoService extends ChangeNotifier {
   _pendingCallKitAcceptId; // Store call ID that was accepted via CallKit before client was initialized
   StreamSubscription<CallState>?
   _activeCallStateSubscription; // Listener to detect when active call ends remotely
-  StreamSubscription<CallState>?
-  _incomingCallStateSubscription; // Listener to detect when incoming call is cancelled by initiator
   StreamSubscription<CoordinatorEvent>?
   _coordinatorEventsSubscription; // Listener for coordinator events (call rejected by initiator)
   static const _platform = MethodChannel(
@@ -296,9 +294,7 @@ class StreamVideoService extends ChangeNotifier {
         // The call is already joined by the SDK - just update state and navigate
         _activeCall = callToJoin;
         _setupActiveCallStateListener(callToJoin);
-        // Clear incoming call state (and its listener) since call is now active
-        _incomingCallStateSubscription?.cancel();
-        _incomingCallStateSubscription = null;
+        // Clear incoming call state since call is now active
         _incomingCall = null;
         _incomingCallId = null;
         _incomingCallerName = null;
@@ -517,9 +513,6 @@ class StreamVideoService extends ChangeNotifier {
         _incomingCall = call; // Store the actual Call object
         _incomingCallId = callId; // Also store ID for display
 
-        // Set up listener for this incoming call's state to detect cancellation by initiator
-        _setupIncomingCallStateListener(call);
-
         // Get caller name from callParticipants (the mentor who initiated the call)
         final participants = call.state.value.callParticipants;
         if (participants.isNotEmpty && participants.first.name.isNotEmpty) {
@@ -582,34 +575,10 @@ class StreamVideoService extends ChangeNotifier {
     debugPrint('✅ Coordinator events listener setup complete');
   }
 
-  /// Set up listener on incoming call's state to detect cancellation by initiator
-  void _setupIncomingCallStateListener(Call call) {
-    _incomingCallStateSubscription?.cancel();
-    _incomingCallStateSubscription = call.state.asStream().listen((callState) {
-      final status = callState.status;
-      debugPrint('📞 [IncomingCallStateListener] State changed: $status');
-
-      // Check if call was cancelled/rejected by initiator (call owner)
-      if (status.isDisconnected ||
-          callState.endedAt != null ||
-          status.isIdle ||
-          status.toString().contains('Rejected')) {
-        debugPrint(
-          '📞 [IncomingCallStateListener] Call cancelled by initiator - clearing incoming call',
-        );
-        _clearIncomingCall();
-      }
-    }, onError: (error) {
-      debugPrint('❌ [IncomingCallStateListener] Error: $error');
-    });
-  }
-
   /// Clear incoming call state and notify listeners
   void _clearIncomingCall() {
     if (_incomingCall == null && _incomingCallId == null) return;
     debugPrint('📞 Clearing incoming call state');
-    _incomingCallStateSubscription?.cancel();
-    _incomingCallStateSubscription = null;
     _incomingCall = null;
     _incomingCallId = null;
     _incomingCallerName = null;
@@ -772,9 +741,7 @@ class StreamVideoService extends ChangeNotifier {
 
       _activeCall = call;
       _setupActiveCallStateListener(call);
-      // Clear incoming call state (and its listener) since call is now active
-      _incomingCallStateSubscription?.cancel();
-      _incomingCallStateSubscription = null;
+      // Clear incoming call state since call is now active
       _incomingCall = null;
       _incomingCallId = null;
       _incomingCallerName = null;
@@ -802,9 +769,7 @@ class StreamVideoService extends ChangeNotifier {
       // Use the actual Call object to reject
       await _incomingCall!.reject();
 
-      // Cancel incoming call state listener
-      _incomingCallStateSubscription?.cancel();
-      _incomingCallStateSubscription = null;
+      // Clear incoming call state
       _incomingCall = null;
       _incomingCallId = null;
       _incomingCallerName = null;
@@ -812,8 +777,6 @@ class StreamVideoService extends ChangeNotifier {
       notifyListeners();
 
       debugPrint('Call declined successfully');
-
-      // NOTE: No need to re-establish listener - it remains active for next call
     } catch (e) {
       debugPrint('Error declining call: $e');
     }
@@ -913,8 +876,6 @@ class StreamVideoService extends ChangeNotifier {
     _callKitSubscription = null;
     _activeCallStateSubscription?.cancel();
     _activeCallStateSubscription = null;
-    _incomingCallStateSubscription?.cancel();
-    _incomingCallStateSubscription = null;
     await _coordinatorEventsSubscription?.cancel();
     _coordinatorEventsSubscription = null;
     await _client?.disconnect();

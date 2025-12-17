@@ -1,10 +1,8 @@
 // screens/video_call/incoming_call_screen.dart
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:stream_video_flutter/stream_video_flutter.dart';
 import '../../services/video_call/stream_video_service.dart';
 
 /// Incoming call screen for students
@@ -25,7 +23,6 @@ class IncomingCallScreen extends StatefulWidget {
 
 class _IncomingCallScreenState extends State<IncomingCallScreen> {
   late final StreamVideoService _videoService;
-  StreamSubscription<CallState>? _callStateSubscription;
   bool _isDismissing = false;
 
   @override
@@ -33,40 +30,12 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
     super.initState();
     _videoService = context.read<StreamVideoService>();
     // Listen for call cancellation (caller hangs up before we answer)
+    // The service's coordinator events listener clears incomingCallId when initiator cancels
     _videoService.addListener(_onServiceChanged);
-
-    // Also listen directly to the incoming call's state for cancellation
-    _setupCallStateListener();
-  }
-
-  void _setupCallStateListener() {
-    final incomingCall = _videoService.incomingCall;
-    if (incomingCall != null) {
-      debugPrint('📞 [IncomingCallScreen] Setting up call state listener');
-      _callStateSubscription = incomingCall.state.asStream().listen((
-        callState,
-      ) {
-        final status = callState.status;
-        debugPrint('📞 [IncomingCallScreen] Call state changed: $status');
-
-        // Check if call was cancelled/ended by caller
-        // Also check for Rejected status which happens when initiator cancels
-        if (status.isDisconnected ||
-            callState.endedAt != null ||
-            status.isIdle ||
-            status.toString().contains('Rejected')) {
-          debugPrint(
-            '📞 [IncomingCallScreen] Call cancelled by initiator - dismissing (status: $status)',
-          );
-          _dismiss();
-        }
-      });
-    }
   }
 
   @override
   void dispose() {
-    _callStateSubscription?.cancel();
     _videoService.removeListener(_onServiceChanged);
     super.dispose();
   }
