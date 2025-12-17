@@ -371,6 +371,34 @@ class StreamVideoService extends ChangeNotifier {
     }
   }
 
+  /// Extract Stream call ID from CallKit data (used by both event listener and active calls check)
+  /// CallKit stores the Stream call ID in extra['callCid'] (format: "default:callId") or extra['call_id']
+  String? _extractStreamCallIdFromCallKitData(Map<dynamic, dynamic> data) {
+    String? callId;
+    
+    final extra = data['extra'] as Map<dynamic, dynamic>?;
+    if (extra != null) {
+      // First try call_id directly (clean ID without prefix)
+      callId = extra['call_id'] as String?;
+      if (callId != null) {
+        debugPrint('📞 [CallKit] Extracted call_id from extra.call_id: $callId');
+        return callId;
+      }
+
+      // Try extracting from callCid/call_cid (has "default:" prefix)
+      final callCid =
+          (extra['callCid'] as String?) ??
+          (extra['call_cid'] as String?);
+      if (callCid != null && callCid.contains(':')) {
+        callId = callCid.split(':').last;
+        debugPrint('📞 [CallKit] Extracted call_id from extra.callCid: $callId');
+        return callId;
+      }
+    }
+    
+    return null;
+  }
+
   /// Setup direct CallKit event listener using FlutterCallkitIncoming
   /// This handles accept/decline when user interacts with native iOS CallKit UI
   /// Works even when app was terminated and wakes up from CallKit
@@ -381,7 +409,7 @@ class StreamVideoService extends ChangeNotifier {
     _callKitSubscription?.cancel();
 
     // Check for active calls that may have been accepted before listener was set up (race condition fix)
-    // When app is terminated and user accepts call, the accept happens before we set up the listener
+    // When app is terminated/locked and user swipes to accept, the accept happens before we set up the listener
     Future.microtask(() async {
       try {
         final activeCalls = await FlutterCallkitIncoming.activeCalls();
@@ -394,16 +422,16 @@ class StreamVideoService extends ChangeNotifier {
             debugPrint('📞 [CallKit] Active call found: ${call['id']}');
             debugPrint('📞 [CallKit] Active call extra: ${call['extra']}');
 
-            // Extract call ID from the active call data
-            final extra = call['extra'] as Map<String, dynamic>?;
-            if (extra != null) {
-              final callId = extra['call_id'] as String?;
-              if (callId != null) {
-                debugPrint(
-                  '📞 [CallKit] Processing active call that was accepted before listener: $callId',
-                );
-                _handleCallKitAccept(callId);
-              }
+            // Extract Stream call ID from the active call data
+            // Use the same extraction logic as the event listener
+            final callId = _extractStreamCallIdFromCallKitData(call);
+            if (callId != null) {
+              debugPrint(
+                '📞 [CallKit] Processing active call that was accepted before listener (locked screen): $callId',
+              );
+              _handleCallKitAccept(callId);
+            } else {
+              debugPrint('⚠️ [CallKit] Could not extract Stream callId from active call');
             }
           }
         }
@@ -420,46 +448,22 @@ class StreamVideoService extends ChangeNotifier {
       debugPrint('📞 [CallKit] Event received: ${event.event}');
       debugPrint('📞 [CallKit] Event body: ${event.body}');
 
-      // Extract call ID from event body
-      // IMPORTANT:
-      // - CallKit provides its own UUID in body['id'] / body['uuid'] (NOT a Stream call id)
-      // - Stream call id must be extracted from extra['callCid'] / extra['call_cid'] / extra['call_id']
-      String? callId;
+      // Extract Stream call ID from event body using shared helper
       final body = event.body;
-      if (body is Map) {
-        // Try different possible keys for call ID
-        final extraData = body['extra'] as Map<dynamic, dynamic>?;
-        if (extraData != null) {
-          // First try call_id directly (clean ID without prefix)
-          callId = extraData['call_id'] as String?;
-          debugPrint('📞 [CallKit] Extracted call_id from extra: $callId');
-
-          // If not found, try extracting from callCid/call_cid (has "default:" prefix)
-          if (callId == null) {
-            final callCid =
-                (extraData['callCid'] as String?) ??
-                (extraData['call_cid'] as String?) ??
-                (extraData['callCid'.toLowerCase()] as String?);
-            if (callCid != null && callCid.contains(':')) {
-              callId = callCid.split(':').last;
-              debugPrint(
-                '📞 [CallKit] Extracted call_id from call_cid: $callId',
-              );
-            }
-          }
-        }
+      if (body is! Map) {
+        debugPrint('⚠️ [CallKit] Event body is not a Map, ignoring');
+        return;
       }
 
+      final callId = _extractStreamCallIdFromCallKitData(body);
       if (callId == null) {
-        // Never use CallKit UUID as a Stream call id.
-        // Without a Stream call id we cannot accept/decline correctly.
         debugPrint(
-          '⚠️ [CallKit] Could not extract Stream callId from event (extra.callCid/call_cid/call_id missing). Ignoring.',
+          '⚠️ [CallKit] Could not extract Stream callId from event. Ignoring.',
         );
         return;
       }
 
-      debugPrint('📞 [CallKit] Call ID: $callId');
+      debugPrint('📞 [CallKit] Stream Call ID: $callId');
 
       switch (event.event) {
         case callkit_entities.Event.actionCallAccept:
@@ -554,7 +558,7 @@ class StreamVideoService extends ChangeNotifier {
 
     // Clear incoming call state regardless of whether reject succeeds
     // This ensures UI updates even if the API call fails
-    _clearIncomingCallState();
+    _clearIncomingCall();
 
     if (_client == null) {
       debugPrint(
@@ -582,14 +586,15 @@ class StreamVideoService extends ChangeNotifier {
   }
 
   /// Clear incoming call state, dismiss CallKit, and notify listeners
-  void _clearIncomingCallState() {
-    debugPrint('📞 [CallKit] Clearing incoming call state');
+  void _clearIncomingCall() {
+    if (_incomingCall == null && _incomingCallId == null) return;
+    debugPrint('📞 Clearing incoming call state');
     _incomingCall = null;
     _incomingCallId = null;
     _incomingCallerName = null;
     _lastProcessedCallId = null;
-    // Dismiss CallKit UI when incoming call state is cleared
-    _dismissCallKitIfAny(reason: 'incoming_call_state_cleared');
+    // Dismiss CallKit UI when incoming call is cleared (e.g., initiator cancelled or declined)
+    _dismissCallKitIfAny(reason: 'incoming_call_cleared');
     notifyListeners();
   }
 
@@ -694,19 +699,6 @@ class StreamVideoService extends ChangeNotifier {
     });
 
     debugPrint('✅ Coordinator events listener setup complete');
-  }
-
-  /// Clear incoming call state, dismiss CallKit, and notify listeners
-  void _clearIncomingCall() {
-    if (_incomingCall == null && _incomingCallId == null) return;
-    debugPrint('📞 Clearing incoming call state');
-    _incomingCall = null;
-    _incomingCallId = null;
-    _incomingCallerName = null;
-    _lastProcessedCallId = null;
-    // IMPORTANT: Dismiss CallKit UI when incoming call is cleared (e.g., initiator cancelled)
-    _dismissCallKitIfAny(reason: 'incoming_call_cleared');
-    notifyListeners();
   }
 
   /// Create and initiate a call (mentor only)
