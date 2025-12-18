@@ -26,6 +26,9 @@ import 'package:launchgo/features/recaps/data/recap_repository.dart';
 import 'package:provider/provider.dart';
 import 'package:stream_chat_flutter/stream_chat_flutter.dart';
 
+/// MethodChannel for receiving video call intents from Android native code
+const _videoCallChannel = MethodChannel('com.launchgo/video_call');
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
@@ -171,80 +174,75 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       _streamVideoService,
     );
 
+    // Set up MethodChannel listener for Android terminated state call acceptance
+    // When user accepts call via CallKit while app is terminated, MainActivity sends
+    // the call_id to Flutter via this channel
+    if (Platform.isAndroid) {
+      _setupAndroidCallIntentHandler();
+    }
+
+    // NOTE: We DO NOT set up manual CallKit listeners here.
+    // The Stream Video SDK handles CallKit internally via observeCoreRingingEvents.
+    // Manual listeners conflict with the SDK's internal handling.
+
     // Set up ringing events callback for navigation when call is accepted
-    // This is called when user accepts via CallKit (iOS) or Android Intent
+    // Based on official pattern: observeCoreRingingEvents
     // The call is ALREADY JOINED when this callback fires
     _streamVideoService.setOnCallAcceptedCallback((call) {
-      debugPrint('📞 Call accepted callback - call is already joined, navigating to video call screen');
-      debugPrint('📞 CallId: ${call.id}');
+      debugPrint('[VIDEO_CALL] Call accepted via CallKit/push - navigating');
+      debugPrint('[VIDEO_CALL] Call ID: ${call.id}');
+      debugPrint('[VIDEO_CALL] App state: foreground');
 
-      // Always navigate when this callback fires - it means call was accepted via CallKit/Intent
-      // Don't check _lastNavigatedCallId here because this is the primary navigation path
       _lastNavigatedCallId = call.id;
       _appRouter.router.pushNamed(
-        'video-call',
+        'student-video-chat',
         pathParameters: {'callId': call.id},
         queryParameters: {
-          'recipientName': 'Mentor',
-          'callAlreadyJoined': 'true', // Tell VideoCallScreen the call is already joined
+          'callerName': 'Mentor',
+          'autoAccept': 'true',  // Call already accepted via CallKit
         },
       );
     });
 
-    // Listen for incoming video calls and active call changes
+    // Listen for incoming video calls (foreground - students only)
+    // Based on official pattern: listening to service.incomingCallId
     _streamVideoService.addListener(() {
-      debugPrint('📞 StreamVideoService listener triggered');
-      debugPrint('📞 incomingCallId: ${_streamVideoService.incomingCallId}');
-      debugPrint('📞 incomingCallerName: ${_streamVideoService.incomingCallerName}');
-      debugPrint('📞 hasActiveCall: ${_streamVideoService.hasActiveCall}');
-      debugPrint('📞 User role: ${_authService.userInfo?.role}');
+      final userRole = _authService.userInfo?.role.toString() ?? 'unknown';
+      debugPrint('[VIDEO_CALL] Service listener triggered');
+      debugPrint('[VIDEO_CALL] User role: $userRole');
+      debugPrint('[VIDEO_CALL] Incoming call ID: ${_streamVideoService.incomingCallId}');
+      debugPrint('[VIDEO_CALL] Incoming caller: ${_streamVideoService.incomingCallerName}');
 
-      // Handle incoming calls
+      // Handle incoming calls (students only, app in foreground)
       if (_streamVideoService.incomingCallId != null &&
           _streamVideoService.incomingCallerName != null &&
           _authService.userInfo != null &&
           _authService.userInfo!.isStudent) {
         final currentCallId = _streamVideoService.incomingCallId!;
 
-        // Only navigate if this is a new incoming call (prevent duplicate screens)
+        // Prevent duplicate navigation
         if (_lastIncomingCallId != currentCallId) {
-          debugPrint('📞 Incoming video call from: ${_streamVideoService.incomingCallerName}');
-          _lastIncomingCallId = currentCallId; // Track to prevent duplicate navigation
+          debugPrint('[VIDEO_CALL] New incoming call detected');
+          debugPrint('[VIDEO_CALL] App state: foreground');
+          debugPrint('[VIDEO_CALL] Navigating to student-video-chat screen');
 
-          // For now, show custom incoming call screen on both platforms
-          // CallKit requires VoIP push notifications which aren't configured yet
-          debugPrint('📞 Navigating to incoming-call screen');
+          _lastIncomingCallId = currentCallId;
+
           _appRouter.router.pushNamed(
-            'incoming-call',
+            'student-video-chat',
             pathParameters: {'callId': currentCallId},
-            queryParameters: {'callerName': _streamVideoService.incomingCallerName!},
+            queryParameters: {
+              'callerName': _streamVideoService.incomingCallerName!,
+              // autoAccept is false by default - show Accept/Decline UI
+            },
           );
-        } else {
-          debugPrint('📞 Incoming call screen already shown for call: $currentCallId');
         }
       } else if (_streamVideoService.incomingCallId == null) {
-        // Reset tracking when no incoming call
         _lastIncomingCallId = null;
       }
 
-      // Handle when call becomes active via foreground accept (acceptIncomingCall from IncomingCallScreen)
-      // Skip if the call was accepted via ringing events (CallKit) - navigation happens via callback
-      if (_streamVideoService.hasActiveCall &&
-          _authService.userInfo != null &&
-          _authService.userInfo!.isStudent) {
-        final activeCall = _streamVideoService.activeCall;
-        // Only navigate if we haven't already navigated to this call
-        // (prevents duplicate navigation from both listener and callback)
-        if (activeCall != null && _lastNavigatedCallId != activeCall.id) {
-          debugPrint('📞 Active call detected, but navigation handled by IncomingCallScreen or callback');
-          // Note: Navigation is handled by:
-          // 1. IncomingCallScreen._acceptCall() for foreground accepts
-          // 2. setOnCallAcceptedCallback for CallKit/ringing events accepts
-          // So we just track the ID here to prevent duplicates
-          _lastNavigatedCallId = activeCall.id;
-        }
-      } else if (!_streamVideoService.hasActiveCall) {
-        // Reset when no active call
+      // Reset navigation tracking when call ends
+      if (!_streamVideoService.hasActiveCall) {
         _lastNavigatedCallId = null;
       }
     });
@@ -270,6 +268,27 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         if (_authService.userInfo!.callGetStreamToken != null) {
           await _streamVideoService.initialize(_authService.userInfo!);
           debugPrint('✅ Stream Video initialized for user: ${_authService.userInfo!.id}');
+
+          // Consume active call from terminated state (for students)
+          if (_authService.userInfo!.isStudent) {
+            debugPrint('[VIDEO_CALL] Checking for active call from terminated state');
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _streamVideoService.consumeAndAcceptActiveCall((callToJoin) {
+                debugPrint('[VIDEO_CALL] Active call consumed from terminated state (auth listener)');
+                debugPrint('[VIDEO_CALL] Call ID: ${callToJoin.id}');
+
+                _lastNavigatedCallId = callToJoin.id;
+                _appRouter.router.pushNamed(
+                  'student-video-chat',
+                  pathParameters: {'callId': callToJoin.id},
+                  queryParameters: {
+                    'callerName': 'Mentor',
+                    'autoAccept': 'true',  // Call already accepted from terminated state
+                  },
+                );
+              });
+            });
+          }
         }
 
         // Process any pending navigation after auth is ready
@@ -330,7 +349,29 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         // Double-check user is still authenticated
         if (_authService.userInfo != null) {
           await _streamVideoService.initialize(_authService.userInfo!);
-          debugPrint('✅ Stream Video initialized on startup for user: ${_authService.userInfo!.id}');
+          debugPrint('[VIDEO_CALL] Stream Video initialized on startup');
+
+          // Consume active call from terminated state (Android)
+          // Based on official pattern from GetStream tutorial
+          if (_authService.userInfo!.isStudent) {
+            debugPrint('[VIDEO_CALL] Attempting to consume active call from terminated state');
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _streamVideoService.consumeAndAcceptActiveCall((callToJoin) {
+                debugPrint('[VIDEO_CALL] Active call consumed from terminated state');
+                debugPrint('[VIDEO_CALL] Call ID: ${callToJoin.id}');
+                debugPrint('[VIDEO_CALL] App state: terminated -> foreground');
+
+                _appRouter.router.pushNamed(
+                  'student-video-chat',
+                  pathParameters: {'callId': callToJoin.id},
+                  queryParameters: {
+                    'callerName': 'Mentor',
+                    'autoAccept': 'true',  // Call already accepted from terminated state
+                  },
+                );
+              });
+            });
+          }
         }
       });
     }
@@ -357,6 +398,95 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         });
       }
     });
+  }
+
+  /// Set up handler for video call intents from Android native code
+  /// This handles the case where user accepts a call via CallKit while app is terminated
+  void _setupAndroidCallIntentHandler() {
+    debugPrint('[VC] 📞 Setting up Android call intent handler via MethodChannel');
+
+    _videoCallChannel.setMethodCallHandler((call) async {
+      debugPrint('[VC] 📞 MethodChannel received: ${call.method}');
+      debugPrint('[VC] 📞 MethodChannel arguments: ${call.arguments}');
+
+      if (call.method == 'onCallAcceptedFromIntent') {
+        final args = call.arguments as Map<dynamic, dynamic>?;
+        final callId = args?['callId'] as String?;
+
+        debugPrint('[VC] 📞 ========== CALL ACCEPTED FROM ANDROID INTENT ==========');
+        debugPrint('[VC] 📞 Call ID: $callId');
+
+        if (callId != null) {
+          // Wait a bit for auth and video service to be ready
+          await Future.delayed(const Duration(milliseconds: 500));
+
+          // Ensure video service is initialized
+          if (_authService.userInfo != null && !_streamVideoService.isInitialized) {
+            debugPrint('[VC] 📞 Video service not initialized, initializing now...');
+            await _streamVideoService.initialize(_authService.userInfo!);
+          }
+
+          // Navigate to video chat screen
+          // User already accepted from notification - auto-accept the call
+          debugPrint('[VC] 📞 Navigating to student-video-chat screen with autoAccept=true');
+          _lastNavigatedCallId = callId;
+          _appRouter.router.pushNamed(
+            'student-video-chat',
+            pathParameters: {'callId': callId},
+            queryParameters: {
+              'callerName': 'Mentor',
+              'autoAccept': 'true',  // User already tapped Answer on notification
+            },
+          );
+          debugPrint('[VC] 📞 Navigation initiated');
+        } else {
+          debugPrint('[VC] ❌ Call ID is null, cannot navigate');
+        }
+        debugPrint('[VC] 📞 ========== END CALL ACCEPTED FROM ANDROID INTENT ==========');
+      }
+    });
+
+    // Also check for pending call ID (in case Flutter was slow to start)
+    _checkPendingCallFromAndroid();
+  }
+
+  /// Check if there's a pending call ID from Android (terminated state acceptance)
+  Future<void> _checkPendingCallFromAndroid() async {
+    try {
+      debugPrint('[VC] 📞 Checking for pending call from Android...');
+      final callId = await _videoCallChannel.invokeMethod<String>('getPendingCallId');
+
+      if (callId != null) {
+        debugPrint('[VC] 📞 Found pending call ID from Android: $callId');
+
+        // Wait for auth to be ready
+        await Future.delayed(const Duration(milliseconds: 800));
+
+        if (_authService.userInfo != null) {
+          // Ensure video service is initialized
+          if (!_streamVideoService.isInitialized) {
+            await _streamVideoService.initialize(_authService.userInfo!);
+          }
+
+          // Navigate to video chat screen
+          // User already accepted from notification - auto-accept the call
+          debugPrint('[VC] 📞 Navigating to student-video-chat for pending call with autoAccept=true');
+          _lastNavigatedCallId = callId;
+          _appRouter.router.pushNamed(
+            'student-video-chat',
+            pathParameters: {'callId': callId},
+            queryParameters: {
+              'callerName': 'Mentor',
+              'autoAccept': 'true',  // User already tapped Answer on notification
+            },
+          );
+        }
+      } else {
+        debugPrint('[VC] 📞 No pending call from Android');
+      }
+    } catch (e) {
+      debugPrint('[VC] 📞 Error checking pending call: $e');
+    }
   }
 
   @override

@@ -72,10 +72,14 @@ android {
             storePassword = "android"
         }
         create("release") {
-            keyAlias = keystoreProperties["keyAlias"] as String
-            keyPassword = keystoreProperties["keyPassword"] as String
-            storeFile = file(keystoreProperties["storeFile"] as String)
-            storePassword = keystoreProperties["storePassword"] as String
+//            keyAlias = keystoreProperties["keyAlias"] as String
+//            keyPassword = keystoreProperties["keyPassword"] as String
+//            storeFile = file(keystoreProperties["storeFile"] as String)
+//            storePassword = keystoreProperties["storePassword"] as String
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+            storeFile = file("keystore/debug.keystore")
+            storePassword = "android"
         }
     }
 
@@ -97,7 +101,8 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
         release {
-            signingConfig = signingConfigs.getByName("release")
+//            signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 }
@@ -107,5 +112,5 @@ flutter {
 }
 
 dependencies {
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

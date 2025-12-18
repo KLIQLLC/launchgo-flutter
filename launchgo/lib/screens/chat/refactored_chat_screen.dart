@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../services/chat/stream_chat_service.dart';
 import '../../services/chat/chat_channel_manager.dart';
 import '../../services/auth_service.dart';
-import '../../widgets/custom_chat_widget.dart';
+import '../video_call/custom_chat_widget.dart';
 
 class RefactoredChatScreen extends StatefulWidget {
   const RefactoredChatScreen({super.key});

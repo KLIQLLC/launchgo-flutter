@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import '../services/permissions_service.dart';
 import '../theme/app_colors.dart';
 import 'package:launchgo/widgets/chat_badge_widget.dart';
 import 'package:launchgo/features/documents/domain/entities/document_entity.dart';
@@ -29,8 +28,8 @@ import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/widgets/app_drawer.dart';
 import 'package:launchgo/widgets/custom_icon.dart';
 import 'package:launchgo/widgets/notification_badge_widget.dart';
-import 'package:launchgo/screens/video_call/video_call_screen.dart';
-import 'package:launchgo/screens/video_call/incoming_call_screen.dart';
+import 'package:launchgo/screens/video_call/mentor_video_chat_screen.dart';
+import 'package:launchgo/screens/video_call/student_video_chat_screen.dart';
 
 class AppRouter {
   final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -216,32 +215,63 @@ class AppRouter {
             return RecapFormScreen(recap: recap);
           },
         ),
+        // Mentor video call screen (outgoing calls)
         GoRoute(
-          path: '/video-call/:callId',
-          name: 'video-call',
+          path: '/mentor-video-chat/:callId',
+          name: 'mentor-video-chat',
           builder: (context, state) {
             final callId = state.pathParameters['callId']!;
-            final recipientName = state.uri.queryParameters['recipientName'] ?? 'User';
-            final callAlreadyJoined = state.uri.queryParameters['callAlreadyJoined'] == 'true';
-            return VideoCallScreen(
+            final recipientName = state.uri.queryParameters['recipientName'];
+
+            return MentorVideoChatScreen(
               callId: callId,
               recipientName: recipientName,
-              callAlreadyJoined: callAlreadyJoined,
             );
           },
         ),
+        // Student video call screen (incoming calls)
         GoRoute(
-          path: '/incoming-call/:callId',
-          name: 'incoming-call',
+          path: '/student-video-chat/:callId',
+          name: 'student-video-chat',
           builder: (context, state) {
             final callId = state.pathParameters['callId']!;
-            final callerName = state.uri.queryParameters['callerName'] ?? 'Unknown';
-            return IncomingCallScreen(
+            final callerName = state.uri.queryParameters['callerName'];
+            final autoAccept = state.uri.queryParameters['autoAccept'] == 'true';
+
+            return StudentVideoChatScreen(
               callId: callId,
               callerName: callerName,
+              autoAccept: autoAccept,
             );
           },
         ),
+        // OLD routes - kept for compatibility during transition
+        // GoRoute(
+        //   path: '/video-call/:callId',
+        //   name: 'video-call',
+        //   builder: (context, state) {
+        //     final callId = state.pathParameters['callId']!;
+        //     final recipientName = state.uri.queryParameters['recipientName'] ?? 'User';
+        //     final callAlreadyJoined = state.uri.queryParameters['callAlreadyJoined'] == 'true';
+        //     return VideoCallScreen(
+        //       callId: callId,
+        //       recipientName: recipientName,
+        //       callAlreadyJoined: callAlreadyJoined,
+        //     );
+        //   },
+        // ),
+        // GoRoute(
+        //   path: '/incoming-call/:callId',
+        //   name: 'incoming-call',
+        //   builder: (context, state) {
+        //     final callId = state.pathParameters['callId']!;
+        //     final callerName = state.uri.queryParameters['callerName'] ?? 'Unknown';
+        //     return IncomingCallScreen(
+        //       callId: callId,
+        //       callerName: callerName,
+        //     );
+        //   },
+        // ),
         ShellRoute(
           navigatorKey: _shellNavigatorKey,
           builder: (context, state, child) => 

@@ -249,12 +249,37 @@ class PushNotificationService extends ChangeNotifier {
   }
   
   /// Handle foreground messages
-  void _handleForegroundMessage(RemoteMessage message) {
-    // 🛑 BREAKPOINT: Set breakpoint here to inspect message data
-    debugPrint('🔔 Foreground message received: ${message.notification?.title}');
-    debugPrint('🔔 Message data: ${message.data}');
-    debugPrint('🔔 Message body: ${message.notification?.body}');
-    
+  Future<void> _handleForegroundMessage(RemoteMessage message) async {
+    // 🛑 EARLY LOGGING - See raw push data before any processing
+    debugPrint('');
+    debugPrint('🔔🔔🔔 ========== PUSH NOTIFICATION RECEIVED (FOREGROUND) ========== 🔔🔔🔔');
+    debugPrint('🔔 TIMESTAMP: ${DateTime.now().toIso8601String()}');
+    debugPrint('🔔 MESSAGE ID: ${message.messageId}');
+    debugPrint('🔔 NOTIFICATION TITLE: ${message.notification?.title}');
+    debugPrint('🔔 NOTIFICATION BODY: ${message.notification?.body}');
+    debugPrint('🔔 DATA PAYLOAD: ${message.data}');
+    debugPrint('🔔 DATA KEYS: ${message.data.keys.toList()}');
+    debugPrint('🔔 FROM: ${message.from}');
+    debugPrint('🔔 SENT TIME: ${message.sentTime}');
+    debugPrint('🔔 CATEGORY: ${message.category}');
+    debugPrint('🔔 COLLAPSE KEY: ${message.collapseKey}');
+    debugPrint('🔔🔔🔔 ========== END RAW PUSH DATA ========== 🔔🔔🔔');
+    debugPrint('');
+
+    // Check if this is a video call notification
+    if (VideoCallPushHandler.isVideoCallNotification(message.data)) {
+      debugPrint('📞 FOREGROUND VIDEO CALL NOTIFICATION DETECTED');
+      debugPrint('📞 App is in foreground - WebSocket will handle incoming call');
+      debugPrint('📞 NOT showing CallKit notification (in-app UI will show instead)');
+      // When app is in foreground:
+      // - WebSocket is connected and detects the incoming call
+      // - StreamVideoService.incomingCall stream triggers
+      // - main.dart listener navigates to video-chat screen
+      // - No need for CallKit notification - it would duplicate the UI
+      debugPrint('🔔 ========== END FOREGROUND MESSAGE ==========');
+      return;
+    }
+
     // Show the notification even when app is in foreground
     // For Stream Chat data-only notifications, show them manually
     if (NotificationParser.isStreamChatMessage(message.data)) {
@@ -268,7 +293,9 @@ class PushNotificationService extends ChangeNotifier {
     } else {
       debugPrint('🔔 Non-Stream Chat foreground notification');
     }
-    
+
+    debugPrint('🔔 ========== END FOREGROUND MESSAGE ==========');
+
     // Update notification badge count when foreground notification received
     if (_notificationsService != null) {
       Future.microtask(() => _notificationsService!.fetchNotifications());
@@ -415,27 +442,49 @@ Screen value: ${message.data['screen']}
 }
 
 /// Background message handler (must be top-level function)
+/// NOTE: This runs in a separate isolate where StreamVideo.instance is NOT available.
+/// For Android terminated state, we must manually show CallKit notification.
+/// When user accepts, the app launches and consumeAndAcceptActiveCall() handles joining.
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // 🛑 BREAKPOINT: Set breakpoint here to inspect background notifications
-  debugPrint('🔔 Background message received: ${message.notification?.title}');
-  debugPrint('🔔 Background message data: ${message.data}');
-  debugPrint('🔔 Background message body: ${message.notification?.body}');
+  // 🛑 EARLY LOGGING - See raw push data before any processing
+  debugPrint('');
+  debugPrint('🔔🔔🔔 ========== PUSH NOTIFICATION RECEIVED (BACKGROUND) ========== 🔔🔔🔔');
+  debugPrint('🔔 TIMESTAMP: ${DateTime.now().toIso8601String()}');
+  debugPrint('🔔 MESSAGE ID: ${message.messageId}');
+  debugPrint('🔔 NOTIFICATION TITLE: ${message.notification?.title}');
+  debugPrint('🔔 NOTIFICATION BODY: ${message.notification?.body}');
+  debugPrint('🔔 DATA PAYLOAD: ${message.data}');
+  debugPrint('🔔 DATA KEYS: ${message.data.keys.toList()}');
+  debugPrint('🔔 FROM: ${message.from}');
+  debugPrint('🔔 SENT TIME: ${message.sentTime}');
+  debugPrint('🔔🔔🔔 ========== END RAW PUSH DATA ========== 🔔🔔🔔');
+  debugPrint('');
 
   // Handle video call notifications
-  // On iOS: VoIP push triggers CallKit automatically via StreamVideoPKDelegateManager
-  // On Android: We need to manually show the incoming call UI when app is terminated
+  // On iOS: VoIP push triggers CallKit automatically via StreamVideoPKDelegateManager in AppDelegate
+  // On Android (terminated): We must manually show CallKit because StreamVideo isn't initialized here
+  // On Android (background): SDK should handle via handleRingingFlowNotifications in foreground listener
   if (VideoCallPushHandler.isVideoCallNotification(message.data)) {
+    debugPrint('📞 ========== BACKGROUND VIDEO CALL NOTIFICATION ==========');
     debugPrint('📞 Background video call notification detected');
+    debugPrint('📞 Message data: ${message.data}');
+    debugPrint('📞 Message notification: ${message.notification?.title}');
 
     // On Android, we need to manually show the incoming call notification
-    // because Stream Video SDK is not initialized in the background isolate
+    // because Stream Video SDK is not initialized in the background isolate.
+    // The flow is:
+    // 1. Show CallKit notification here
+    // 2. User taps Accept -> app launches
+    // 3. StreamVideoService.consumeAndAcceptActiveCall() picks up the call
+    // 4. Navigation happens via callback in main.dart
     if (Platform.isAndroid) {
-      debugPrint('📞 Android: Showing incoming call notification manually');
+      debugPrint('📞 Android: Showing incoming call notification manually (background/terminated)');
       await _showAndroidIncomingCallNotification(message.data);
     } else {
-      debugPrint('📞 iOS: CallKit will handle via VoIP push');
+      debugPrint('📞 iOS: VoIP push + CallKit handled natively via StreamVideoPKDelegateManager');
     }
+    debugPrint('📞 ========== END BACKGROUND VIDEO CALL NOTIFICATION ==========');
     return;
   }
 
@@ -466,6 +515,31 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 Future<void> _showAndroidIncomingCallNotification(Map<String, dynamic> data) async {
   debugPrint('📞 [Android Background] Showing incoming call notification');
   debugPrint('📞 [Android Background] Data: $data');
+
+  // Check the notification type - only show CallKit for actual ring notifications
+  // NOT for call.missed, call.notification, etc.
+  final notificationType = data['type'] as String?;
+  debugPrint('📞 [Android Background] Notification type: $notificationType');
+
+  if (notificationType != 'call.ring') {
+    debugPrint('📞 [Android Background] NOT a call.ring notification (type=$notificationType), skipping CallKit');
+    return;
+  }
+
+  // End any existing active calls before showing new one
+  // This prevents the issue where a previous call blocks the new notification
+  // Always try to end calls unconditionally - activeCalls() can return stale data
+  try {
+    debugPrint('📞 [Android Background] Ending any existing calls unconditionally');
+    await FlutterCallkitIncoming.endAllCalls();
+    // Small delay to ensure previous calls are fully ended
+    await Future.delayed(const Duration(milliseconds: 300));
+  } catch (e) {
+    debugPrint('📞 [Android Background] Error ending previous calls (continuing anyway): $e');
+    // Even if endAllCalls fails, we'll try to show the new notification
+    // Add extra delay when there's an error
+    await Future.delayed(const Duration(milliseconds: 500));
+  }
 
   // Extract call ID from push data
   // Stream Video sends call_cid in format "type:callId" (e.g., "default:abc123")
@@ -524,6 +598,33 @@ Future<void> _showAndroidIncomingCallNotification(Map<String, dynamic> data) asy
   );
 
   debugPrint('📞 [Android Background] Calling FlutterCallkitIncoming.showCallkitIncoming');
-  await FlutterCallkitIncoming.showCallkitIncoming(params);
-  debugPrint('✅ [Android Background] Incoming call notification shown');
+
+  // Try to show the incoming call notification with retry logic
+  int retryCount = 0;
+  const maxRetries = 2;
+
+  while (retryCount <= maxRetries) {
+    try {
+      await FlutterCallkitIncoming.showCallkitIncoming(params);
+      debugPrint('✅ [Android Background] Incoming call notification shown successfully');
+      return;
+    } catch (e) {
+      retryCount++;
+      debugPrint('❌ [Android Background] Error showing notification (attempt $retryCount/$maxRetries): $e');
+
+      if (retryCount <= maxRetries) {
+        // Wait and try again
+        await Future.delayed(const Duration(milliseconds: 500));
+        // Try to clear any stale state before retry
+        try {
+          await FlutterCallkitIncoming.endAllCalls();
+        } catch (_) {
+          // Ignore error on retry cleanup
+        }
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
+    }
+  }
+
+  debugPrint('❌ [Android Background] Failed to show notification after $maxRetries retries');
 }

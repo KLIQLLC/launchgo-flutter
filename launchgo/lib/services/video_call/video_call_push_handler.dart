@@ -22,7 +22,7 @@ class VideoCallPushHandler {
     _router = router;
     _authService = authService;
     _videoService = videoService;
-    debugPrint('📞 VideoCallPushHandler initialized');
+    debugPrint('[VC] 📞 VideoCallPushHandler initialized');
   }
 
   /// Check if this is a video call notification
@@ -36,78 +36,73 @@ class VideoCallPushHandler {
 
   /// Handle video call push when app was terminated
   Future<void> handleVideoCallPush(Map<String, dynamic> data) async {
-    debugPrint('📞 [VideoCallPushHandler] Handling video call push');
-    debugPrint('📞 [VideoCallPushHandler] Data: $data');
-
-    final callId = _extractCallId(data);
-    final callerName = _extractCallerName(data);
-
-    if (callId == null) {
-      debugPrint('❌ [VideoCallPushHandler] No call ID found in push data');
-      return;
-    }
-
-    debugPrint('📞 [VideoCallPushHandler] Call ID: $callId, Caller: $callerName');
+    debugPrint('[VC] 📞 [VideoCallPushHandler:handleVideoCallPush] >> ENTRY');
+    debugPrint('[VC] 📞 [VideoCallPushHandler:handleVideoCallPush] Push data: $data');
+    debugPrint('[VC] 📞 [VideoCallPushHandler:handleVideoCallPush] Auth available: ${_authService != null}');
+    debugPrint('[VC] 📞 [VideoCallPushHandler:handleVideoCallPush] Video service available: ${_videoService != null}');
+    debugPrint('[VC] 📞 [VideoCallPushHandler:handleVideoCallPush] Router available: ${_router != null}');
 
     // Ensure auth is restored before proceeding
+    debugPrint('[VC] 📞 [VideoCallPushHandler:handleVideoCallPush] Waiting for auth to be ready...');
     await _waitForAuth();
+    debugPrint('[VC] 📞 [VideoCallPushHandler:handleVideoCallPush] Auth wait complete');
 
     // Initialize video service if needed
     if (_authService?.userInfo != null && _videoService != null) {
+      debugPrint('[VC] 📞 [VideoCallPushHandler:handleVideoCallPush] Auth and video service available');
+      debugPrint('[VC] 📞 [VideoCallPushHandler:handleVideoCallPush] Video service initialized: ${_videoService!.isInitialized}');
+
       if (!_videoService!.isInitialized) {
-        debugPrint('📞 [VideoCallPushHandler] Initializing video service...');
+        debugPrint('[VC] 📞 [VideoCallPushHandler:handleVideoCallPush] Video service NOT initialized, initializing now...');
         await _videoService!.initialize(_authService!.userInfo!);
+        debugPrint('[VC] 📞 [VideoCallPushHandler:handleVideoCallPush] Video service initialization complete');
       }
-    }
 
-    // Navigate to incoming call screen
-    if (_router != null) {
-      debugPrint('📞 [VideoCallPushHandler] Navigating to incoming-call screen');
-      _router!.pushNamed(
-        'incoming-call',
-        pathParameters: {'callId': callId},
-        queryParameters: {'callerName': callerName ?? 'Mentor'},
-      );
+      // Pass the notification to Stream Video SDK's ringing flow handler
+      // This will trigger the proper observers and CallKit integration
+      // The SDK handles:
+      // 1. Displaying CallKit/incoming call UI
+      // 2. Managing call state
+      // 3. Triggering observeCoreRingingEvents callbacks when user accepts/rejects
+      debugPrint('[VC] 📞 [VideoCallPushHandler:handleVideoCallPush] Passing notification to Stream Video SDK handleRingingFlowNotifications...');
+      final handled = await _videoService!.handleRingingFlowNotifications(data);
+      debugPrint('[VC] 📞 [VideoCallPushHandler:handleVideoCallPush] Stream Video SDK handled: $handled');
+
+      if (handled) {
+        debugPrint('[VC] 📞 [VideoCallPushHandler:handleVideoCallPush] << EXIT: SDK handled successfully');
+        debugPrint('[VC] 📞 [VideoCallPushHandler:handleVideoCallPush] observeCoreRingingEvents callbacks will trigger navigation');
+        // The SDK will trigger observeCoreRingingEvents callbacks
+        // which will handle navigation via the callback we set up in main.dart
+        return;
+      } else {
+        debugPrint('[VC] 📞 [VideoCallPushHandler:handleVideoCallPush] SDK did NOT handle notification');
+        debugPrint('[VC] 📞 [VideoCallPushHandler:handleVideoCallPush] This may happen if the call has already ended or was handled elsewhere');
+        // Don't fall back to manual navigation - let the SDK listeners handle it
+        // The WebSocket-based incomingCall stream should still work
+        return;
+      }
     } else {
-      debugPrint('❌ [VideoCallPushHandler] Router not available');
-    }
-  }
-
-  /// Extract call ID from push data
-  /// Stream Video sends call_cid in format "type:callId" (e.g., "default:abc123")
-  String? _extractCallId(Map<String, dynamic> data) {
-    // Try call_cid first (Stream Video format)
-    final callCid = data['call_cid'] as String?;
-    if (callCid != null && callCid.contains(':')) {
-      return callCid.split(':').last;
+      debugPrint('[VC] ⚠️ [VideoCallPushHandler:handleVideoCallPush] Auth or video service not available');
+      debugPrint('[VC] ⚠️ [VideoCallPushHandler:handleVideoCallPush] Cannot process video call push without auth');
     }
 
-    // Try direct call_id
-    final callId = data['call_id'] as String?;
-    if (callId != null) return callId;
-
-    // Try id field
-    return data['id'] as String?;
-  }
-
-  /// Extract caller name from push data
-  String? _extractCallerName(Map<String, dynamic> data) {
-    // Try various fields that might contain caller name
-    return data['caller_name'] as String? ??
-        data['created_by_display_name'] as String? ??
-        data['sender_name'] as String?;
+    // NOTE: We no longer use fallback navigation here.
+    // The SDK's observeCoreRingingEvents and incomingCall stream in main.dart
+    // will handle navigation when the call arrives via WebSocket.
+    // Manual navigation can cause duplicate screens and conflicts with SDK state.
+    debugPrint('[VC] 📞 [VideoCallPushHandler:handleVideoCallPush] << EXIT: No fallback navigation - relying on SDK streams');
   }
 
   /// Wait for auth to be ready (up to 5 seconds)
   Future<void> _waitForAuth() async {
-    debugPrint('📞 [VideoCallPushHandler] Waiting for auth...');
+    debugPrint('[VC] 📞 [VideoCallPushHandler] Waiting for auth...');
     for (int i = 0; i < 50; i++) {
       if (_authService?.userInfo != null) {
-        debugPrint('📞 [VideoCallPushHandler] Auth ready');
+        debugPrint('[VC] 📞 [VideoCallPushHandler] Auth ready');
         return;
       }
       await Future.delayed(const Duration(milliseconds: 100));
     }
-    debugPrint('⚠️ [VideoCallPushHandler] Auth wait timeout');
+    debugPrint('[VC] ⚠️ [VideoCallPushHandler] Auth wait timeout');
   }
 }

@@ -35,3 +35,8 @@
 
 # Flutter CallKit Incoming
 -keep class com.hiennv.flutter_callkit_incoming.** { *; }
+
+# Jackson databind - suppress warnings for Java SE classes not available on Android
+-dontwarn java.beans.ConstructorProperties
+-dontwarn java.beans.Transient
+-dontwarn org.w3c.dom.bootstrap.DOMImplementationRegistry
