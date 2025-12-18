@@ -298,9 +298,7 @@ class StreamVideoService extends ChangeNotifier {
     // Note: In stream_video 1.0.0+, this was renamed to observeCoreRingingEvents
     _ringingEventsSubscription = _client?.observeCoreCallKitEvents(
       onCallAccepted: (callToJoin) {
-        debugPrint(
-          '📞 [RingingEvents] Call accepted (CallKit/ringing events)',
-        );
+        debugPrint('📞 [RingingEvents] Call accepted (CallKit/ringing events)');
         debugPrint('📞 [RingingEvents] Call ID: ${callToJoin.id}');
 
         // Update state and navigate. Note: depending on platform/version, the SDK may
@@ -317,7 +315,9 @@ class StreamVideoService extends ChangeNotifier {
 
         // Ensure the client/call are actually connected (resume-from-CallKit case)
         Future.microtask(() async {
-          await ensureActiveCallConnected(reason: 'ringing_events_onCallAccepted');
+          await ensureActiveCallConnected(
+            reason: 'ringing_events_onCallAccepted',
+          );
         });
 
         // Invoke callback for navigation
@@ -360,14 +360,18 @@ class StreamVideoService extends ChangeNotifier {
         await call.accept();
         debugPrint('📞 [EnsureConnected] accept() ok');
       } catch (e) {
-        debugPrint('📞 [EnsureConnected] accept() skipped/failed (likely already accepted): $e');
+        debugPrint(
+          '📞 [EnsureConnected] accept() skipped/failed (likely already accepted): $e',
+        );
       }
 
       // Then join()
       await call.join();
       debugPrint('📞 [EnsureConnected] join() ok');
     } catch (e) {
-      debugPrint('❌ [EnsureConnected] Failed to ensure active call connected: $e');
+      debugPrint(
+        '❌ [EnsureConnected] Failed to ensure active call connected: $e',
+      );
     }
   }
 
@@ -375,27 +379,30 @@ class StreamVideoService extends ChangeNotifier {
   /// CallKit stores the Stream call ID in extra['callCid'] (format: "default:callId") or extra['call_id']
   String? _extractStreamCallIdFromCallKitData(Map<dynamic, dynamic> data) {
     String? callId;
-    
+
     final extra = data['extra'] as Map<dynamic, dynamic>?;
     if (extra != null) {
       // First try call_id directly (clean ID without prefix)
       callId = extra['call_id'] as String?;
       if (callId != null) {
-        debugPrint('📞 [CallKit] Extracted call_id from extra.call_id: $callId');
+        debugPrint(
+          '📞 [CallKit] Extracted call_id from extra.call_id: $callId',
+        );
         return callId;
       }
 
       // Try extracting from callCid/call_cid (has "default:" prefix)
       final callCid =
-          (extra['callCid'] as String?) ??
-          (extra['call_cid'] as String?);
+          (extra['callCid'] as String?) ?? (extra['call_cid'] as String?);
       if (callCid != null && callCid.contains(':')) {
         callId = callCid.split(':').last;
-        debugPrint('📞 [CallKit] Extracted call_id from extra.callCid: $callId');
+        debugPrint(
+          '📞 [CallKit] Extracted call_id from extra.callCid: $callId',
+        );
         return callId;
       }
     }
-    
+
     return null;
   }
 
@@ -431,7 +438,9 @@ class StreamVideoService extends ChangeNotifier {
               );
               _handleCallKitAccept(callId);
             } else {
-              debugPrint('⚠️ [CallKit] Could not extract Stream callId from active call');
+              debugPrint(
+                '⚠️ [CallKit] Could not extract Stream callId from active call',
+              );
             }
           }
         }
@@ -497,10 +506,14 @@ class StreamVideoService extends ChangeNotifier {
 
     // Check if call is already active (observeCoreCallKitEvents might have handled it)
     if (_activeCall != null && _activeCall!.id == callId) {
-      debugPrint('📞 [CallKit-Backup] Call already active - skipping (handled by observeCoreCallKitEvents)');
+      debugPrint(
+        '📞 [CallKit-Backup] Call already active - skipping (handled by observeCoreCallKitEvents)',
+      );
       // Still invoke navigation callback if it hasn't been done
       if (_onCallAcceptedCallback != null) {
-        debugPrint('📞 [CallKit-Backup] Invoking navigation callback for already active call');
+        debugPrint(
+          '📞 [CallKit-Backup] Invoking navigation callback for already active call',
+        );
         _onCallAcceptedCallback!(_activeCall!);
       }
       return;
@@ -517,7 +530,9 @@ class StreamVideoService extends ChangeNotifier {
 
     try {
       // Request camera and microphone permissions (required for video call)
-      debugPrint('📞 [CallKit-Backup] Requesting camera and microphone permissions...');
+      debugPrint(
+        '📞 [CallKit-Backup] Requesting camera and microphone permissions...',
+      );
       final Map<Permission, PermissionStatus> statuses = await [
         Permission.camera,
         Permission.microphone,
@@ -530,7 +545,9 @@ class StreamVideoService extends ChangeNotifier {
       // Check if all permissions are granted
       final allGranted = statuses.values.every((status) => status.isGranted);
       if (!allGranted) {
-        debugPrint('⚠️ [CallKit-Backup] Not all permissions granted - continuing anyway');
+        debugPrint(
+          '⚠️ [CallKit-Backup] Not all permissions granted - continuing anyway',
+        );
         // On iOS with CallKit, we should still try to join even without permissions
         // The system will show permission dialogs when needed
       }
@@ -671,32 +688,35 @@ class StreamVideoService extends ChangeNotifier {
   /// Listen to coordinator events to detect when call is rejected by initiator
   void _listenForCoordinatorEvents() {
     _coordinatorEventsSubscription?.cancel();
-    _coordinatorEventsSubscription = _client?.events.listen((event) {
-      // Handle call rejected event - this is the key event when initiator cancels
-      if (event is CoordinatorCallRejectedEvent) {
-        final rejectorId = event.rejectedByUserId;
-        final callOwnerId = event.metadata.details.createdBy.id;
-        final callCid = event.callCid.value;
+    _coordinatorEventsSubscription = _client?.events.listen(
+      (event) {
+        // Handle call rejected event - this is the key event when initiator cancels
+        if (event is CoordinatorCallRejectedEvent) {
+          final rejectorId = event.rejectedByUserId;
+          final callOwnerId = event.metadata.details.createdBy.id;
+          final callCid = event.callCid.value;
 
-        debugPrint(
-          '📞 [CoordinatorEvents] Call rejected: $callCid, rejectedBy: $rejectorId, owner: $callOwnerId',
-        );
+          debugPrint(
+            '📞 [CoordinatorEvents] Call rejected: $callCid, rejectedBy: $rejectorId, owner: $callOwnerId',
+          );
 
-        // If the call owner (initiator) rejected, clear the incoming call on the receiver
-        if (rejectorId == callOwnerId && _incomingCallId != null) {
-          // Check if this is for our incoming call
-          final incomingCid = 'default:$_incomingCallId';
-          if (callCid == incomingCid) {
-            debugPrint(
-              '📞 [CoordinatorEvents] Initiator cancelled our incoming call - clearing state',
-            );
-            _clearIncomingCall();
+          // If the call owner (initiator) rejected, clear the incoming call on the receiver
+          if (rejectorId == callOwnerId && _incomingCallId != null) {
+            // Check if this is for our incoming call
+            final incomingCid = 'default:$_incomingCallId';
+            if (callCid == incomingCid) {
+              debugPrint(
+                '📞 [CoordinatorEvents] Initiator cancelled our incoming call - clearing state',
+              );
+              _clearIncomingCall();
+            }
           }
         }
-      }
-    }, onError: (error) {
-      debugPrint('❌ [CoordinatorEvents] Error: $error');
-    });
+      },
+      onError: (error) {
+        debugPrint('❌ [CoordinatorEvents] Error: $error');
+      },
+    );
 
     debugPrint('✅ Coordinator events listener setup complete');
   }
@@ -914,51 +934,64 @@ class StreamVideoService extends ChangeNotifier {
   void _setupActiveCallStateListener(Call call) {
     // Cancel any existing subscription
     _activeCallStateSubscription?.cancel();
-    
-    debugPrint('📞 [CallStateListener] Setting up listener for call: ${call.id}');
-    
+
+    debugPrint(
+      '📞 [CallStateListener] Setting up listener for call: ${call.id}',
+    );
+
     // Track if we've seen a connected state - only clear after being connected
     bool wasConnected = false;
-    
-    _activeCallStateSubscription = call.state.asStream().listen((callState) {
-      final status = callState.status;
-      
-      debugPrint('📞 [CallStateListener] State update - status: $status, wasConnected: $wasConnected');
-      
-      // Always clear if the call is disconnected/ended (even if it never reached Connected).
-      // This is critical for "callee declined" / "caller cancelled" flows.
-      if (status.isDisconnected || callState.endedAt != null) {
-        debugPrint(
-          '📞 [CallStateListener] Call ended/disconnected - status: $status, endedAt: ${callState.endedAt}',
-        );
-        _dismissCallKitIfAny(reason: 'call_state_disconnected');
-        _clearActiveCall();
-        return;
-      }
 
-      // Mark as connected when we reach connected state
-      if (status.isConnected) {
-        wasConnected = true;
-        debugPrint('📞 [CallStateListener] Call is now connected');
-      }
-      
-      // Only check for end conditions if we were previously connected
-      // This prevents false positives during initial connection
-      if (!wasConnected) {
-        debugPrint('📞 [CallStateListener] Skipping end check - not yet connected');
-        return;
-      }
-      
-      // Also check if we're alone in the call (other party left)
-      final participantCount = callState.callParticipants.length;
-      if (participantCount <= 1 && status.isConnected && _activeCall != null) {
-        debugPrint('📞 [CallStateListener] Alone in call (participants: $participantCount) - ending');
-        _dismissCallKitIfAny(reason: 'call_state_alone');
-        _clearActiveCall();
-      }
-    }, onError: (error) {
-      debugPrint('❌ [CallStateListener] Error: $error');
-    });
+    _activeCallStateSubscription = call.state.asStream().listen(
+      (callState) {
+        final status = callState.status;
+
+        debugPrint(
+          '📞 [CallStateListener] State update - status: $status, wasConnected: $wasConnected',
+        );
+
+        // Always clear if the call is disconnected/ended (even if it never reached Connected).
+        // This is critical for "callee declined" / "caller cancelled" flows.
+        if (status.isDisconnected || callState.endedAt != null) {
+          debugPrint(
+            '📞 [CallStateListener] Call ended/disconnected - status: $status, endedAt: ${callState.endedAt}',
+          );
+          _dismissCallKitIfAny(reason: 'call_state_disconnected');
+          _clearActiveCall();
+          return;
+        }
+
+        // Mark as connected when we reach connected state
+        if (status.isConnected) {
+          wasConnected = true;
+          debugPrint('📞 [CallStateListener] Call is now connected');
+        }
+
+        // Only check for end conditions if we were previously connected
+        // This prevents false positives during initial connection
+        if (!wasConnected) {
+          debugPrint(
+            '📞 [CallStateListener] Skipping end check - not yet connected',
+          );
+          return;
+        }
+
+        // Also check if we're alone in the call (other party left)
+        final participantCount = callState.callParticipants.length;
+        if (participantCount <= 1 &&
+            status.isConnected &&
+            _activeCall != null) {
+          debugPrint(
+            '📞 [CallStateListener] Alone in call (participants: $participantCount) - ending',
+          );
+          _dismissCallKitIfAny(reason: 'call_state_alone');
+          _clearActiveCall();
+        }
+      },
+      onError: (error) {
+        debugPrint('❌ [CallStateListener] Error: $error');
+      },
+    );
   }
 
   void _dismissCallKitIfAny({required String reason}) {
@@ -973,11 +1006,11 @@ class StreamVideoService extends ChangeNotifier {
       }
     });
   }
-  
+
   /// Clear the active call and notify listeners
   void _clearActiveCall() {
     if (_activeCall == null) return;
-    
+
     debugPrint('📞 [CallStateListener] Clearing active call');
     _activeCallStateSubscription?.cancel();
     _activeCallStateSubscription = null;

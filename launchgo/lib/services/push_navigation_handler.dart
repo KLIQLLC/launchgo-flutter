@@ -1,3 +1,4 @@
+// services/push_navigation_handler.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -6,18 +7,19 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 /// Handles push notification navigation with proper timing
 class PushNavigationHandler {
   static PushNavigationHandler? _instance;
-  static PushNavigationHandler get instance => _instance ??= PushNavigationHandler._();
-  
+  static PushNavigationHandler get instance =>
+      _instance ??= PushNavigationHandler._();
+
   PushNavigationHandler._();
-  
+
   GoRouter? _router;
   RemoteMessage? _pendingMessage;
   Timer? _navigationTimer;
-  
+
   void setRouter(GoRouter router) {
     _router = router;
     debugPrint('🚀 PushNavigationHandler: Router set');
-    
+
     // Check if we have a pending navigation
     if (_pendingMessage != null) {
       debugPrint('🚀 PushNavigationHandler: Processing pending navigation');
@@ -26,18 +28,18 @@ class PushNavigationHandler {
       });
     }
   }
-  
+
   /// Queue a navigation from push notification
   void queueNavigation(RemoteMessage message) {
     debugPrint('🚀 ============================================');
     debugPrint('🚀 PushNavigationHandler: Queueing navigation');
     debugPrint('🚀 Message data: ${message.data}');
-    
+
     _pendingMessage = message;
-    
+
     // Cancel any existing timer
     _navigationTimer?.cancel();
-    
+
     // If router is ready, process immediately
     if (_router != null) {
       // Use a timer to ensure we're not in the middle of a navigation
@@ -45,21 +47,23 @@ class PushNavigationHandler {
         _processPendingNavigation();
       });
     } else {
-      debugPrint('🚀 Router not ready, navigation will be processed when router is set');
+      debugPrint(
+        '🚀 Router not ready, navigation will be processed when router is set',
+      );
     }
-    
+
     debugPrint('🚀 ============================================');
   }
-  
+
   void _processPendingNavigation() {
     if (_pendingMessage == null || _router == null) {
       debugPrint('🚀 No pending navigation or router not ready');
       return;
     }
-    
+
     final data = _pendingMessage!.data;
     debugPrint('🚀 Processing navigation with data: $data');
-    
+
     try {
       // Determine navigation target
       if (data.containsKey('screen')) {
@@ -71,7 +75,7 @@ class PushNavigationHandler {
       } else if (_isStreamChatNotification(data)) {
         _navigateToChat(data);
       }
-      
+
       // Clear pending message after successful navigation
       _pendingMessage = null;
     } catch (e) {
@@ -82,16 +86,16 @@ class PushNavigationHandler {
       });
     }
   }
-  
+
   bool _isStreamChatNotification(Map<String, dynamic> data) {
-    return data.containsKey('channel_id') || 
-           data.containsKey('channel_type') ||
-           data.containsKey('channel_cid');
+    return data.containsKey('channel_id') ||
+        data.containsKey('channel_type') ||
+        data.containsKey('channel_cid');
   }
-  
+
   void _navigateToScreen(String screen, Map<String, dynamic> data) {
     debugPrint('🚀 Navigating to screen: $screen');
-    
+
     String targetRoute;
     switch (screen.toLowerCase()) {
       case 'chat':
@@ -126,9 +130,9 @@ class PushNavigationHandler {
         debugPrint('🚀 Unknown screen: $screen, defaulting to /schedule');
         targetRoute = '/schedule';
     }
-    
+
     debugPrint('🚀 Executing navigation to: $targetRoute');
-    
+
     // Use Future.microtask to ensure we're not blocking the UI
     Future.microtask(() {
       try {
@@ -143,11 +147,11 @@ class PushNavigationHandler {
       }
     });
   }
-  
+
   void _navigateToRoute(String route, Map<String, dynamic> data) {
     debugPrint('🚀 Navigating to route: $route');
     final cleanRoute = route.startsWith('/') ? route : '/$route';
-    
+
     Future.microtask(() {
       try {
         if (data.containsKey('extra')) {
@@ -162,18 +166,21 @@ class PushNavigationHandler {
       }
     });
   }
-  
+
   void _navigateToChat(Map<String, dynamic> data) {
     debugPrint('🚀 Navigating to chat');
     final channelId = data['channel_id'] ?? data['channel_cid'];
-    
+
     Future.microtask(() {
       try {
         if (channelId != null) {
-          _router!.go('/chat', extra: {
-            'channelId': channelId,
-            'channelType': data['channel_type'] ?? 'messaging',
-          });
+          _router!.go(
+            '/chat',
+            extra: {
+              'channelId': channelId,
+              'channelType': data['channel_type'] ?? 'messaging',
+            },
+          );
         } else {
           _router!.go('/chat');
         }
@@ -184,7 +191,7 @@ class PushNavigationHandler {
       }
     });
   }
-  
+
   void dispose() {
     _navigationTimer?.cancel();
     _pendingMessage = null;

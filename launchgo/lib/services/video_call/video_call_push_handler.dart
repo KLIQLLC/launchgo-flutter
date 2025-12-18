@@ -1,3 +1,4 @@
+// services/video_call/video_call_push_handler.dart
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import '../auth_service.dart';
@@ -47,7 +48,9 @@ class VideoCallPushHandler {
       return;
     }
 
-    debugPrint('📞 [VideoCallPushHandler] Call ID: $callId, Caller: $callerName');
+    debugPrint(
+      '📞 [VideoCallPushHandler] Call ID: $callId, Caller: $callerName',
+    );
 
     // Ensure auth is restored before proceeding
     await _waitForAuth();
@@ -62,7 +65,9 @@ class VideoCallPushHandler {
 
     // Navigate to incoming call screen
     if (_router != null) {
-      debugPrint('📞 [VideoCallPushHandler] Navigating to incoming-call screen');
+      debugPrint(
+        '📞 [VideoCallPushHandler] Navigating to incoming-call screen',
+      );
       _router!.pushNamed(
         'incoming-call',
         pathParameters: {'callId': callId},

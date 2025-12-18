@@ -1,3 +1,4 @@
+// main.dart
 import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
@@ -28,38 +29,42 @@ import 'package:stream_chat_flutter/stream_chat_flutter.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize environment configuration
   EnvironmentConfig.init();
-  
+
   // Initialize Firebase
   await Firebase.initializeApp();
-  
+
   // Don't initialize push notifications here - will be done after router is ready
-  
+
   // Set up Crashlytics
   FlutterError.onError = (errorDetails) {
     FirebaseCrashlytics.instance.recordFlutterFatalError(errorDetails);
   };
-  
+
   // Pass all uncaught asynchronous errors that aren't handled by the Flutter framework to Crashlytics
   PlatformDispatcher.instance.onError = (error, stack) {
     // Filter out known WebSocket close code errors from Stream Chat
-    if (error.toString().contains('close code must be 1000 or in the range 3000-4999')) {
-      debugPrint('🟡 WebSocket close code error handled gracefully (from Stream Chat SDK)');
+    if (error.toString().contains(
+      'close code must be 1000 or in the range 3000-4999',
+    )) {
+      debugPrint(
+        '🟡 WebSocket close code error handled gracefully (from Stream Chat SDK)',
+      );
       return true; // Don't crash the app
     }
-    
+
     FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
     return true;
   };
-  
+
   // Lock orientation to portrait only
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-  
+
   runApp(
     MultiProvider(
       providers: [
@@ -70,31 +75,26 @@ void main() async {
         ChangeNotifierProvider.value(value: PushNotificationService.instance),
         ChangeNotifierProvider.value(value: PendingNavigationService.instance),
         Provider(
-          create: (context) => ApiServiceRetrofit(
-            authService: context.read<AuthService>(),
-          ),
+          create: (context) =>
+              ApiServiceRetrofit(authService: context.read<AuthService>()),
         ),
         Provider(
-          create: (context) => ApiService(
-            authService: context.read<AuthService>(),
-          ),
+          create: (context) =>
+              ApiService(authService: context.read<AuthService>()),
         ),
         ChangeNotifierProxyProvider<ApiService, NotificationsApiService>(
-          create: (context) => NotificationsApiService(
-            apiService: context.read<ApiService>(),
-          ),
-          update: (context, apiService, notificationsService) => notificationsService ?? NotificationsApiService(
-            apiService: apiService,
-          ),
+          create: (context) =>
+              NotificationsApiService(apiService: context.read<ApiService>()),
+          update: (context, apiService, notificationsService) =>
+              notificationsService ??
+              NotificationsApiService(apiService: apiService),
         ),
         ProxyProvider<ApiServiceRetrofit, RecapRepository>(
           update: (context, apiService, _) => RecapRepositoryImpl(apiService),
         ),
         ProxyProvider2<RecapRepository, AuthService, RecapBloc>(
-          update: (context, repository, authService, _) => RecapBloc(
-            repository: repository,
-            authService: authService,
-          ),
+          update: (context, repository, authService, _) =>
+              RecapBloc(repository: repository, authService: authService),
         ),
       ],
       child: MultiBlocProvider(
@@ -123,8 +123,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   late final StreamChatService _streamChatService;
   late final StreamVideoService _streamVideoService;
   late final NotificationsApiService _notificationsService;
-  String? _lastNavigatedCallId; // Track last call we navigated to (video call screen)
-  String? _lastIncomingCallId; // Track last incoming call to prevent duplicate screens
+  String?
+  _lastNavigatedCallId; // Track last call we navigated to (video call screen)
+  String?
+  _lastIncomingCallId; // Track last incoming call to prevent duplicate screens
 
   @override
   void initState() {
@@ -134,26 +136,28 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     _streamVideoService = context.read<StreamVideoService>();
     _notificationsService = context.read<NotificationsApiService>();
     _appRouter = AppRouter(_authService);
-    
+
     // Set router in navigation service
     PendingNavigationService.instance.setRouter(_appRouter.router);
-    
+
     // Set router in push notification service for direct navigation
     PushNotificationService.instance.setRouter(_appRouter.router);
-    
+
     // Set auth service for semester switching
     PushNotificationService.instance.setAuthService(_authService);
-    
+
     // Now that router is ready, initialize push notifications
     PushNotificationService.instance.initialize().catchError((e) {
       debugPrint('❌ Push notification service initialization failed: $e');
     });
-    
+
     // Set StreamChatService reference in AuthService for presence management
     _authService.setStreamChatService(_streamChatService);
-    
+
     // Set NotificationsApiService reference in PushNotificationService for badge updates
-    PushNotificationService.instance.setNotificationsService(_notificationsService);
+    PushNotificationService.instance.setNotificationsService(
+      _notificationsService,
+    );
 
     // Set router and auth service for AndroidNotificationDisplayService for tap navigation (Android only)
     if (Platform.isAndroid) {
@@ -162,7 +166,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     }
 
     // Initialize NotificationNavigationService for local notification tap handling
-    NotificationNavigationService.instance.initialize(_appRouter.router, _authService);
+    NotificationNavigationService.instance.initialize(
+      _appRouter.router,
+      _authService,
+    );
 
     // Initialize VideoCallPushHandler for handling video call push notifications
     VideoCallPushHandler.instance.initialize(
@@ -174,13 +181,17 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // Set up ringing events callback for navigation when call is accepted via CallKit/ringing events
     // The call is ALREADY JOINED when this callback fires (Stream SDK handles accept/join)
     _streamVideoService.setOnCallAcceptedCallback((call) {
-      debugPrint('📞 Call accepted callback - call is already joined, navigating to video call screen');
+      debugPrint(
+        '📞 Call accepted callback - call is already joined, navigating to video call screen',
+      );
       debugPrint('📞 CallId: ${call.id}');
 
       // Check if we're already on the video call screen (foreground accept via StreamCallContainer)
       // In that case, don't navigate again
       if (_lastNavigatedCallId == call.id) {
-        debugPrint('📞 Already on video call screen for this call - skipping navigation');
+        debugPrint(
+          '📞 Already on video call screen for this call - skipping navigation',
+        );
         return;
       }
 
@@ -191,7 +202,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         pathParameters: {'callId': call.id},
         queryParameters: {
           'recipientName': 'Mentor',
-          'callAlreadyJoined': 'true', // Tell VideoCallScreen the call is already joined
+          'callAlreadyJoined':
+              'true', // Tell VideoCallScreen the call is already joined
         },
       );
     });
@@ -200,7 +212,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     _streamVideoService.addListener(() {
       debugPrint('📞 StreamVideoService listener triggered');
       debugPrint('📞 incomingCallId: ${_streamVideoService.incomingCallId}');
-      debugPrint('📞 incomingCallerName: ${_streamVideoService.incomingCallerName}');
+      debugPrint(
+        '📞 incomingCallerName: ${_streamVideoService.incomingCallerName}',
+      );
       debugPrint('📞 hasActiveCall: ${_streamVideoService.hasActiveCall}');
       debugPrint('📞 User role: ${_authService.userInfo?.role}');
 
@@ -215,24 +229,33 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
         // Only navigate if this is a new incoming call (prevent duplicate screens)
         if (_lastIncomingCallId != currentCallId) {
-          debugPrint('📞 Incoming video call from: ${_streamVideoService.incomingCallerName}');
-          _lastIncomingCallId = currentCallId; // Track to prevent duplicate navigation
+          debugPrint(
+            '📞 Incoming video call from: ${_streamVideoService.incomingCallerName}',
+          );
+          _lastIncomingCallId =
+              currentCallId; // Track to prevent duplicate navigation
 
           // iOS: Do NOT navigate - CallKit handles accept/decline
           // When user accepts via CallKit, _onCallAcceptedCallback will navigate to VideoCallScreen
           if (Platform.isIOS) {
-            debugPrint('📞 [iOS] CallKit will handle incoming call UI - waiting for accept callback');
+            debugPrint(
+              '📞 [iOS] CallKit will handle incoming call UI - waiting for accept callback',
+            );
           } else {
             // Android: Show custom IncomingCallScreen
             debugPrint('📞 [Android] Navigating to incoming-call screen');
             _appRouter.router.pushNamed(
               'incoming-call',
               pathParameters: {'callId': currentCallId},
-              queryParameters: {'callerName': _streamVideoService.incomingCallerName!},
+              queryParameters: {
+                'callerName': _streamVideoService.incomingCallerName!,
+              },
             );
           }
         } else {
-          debugPrint('📞 Incoming call screen already shown for call: $currentCallId');
+          debugPrint(
+            '📞 Incoming call screen already shown for call: $currentCallId',
+          );
         }
       } else if (_streamVideoService.incomingCallId == null) {
         // Reset tracking when no incoming call
@@ -250,11 +273,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
     // Add app lifecycle observer
     WidgetsBinding.instance.addObserver(this);
-    
+
     // Auto-connect Stream Chat for unread badge when user is authenticated
     // Only for students - mentors connect when they select a student
     _authService.addListener(() async {
-      if (_authService.userInfo != null && _authService.userInfo!.chatGetStreamToken != null) {
+      if (_authService.userInfo != null &&
+          _authService.userInfo!.chatGetStreamToken != null) {
         // Only auto-connect students - mentors connect selectively
         if (_authService.userInfo!.isStudent) {
           await _streamChatService.autoConnectUser(
@@ -268,14 +292,18 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         // Initialize Stream Video for video calls
         if (_authService.userInfo!.callGetStreamToken != null) {
           await _streamVideoService.initialize(_authService.userInfo!);
-          debugPrint('✅ Stream Video initialized for user: ${_authService.userInfo!.id}');
+          debugPrint(
+            '✅ Stream Video initialized for user: ${_authService.userInfo!.id}',
+          );
         }
 
         // Process any pending navigation after auth is ready
         // BUT skip if there's an active video call (user accepted via CallKit)
         if (PendingNavigationService.instance.hasPendingNavigation) {
           if (_streamVideoService.hasActiveCall) {
-            debugPrint('🔄 Auth ready with pending navigation, but video call is active - skipping');
+            debugPrint(
+              '🔄 Auth ready with pending navigation, but video call is active - skipping',
+            );
             PendingNavigationService.instance.clearPendingNavigation();
           } else {
             debugPrint('🔄 Auth ready, processing pending navigation');
@@ -284,24 +312,30 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               if (!_streamVideoService.hasActiveCall) {
                 PendingNavigationService.instance.processPendingNavigation();
               } else {
-                debugPrint('🔄 Video call became active - skipping pending navigation');
+                debugPrint(
+                  '🔄 Video call became active - skipping pending navigation',
+                );
                 PendingNavigationService.instance.clearPendingNavigation();
               }
             });
           }
         }
-        
+
         // Request FCM permissions and setup token for push notifications
         if (_authService.isAuthenticated) {
           Future.microtask(() async {
             // Check if user is still authenticated (might have signed out)
-            if (!_authService.isAuthenticated || _authService.userInfo == null) {
-              debugPrint('⚠️ User signed out during async operation, skipping setup');
+            if (!_authService.isAuthenticated ||
+                _authService.userInfo == null) {
+              debugPrint(
+                '⚠️ User signed out during async operation, skipping setup',
+              );
               return;
             }
 
             // Request FCM permissions and setup token
-            final success = await PushNotificationService.instance.requestPermissionsAndSetupToken();
+            final success = await PushNotificationService.instance
+                .requestPermissionsAndSetupToken();
             if (success) {
               debugPrint('✅ FCM token setup successful');
               // Manually trigger Stream Chat FCM registration
@@ -316,7 +350,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             // Initialize and schedule weekly notifications for authenticated users
             if (_authService.userInfo != null) {
               await WeeklyNotificationService.instance.initialize();
-              await WeeklyNotificationService.instance.scheduleWeeklyRecapNotification(_authService.userInfo);
+              await WeeklyNotificationService.instance
+                  .scheduleWeeklyRecapNotification(_authService.userInfo);
             }
           });
         }
@@ -336,20 +371,24 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     }
 
     // Initialize Stream Video immediately if already authenticated
-    if (_authService.userInfo != null && _authService.userInfo!.callGetStreamToken != null) {
+    if (_authService.userInfo != null &&
+        _authService.userInfo!.callGetStreamToken != null) {
       Future.microtask(() async {
         // Double-check user is still authenticated
         if (_authService.userInfo != null) {
           await _streamVideoService.initialize(_authService.userInfo!);
-          debugPrint('✅ Stream Video initialized on startup for user: ${_authService.userInfo!.id}');
+          debugPrint(
+            '✅ Stream Video initialized on startup for user: ${_authService.userInfo!.id}',
+          );
         }
       });
     }
-    
+
     // Setup FCM token if already authenticated
     if (_authService.isAuthenticated) {
       Future.microtask(() async {
-        final success = await PushNotificationService.instance.requestPermissionsAndSetupToken();
+        final success = await PushNotificationService.instance
+            .requestPermissionsAndSetupToken();
         if (success) {
           debugPrint('✅ FCM token setup successful (initial)');
           await _streamChatService.registerPushTokenManually();
@@ -359,7 +398,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         _notificationsService.fetchNotifications();
       });
     }
-    
+
     // Show splash screen for 2 seconds
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
@@ -380,11 +419,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     debugPrint('🔄 App Lifecycle State: $state');
-    
+
     // Stream Chat automatically manages presence based on WebSocket connection
     // When app resumes, ensure connection is active for presence
     if (state == AppLifecycleState.resumed) {
-      if (_authService.userInfo != null && _authService.userInfo!.chatGetStreamToken != null) {
+      if (_authService.userInfo != null &&
+          _authService.userInfo!.chatGetStreamToken != null) {
         // Only auto-reconnect students - mentors will reconnect when they select students
         if (_authService.userInfo!.isStudent) {
           _streamChatService.autoConnectUser(
@@ -395,20 +435,24 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           );
           debugPrint('🟢 App resumed - Student reconnected to Stream Chat');
         } else {
-          debugPrint('🟡 App resumed - Mentor will connect when selecting student');
+          debugPrint(
+            '🟡 App resumed - Mentor will connect when selecting student',
+          );
         }
       }
-      
+
       // Only fetch notifications if user is authenticated
       if (_authService.isAuthenticated) {
         Future.microtask(() => _notificationsService.fetchNotifications());
       }
-      
+
       // Check for pending navigation when app resumes
       // BUT skip if there's an active video call (user accepted via CallKit)
       if (PendingNavigationService.instance.hasPendingNavigation) {
         if (_streamVideoService.hasActiveCall) {
-          debugPrint('🔄 App resumed with pending navigation, but video call is active - skipping');
+          debugPrint(
+            '🔄 App resumed with pending navigation, but video call is active - skipping',
+          );
           PendingNavigationService.instance.clearPendingNavigation();
         } else {
           debugPrint('🔄 App resumed with pending navigation');
@@ -417,7 +461,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             if (!_streamVideoService.hasActiveCall) {
               PendingNavigationService.instance.processPendingNavigation();
             } else {
-              debugPrint('🔄 Video call became active - skipping pending navigation');
+              debugPrint(
+                '🔄 Video call became active - skipping pending navigation',
+              );
               PendingNavigationService.instance.clearPendingNavigation();
             }
           });
@@ -427,7 +473,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       // If user accepted via CallKit and app just resumed, ensure Stream Video reconnects/joins.
       if (_streamVideoService.hasActiveCall) {
         Future.microtask(() async {
-          await _streamVideoService.ensureActiveCallConnected(reason: 'app_resumed');
+          await _streamVideoService.ensureActiveCallConnected(
+            reason: 'app_resumed',
+          );
         });
       }
     }
@@ -439,17 +487,15 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final themeService = context.watch<ThemeService>();
     final streamChatService = context.watch<StreamChatService>();
-    
+
     if (_showSplash) {
       return MaterialApp(
         title: 'launchgo',
         theme: themeService.themeData,
         home: const SplashScreen(),
         debugShowCheckedModeBanner: false,
-        builder: (context, child) => StreamChat(
-          client: streamChatService.client,
-          child: child!,
-        ),
+        builder: (context, child) =>
+            StreamChat(client: streamChatService.client, child: child!),
       );
     }
 
@@ -458,11 +504,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       theme: themeService.themeData,
       routerConfig: _appRouter.router,
       debugShowCheckedModeBanner: false,
-      builder: (context, child) => StreamChat(
-        client: streamChatService.client,
-        child: child!,
-      ),
+      builder: (context, child) =>
+          StreamChat(client: streamChatService.client, child: child!),
     );
   }
 }
-

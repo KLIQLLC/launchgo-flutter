@@ -1,3 +1,4 @@
+// services/push_notification_service.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -18,22 +19,23 @@ import 'video_call/video_call_push_handler.dart';
 /// Service for handling FCM token lifecycle and device registration
 class PushNotificationService extends ChangeNotifier {
   static PushNotificationService? _instance;
-  static PushNotificationService get instance => _instance ??= PushNotificationService._();
-  
+  static PushNotificationService get instance =>
+      _instance ??= PushNotificationService._();
+
   PushNotificationService._();
-  
+
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   String? _fcmToken;
   bool _isInitialized = false;
   NotificationsApiService? _notificationsService;
   GoRouter? _router;
-  
+
   // Add auth service for semester switching
   AuthService? _authService;
-  
+
   // Callback for when FCM token becomes available
   VoidCallback? _onTokenAvailableCallback;
-  
+
   /// Log to file for debugging
   Future<void> _logToFile(String message) async {
     try {
@@ -41,27 +43,30 @@ class PushNotificationService extends ChangeNotifier {
       final directory = await getApplicationDocumentsDirectory();
       final file = File('${directory.path}/debug_logs.txt');
       final timestamp = DateTime.now().toIso8601String();
-      await file.writeAsString('[$timestamp] $message\n', mode: FileMode.append);
+      await file.writeAsString(
+        '[$timestamp] $message\n',
+        mode: FileMode.append,
+      );
       debugPrint('✅ Logged to file: ${file.path}');
     } catch (e) {
       debugPrint('Failed to write to log file: $e');
     }
   }
-  
+
   String? get fcmToken => _fcmToken;
   bool get isInitialized => _isInitialized;
-  
+
   /// Set notifications service for updating badge count
   void setNotificationsService(NotificationsApiService notificationsService) {
     _notificationsService = notificationsService;
   }
-  
+
   /// Set router for direct navigation
   void setRouter(GoRouter router) {
     _router = router;
     debugPrint('🔔 PushNotificationService: Router set for direct navigation');
   }
-  
+
   /// Set auth service for semester switching
   void setAuthService(AuthService authService) {
     _authService = authService;
@@ -69,9 +74,11 @@ class PushNotificationService extends ChangeNotifier {
     if (_router != null) {
       NotificationNavigationService.instance.initialize(_router!, authService);
     }
-    debugPrint('🔔 PushNotificationService: AuthService set for semester switching');
+    debugPrint(
+      '🔔 PushNotificationService: AuthService set for semester switching',
+    );
   }
-  
+
   /// Set callback to be called when FCM token becomes available
   void setTokenAvailableCallback(VoidCallback callback) {
     _onTokenAvailableCallback = callback;
@@ -80,72 +87,83 @@ class PushNotificationService extends ChangeNotifier {
       Future.microtask(() => callback());
     }
   }
-  
+
   /// Initialize FCM for basic functionality (without requesting permissions)
   Future<void> initialize() async {
     if (_isInitialized) {
       debugPrint('🔔 PushNotificationService already initialized, skipping...');
       return;
     }
-    
+
     debugPrint('🔔 Initializing PushNotificationService...');
-    
+
     try {
       // Setup message handlers without requesting permissions
       // Handle background messages
-      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-      
+      FirebaseMessaging.onBackgroundMessage(
+        _firebaseMessagingBackgroundHandler,
+      );
+
       // Handle foreground messages
       FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-      
+
       // Add global message listener for debugging
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        debugPrint('🔔 [GLOBAL] Foreground message: ${message.notification?.title}');
+        debugPrint(
+          '🔔 [GLOBAL] Foreground message: ${message.notification?.title}',
+        );
         debugPrint('🔔 [GLOBAL] Message data: ${message.data}');
       });
-      
+
       // Handle message when app is opened from notification tap
       debugPrint('🔔 Setting up onMessageOpenedApp listener...');
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
         debugPrint('🔔 [LISTENER] onMessageOpenedApp triggered!');
         _handleMessageOpenedApp(message);
       });
-      
+
       // Handle initial message if app was opened from notification
       debugPrint('🔔 Checking for initial message...');
       RemoteMessage? initialMessage = await _messaging.getInitialMessage();
       if (initialMessage != null) {
-        debugPrint('🔔 [INITIAL] App opened from notification (terminated state)');
+        debugPrint(
+          '🔔 [INITIAL] App opened from notification (terminated state)',
+        );
         debugPrint('🔔 [INITIAL] Message data: ${initialMessage.data}');
-        debugPrint('🔔 [INITIAL] Screen value: ${initialMessage.data['screen']}');
+        debugPrint(
+          '🔔 [INITIAL] Screen value: ${initialMessage.data['screen']}',
+        );
         // Store navigation - will be processed when router is ready
         _storeNavigationFromMessage(initialMessage);
       } else {
         debugPrint('🔔 No initial message found');
       }
-      
+
       _isInitialized = true;
       notifyListeners();
-      
-      debugPrint('✅ PushNotificationService initialized successfully (no permissions requested yet)');
-      _logToFile('PUSH_SERVICE_INITIALIZED: Message handlers ready, awaiting permissions');
+
+      debugPrint(
+        '✅ PushNotificationService initialized successfully (no permissions requested yet)',
+      );
+      _logToFile(
+        'PUSH_SERVICE_INITIALIZED: Message handlers ready, awaiting permissions',
+      );
     } catch (e) {
       debugPrint('❌ Error initializing PushNotificationService: $e');
       rethrow;
     }
   }
-  
 
   /// Request notification permissions and setup FCM token
   Future<bool> requestPermissionsAndSetupToken() async {
     debugPrint('🔔 Requesting notification permissions...');
-    
+
     try {
       // Initialize notification display service (Android only)
       if (Platform.isAndroid) {
         await AndroidNotificationDisplayService.instance.initialize();
       }
-      
+
       // Request notification permissions
       NotificationSettings settings = await _messaging.requestPermission(
         alert: true,
@@ -156,46 +174,51 @@ class PushNotificationService extends ChangeNotifier {
         provisional: false,
         sound: true,
       );
-      
-      debugPrint('🔔 Notification permission status: ${settings.authorizationStatus}');
-      
+
+      debugPrint(
+        '🔔 Notification permission status: ${settings.authorizationStatus}',
+      );
+
       if (settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional) {
-        
         // Wait for APNS token on iOS before getting FCM token
         debugPrint('🔔 Waiting for APNS token...');
         await _waitForApnsToken();
-        
+
         // Get FCM token
         _fcmToken = await _messaging.getToken();
         debugPrint('🔔 FCM Token retrieved: $_fcmToken');
-        
+
         // Call callback if set (for backend registration)
         if (_onTokenAvailableCallback != null) {
           debugPrint('🔔 Calling token available callback...');
           Future.microtask(() => _onTokenAvailableCallback!());
         }
-        
+
         // Listen to token refresh
         _messaging.onTokenRefresh.listen((token) {
           _fcmToken = token;
           debugPrint('🔔 FCM Token refreshed: $token');
           notifyListeners();
-          
+
           // Call callback for token refresh too
           if (_onTokenAvailableCallback != null) {
             Future.microtask(() => _onTokenAvailableCallback!());
           }
         });
-        
+
         debugPrint('✅ Push notifications fully enabled with FCM token');
         debugPrint('🔔 FCM Token: $_fcmToken');
-        _logToFile('PUSH_NOTIFICATIONS_ENABLED: FCM Token received, ready for notifications');
-        
+        _logToFile(
+          'PUSH_NOTIFICATIONS_ENABLED: FCM Token received, ready for notifications',
+        );
+
         notifyListeners();
         return true;
       } else {
-        debugPrint('❌ Notification permission denied: ${settings.authorizationStatus}');
+        debugPrint(
+          '❌ Notification permission denied: ${settings.authorizationStatus}',
+        );
         return false;
       }
     } catch (e) {
@@ -203,7 +226,7 @@ class PushNotificationService extends ChangeNotifier {
       return false;
     }
   }
-  
+
   /// Register device with backend using FCM token
   Future<void> registerDevice(ApiServiceRetrofit apiService) async {
     try {
@@ -211,7 +234,7 @@ class PushNotificationService extends ChangeNotifier {
         debugPrint('⚠️ No FCM token available for registration');
         return;
       }
-      
+
       debugPrint('📱 Registering device with backend...');
       await apiService.registerFCMToken(_fcmToken!);
       debugPrint('✅ Device registered successfully with backend');
@@ -220,7 +243,7 @@ class PushNotificationService extends ChangeNotifier {
       rethrow;
     }
   }
-  
+
   /// Unregister device from backend
   Future<void> unregisterDevice(ApiServiceRetrofit apiService) async {
     try {
@@ -228,7 +251,7 @@ class PushNotificationService extends ChangeNotifier {
         debugPrint('⚠️ No FCM token available for unregistration');
         return;
       }
-      
+
       debugPrint('🗑️ Unregistering device from backend...');
       await apiService.deleteFCMToken(_fcmToken!);
       debugPrint('✅ Device unregistered successfully from backend');
@@ -237,7 +260,7 @@ class PushNotificationService extends ChangeNotifier {
       rethrow;
     }
   }
-  
+
   /// Wait for APNS token to be available on iOS
   Future<void> _waitForApnsToken() async {
     try {
@@ -247,14 +270,16 @@ class PushNotificationService extends ChangeNotifier {
       debugPrint('Error getting APNS token: $e');
     }
   }
-  
+
   /// Handle foreground messages
   void _handleForegroundMessage(RemoteMessage message) {
     // 🛑 BREAKPOINT: Set breakpoint here to inspect message data
-    debugPrint('🔔 Foreground message received: ${message.notification?.title}');
+    debugPrint(
+      '🔔 Foreground message received: ${message.notification?.title}',
+    );
     debugPrint('🔔 Message data: ${message.data}');
     debugPrint('🔔 Message body: ${message.notification?.body}');
-    
+
     // Show the notification even when app is in foreground
     // For Stream Chat data-only notifications, show them manually
     if (NotificationParser.isStreamChatMessage(message.data)) {
@@ -268,31 +293,32 @@ class PushNotificationService extends ChangeNotifier {
     } else {
       debugPrint('🔔 Non-Stream Chat foreground notification');
     }
-    
+
     // Update notification badge count when foreground notification received
     if (_notificationsService != null) {
       Future.microtask(() => _notificationsService!.fetchNotifications());
     }
   }
-  
+
   /// Handle message when app is opened from notification
   void _handleMessageOpenedApp(RemoteMessage message) {
     // 🛑 BREAKPOINT: Set breakpoint here to inspect notification tap data
-    final logMessage = '''
+    final logMessage =
+        '''
 ============================================
 Message opened app: ${message.notification?.title}
 Message data: ${message.data}
 Data keys: ${message.data.keys.toList()}
 Screen value: ${message.data['screen']}
 ============================================''';
-    
+
     debugPrint('🔔 $logMessage');
     _logToFile('NOTIFICATION_OPENED: $logMessage');
-    
+
     // Parse and store navigation
     _storeNavigationFromMessage(message);
   }
-  
+
   /// Parse message and execute direct navigation
   void _storeNavigationFromMessage(RemoteMessage message) {
     final data = message.data;
@@ -307,43 +333,48 @@ Screen value: ${message.data['screen']}
     // First try to handle via NotificationNavigationService for structured notifications
     if (data.containsKey('eventType')) {
       final eventType = data['eventType'] as String;
-      debugPrint('🔔 Using NotificationNavigationService for eventType: $eventType');
-      
+      debugPrint(
+        '🔔 Using NotificationNavigationService for eventType: $eventType',
+      );
+
       // Use the centralized navigation service for all eventType notifications
       NotificationNavigationService.instance.handleNotification(
         eventType: eventType,
         data: data,
       );
-      
+
       // Return early since navigation is handled by the service
       return;
     }
-    
+
     // Handle Stream Chat notifications
     if (_isStreamChatNotification(data)) {
-      debugPrint('🔔 Using NotificationNavigationService for chat notification');
-      
+      debugPrint(
+        '🔔 Using NotificationNavigationService for chat notification',
+      );
+
       // Use the specialized navigation service for chat handling
       NotificationNavigationService.instance.handleChatNotification(
         receiverId: data['receiver_id'],
         channelId: data['channel_id'] ?? data['channel_cid'],
         channelType: data['channel_type'],
       );
-      
+
       // Return early since navigation is handled by the service
       return;
     }
-    
+
     // Fallback to legacy handling for backward compatibility
     String? targetRoute;
     Map<String, dynamic>? extra;
-    
+
     if (data.containsKey('screen')) {
       final screen = data['screen'] as String;
       targetRoute = _getRouteFromScreen(screen);
-      
+
       // Special handling for assignments with course_id
-      if (screen.toLowerCase() == 'assignments' && data.containsKey('course_id')) {
+      if (screen.toLowerCase() == 'assignments' &&
+          data.containsKey('course_id')) {
         targetRoute = '/course/${data['course_id']}/assignments';
       }
     } else if (data.containsKey('route')) {
@@ -352,7 +383,7 @@ Screen value: ${message.data['screen']}
         extra = data['extra'] as Map<String, dynamic>;
       }
     }
-    
+
     if (targetRoute != null) {
       if (_router != null) {
         debugPrint('🔔 Executing direct navigation to: $targetRoute');
@@ -367,17 +398,23 @@ Screen value: ${message.data['screen']}
           debugPrint('❌ Direct navigation failed: $e');
           // Fallback to pending service
           debugPrint('🔔 Falling back to pending navigation service');
-          PendingNavigationService.instance.setPendingNavigation(targetRoute, extra: extra);
+          PendingNavigationService.instance.setPendingNavigation(
+            targetRoute,
+            extra: extra,
+          );
         }
       } else {
         debugPrint('🔔 Router not available, using pending navigation service');
-        PendingNavigationService.instance.setPendingNavigation(targetRoute, extra: extra);
+        PendingNavigationService.instance.setPendingNavigation(
+          targetRoute,
+          extra: extra,
+        );
       }
     } else {
       debugPrint('🔔 No navigation target found in notification data');
     }
   }
-  
+
   /// Get route from screen name
   String _getRouteFromScreen(String screen) {
     switch (screen.toLowerCase()) {
@@ -402,16 +439,15 @@ Screen value: ${message.data['screen']}
         return '/schedule';
     }
   }
-  
+
   /// Check if this is a Stream Chat notification
   bool _isStreamChatNotification(Map<String, dynamic> data) {
-    return data.containsKey('channel_id') || 
-           data.containsKey('channel_type') ||
-           data.containsKey('channel_cid');
+    return data.containsKey('channel_id') ||
+        data.containsKey('channel_type') ||
+        data.containsKey('channel_cid');
   }
-  
+
   // iOS notification handler removed - Firebase handles everything now
-  
 }
 
 /// Background message handler (must be top-level function)
@@ -463,13 +499,17 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 /// Show incoming call notification on Android when app is terminated
 /// Uses flutter_callkit_incoming to display full-screen incoming call UI
 @pragma('vm:entry-point')
-Future<void> _showAndroidIncomingCallNotification(Map<String, dynamic> data) async {
+Future<void> _showAndroidIncomingCallNotification(
+  Map<String, dynamic> data,
+) async {
   debugPrint('📞 [Android Background] Showing incoming call notification');
   debugPrint('📞 [Android Background] Data: $data');
 
   // Extract call ID from push data
   // Stream Video sends call_cid in format "type:callId" (e.g., "default:abc123")
-  debugPrint('📞 [Android Background] Raw push data keys: ${data.keys.toList()}');
+  debugPrint(
+    '📞 [Android Background] Raw push data keys: ${data.keys.toList()}',
+  );
   debugPrint('📞 [Android Background] call_cid from push: ${data['call_cid']}');
   debugPrint('📞 [Android Background] call_id from push: ${data['call_id']}');
   debugPrint('📞 [Android Background] id from push: ${data['id']}');
@@ -478,7 +518,9 @@ Future<void> _showAndroidIncomingCallNotification(Map<String, dynamic> data) asy
   final callCid = data['call_cid'] as String?;
   if (callCid != null && callCid.contains(':')) {
     callId = callCid.split(':').last;
-    debugPrint('📞 [Android Background] Extracted callId from call_cid: $callId');
+    debugPrint(
+      '📞 [Android Background] Extracted callId from call_cid: $callId',
+    );
   }
   callId ??= data['call_id'] as String? ?? data['id'] as String?;
 
@@ -488,13 +530,18 @@ Future<void> _showAndroidIncomingCallNotification(Map<String, dynamic> data) asy
   }
 
   // Extract caller name
-  final callerName = data['caller_name'] as String? ??
+  final callerName =
+      data['caller_name'] as String? ??
       data['created_by_display_name'] as String? ??
       data['sender_name'] as String? ??
       'Mentor';
 
-  debugPrint('📞 [Android Background] FINAL Call ID to use: $callId, Caller: $callerName');
-  debugPrint('📞 [Android Background] Storing in extra - call_cid: ${callCid ?? 'default:$callId'}, call_id: $callId');
+  debugPrint(
+    '📞 [Android Background] FINAL Call ID to use: $callId, Caller: $callerName',
+  );
+  debugPrint(
+    '📞 [Android Background] Storing in extra - call_cid: ${callCid ?? 'default:$callId'}, call_id: $callId',
+  );
 
   // Generate a unique UUID for this call notification
   final uuid = const Uuid().v4();
@@ -523,7 +570,9 @@ Future<void> _showAndroidIncomingCallNotification(Map<String, dynamic> data) asy
     ),
   );
 
-  debugPrint('📞 [Android Background] Calling FlutterCallkitIncoming.showCallkitIncoming');
+  debugPrint(
+    '📞 [Android Background] Calling FlutterCallkitIncoming.showCallkitIncoming',
+  );
   await FlutterCallkitIncoming.showCallkitIncoming(params);
   debugPrint('✅ [Android Background] Incoming call notification shown');
 }

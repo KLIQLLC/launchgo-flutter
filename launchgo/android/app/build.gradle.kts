@@ -71,7 +71,12 @@ android {
             storeFile = file("keystore/debug.keystore")
             storePassword = "android"
         }
-        if (keystorePropertiesFile.exists()) {
+        // Only create release signing config if key.properties exists with all required fields
+        if (keystorePropertiesFile.exists() && 
+            keystoreProperties["keyAlias"] != null &&
+            keystoreProperties["keyPassword"] != null &&
+            keystoreProperties["storeFile"] != null &&
+            keystoreProperties["storePassword"] != null) {
             create("release") {
                 keyAlias = keystoreProperties["keyAlias"] as String
                 keyPassword = keystoreProperties["keyPassword"] as String
