@@ -99,3 +99,4 @@ app.*.map.json
 # Claude AI documentation
 CLAUDE.md
 .claude/
+.vscode/templates

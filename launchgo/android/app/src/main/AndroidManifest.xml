@@ -41,6 +41,14 @@
                 <action android:name="FLUTTER_NOTIFICATION_CLICK" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <!-- Intent filter for CallKit actions - handle accept/decline directly in MainActivity -->
+            <intent-filter>
+                <action android:name="com.hiennv.flutter_callkit_incoming.ACTION_CALL_ACCEPT" />
+                <action android:name="com.hiennv.flutter_callkit_incoming.ACTION_CALL_DECLINE" />
+                <action android:name="${applicationId}.com.hiennv.flutter_callkit_incoming.ACTION_CALL_ACCEPT" />
+                <action android:name="${applicationId}.com.hiennv.flutter_callkit_incoming.ACTION_CALL_DECLINE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
@@ -48,14 +56,20 @@
             android:name="flutterEmbedding"
             android:value="2" />
             
-        <!-- Firebase Cloud Messaging Service -->
+        <!-- Custom Firebase Cloud Messaging Service for call monitoring -->
         <service
-            android:name="com.google.firebase.messaging.FirebaseMessagingService"
+            android:name=".LaunchgoFirebaseMessagingService"
             android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
+        <!-- Foreground Service for monitoring call decline without opening app -->
+        <service
+            android:name=".CallMonitorService"
+            android:exported="false"
+            android:foregroundServiceType="phoneCall" />
         
         <!-- Notification icon metadata -->
         <meta-data
@@ -67,6 +81,36 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="default_notification_channel" />
+
+        <!-- BroadcastReceiver for CallKit events when app is in background -->
+        <receiver
+            android:name=".CallKitBroadcastReceiver"
+            android:exported="true">
+            <intent-filter>
+                <!-- Decline actions -->
+                <action android:name="com.hiennv.flutter_callkit_incoming.ACTION_CALL_DECLINE" />
+                <action android:name="${applicationId}.com.hiennv.flutter_callkit_incoming.ACTION_CALL_DECLINE" />
+                <action android:name="ACTION_CALL_DECLINE" />
+                <!-- Accept actions -->
+                <action android:name="com.hiennv.flutter_callkit_incoming.ACTION_CALL_ACCEPT" />
+                <action android:name="${applicationId}.com.hiennv.flutter_callkit_incoming.ACTION_CALL_ACCEPT" />
+                <action android:name="ACTION_CALL_ACCEPT" />
+                <!-- Incoming call actions -->
+                <action android:name="com.hiennv.flutter_callkit_incoming.ACTION_CALL_INCOMING" />
+                <action android:name="${applicationId}.com.hiennv.flutter_callkit_incoming.ACTION_CALL_INCOMING" />
+                <action android:name="ACTION_CALL_INCOMING" />
+                <!-- End/timeout actions -->
+                <action android:name="com.hiennv.flutter_callkit_incoming.ACTION_CALL_ENDED" />
+                <action android:name="${applicationId}.com.hiennv.flutter_callkit_incoming.ACTION_CALL_ENDED" />
+                <action android:name="com.hiennv.flutter_callkit_incoming.ACTION_CALL_TIMEOUT" />
+                <action android:name="${applicationId}.com.hiennv.flutter_callkit_incoming.ACTION_CALL_TIMEOUT" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Service for rejecting calls via Stream Video API when app is in background -->
+        <service
+            android:name=".CallRejectService"
+            android:exported="false" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

@@ -1,11 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:stream_video_flutter/stream_video_flutter.dart';
 import 'package:stream_video_push_notification/stream_video_push_notification.dart';
 import '../../config/environment.dart';
 import '../../models/user_model.dart';
+import '../preferences_service.dart';
+import 'video_call_native_bridge.dart';
 
 /// Callback type for when a call is accepted via CallKit/push (call already joined)
 typedef OnCallAcceptedCallback = void Function(Call call);
@@ -110,6 +114,17 @@ class StreamVideoService extends ChangeNotifier {
         ),
       );
 
+      // Save credentials for native Android background access (call rejection)
+      if (Platform.isAndroid) {
+        debugPrint('[VC] 📞 [StreamVideoService:initialize] Saving credentials for native Android access...');
+        await PreferencesService.saveStreamVideoCredentials(
+          token: token,
+          apiKey: apiKey,
+          userId: user.id,
+        );
+        debugPrint('[VC] 📞 [StreamVideoService:initialize] Credentials saved to SharedPreferences');
+      }
+
       // Connect to establish WebSocket
       debugPrint('[VC] 📞 [StreamVideoService:initialize] Connecting to Stream Video WebSocket...');
       await _client!.connect();
@@ -182,6 +197,17 @@ class StreamVideoService extends ChangeNotifier {
       (call) {
         if (call == null) {
           debugPrint('[VC] 📞 [StreamVideoService:incomingCallListener] Incoming call cleared (set to null)');
+          debugPrint('[VC] 📞 [StreamVideoService:incomingCallListener] Call was cancelled by caller or timed out');
+
+          // End CallKit notification on Android when call is cancelled by mentor
+          // This ensures the ringing stops when mentor cancels the call
+          if (Platform.isAndroid && _incomingCallId != null) {
+            debugPrint('[VC] 📞 [StreamVideoService:incomingCallListener] Ending CallKit notification for cancelled call');
+            FlutterCallkitIncoming.endAllCalls().catchError((e) {
+              debugPrint('[VC] ⚠️ [StreamVideoService:incomingCallListener] Error ending CallKit: $e');
+            });
+          }
+
           _incomingCallId = null;
           _incomingCallerName = null;
           notifyListeners();
@@ -240,6 +266,14 @@ class StreamVideoService extends ChangeNotifier {
         debugPrint('[VC] 📞 [StreamVideoService:onCallAccepted] Call CID: ${callToJoin.callCid}');
         debugPrint('[VC] 📞 [StreamVideoService:onCallAccepted] Call already joined: true');
 
+        // Cancel WorkManager monitoring and clear pending call since call was accepted
+        if (Platform.isAndroid) {
+          debugPrint('[VC] 📞 [StreamVideoService:onCallAccepted] Cancelling WorkManager monitor...');
+          VideoCallNativeBridge.cancelCallMonitor(callId: callToJoin.id);
+          debugPrint('[VC] 📞 [StreamVideoService:onCallAccepted] Clearing pending call...');
+          VideoCallNativeBridge.clearPendingCall(callId: callToJoin.id);
+        }
+
         _activeCall = callToJoin;
         _incomingCallId = null;
         _incomingCallerName = null;
@@ -279,6 +313,14 @@ class StreamVideoService extends ChangeNotifier {
         debugPrint('[VC] 📞 [StreamVideoService:consumeCallback] Call ID: ${callToJoin.id}');
         debugPrint('[VC] 📞 [StreamVideoService:consumeCallback] Call CID: ${callToJoin.callCid}');
         debugPrint('[VC] 📞 [StreamVideoService:consumeCallback] This call was accepted while app was terminated');
+
+        // Cancel WorkManager monitoring and clear pending call since call was accepted
+        if (Platform.isAndroid) {
+          debugPrint('[VC] 📞 [StreamVideoService:consumeCallback] Cancelling WorkManager monitor...');
+          VideoCallNativeBridge.cancelCallMonitor(callId: callToJoin.id);
+          debugPrint('[VC] 📞 [StreamVideoService:consumeCallback] Clearing pending call...');
+          VideoCallNativeBridge.clearPendingCall(callId: callToJoin.id);
+        }
 
         _activeCall = callToJoin;
         _incomingCallId = null;
@@ -337,6 +379,82 @@ class StreamVideoService extends ChangeNotifier {
     debugPrint('[VIDEO_CALL] Clearing active call');
     _activeCall = null;
     notifyListeners();
+  }
+
+  /// Reject an incoming call by ID (for CallKit decline action)
+  /// This is used when user taps Decline on the notification
+  Future<void> rejectIncomingCall(String callId) async {
+    debugPrint('[VC] 📞 =====================================================');
+    debugPrint('[VC] 📞 [StreamVideoService:rejectIncomingCall] >> ENTRY');
+    debugPrint('[VC] 📞 =====================================================');
+    debugPrint('[VC] 📞 Call ID: $callId');
+    debugPrint('[VC] 📞 Client initialized: ${_client != null}');
+    debugPrint('[VC] 📞 Is initialized flag: $_isInitialized');
+
+    if (_client == null) {
+      debugPrint('[VC] ❌ [StreamVideoService:rejectIncomingCall] << EXIT: Client not initialized');
+      return;
+    }
+
+    try {
+      // Create call reference
+      debugPrint('[VC] 📞 Creating call reference with StreamCallType.defaultType()...');
+      final call = _client!.makeCall(
+        callType: StreamCallType.defaultType(),
+        id: callId,
+      );
+      debugPrint('[VC] 📞 Call reference created: ${call.callCid}');
+
+      // Fetch the call to ensure it exists
+      debugPrint('[VC] 📞 Calling getOrCreate()...');
+      final result = await call.getOrCreate();
+      debugPrint('[VC] 📞 getOrCreate() completed');
+      debugPrint('[VC] 📞 Call state status: ${call.state.value.status}');
+      debugPrint('[VC] 📞 Call participants: ${call.state.value.callParticipants.length}');
+
+      // Reject the call
+      debugPrint('[VC] 📞 Calling call.reject()...');
+      await call.reject();
+      debugPrint('[VC] 📞 call.reject() completed');
+
+      debugPrint('[VC] 📞 Call rejected successfully - caller should receive notification');
+
+      // End CallKit notification on Android
+      if (Platform.isAndroid) {
+        debugPrint('[VC] 📞 Ending CallKit notification...');
+        await FlutterCallkitIncoming.endAllCalls();
+        debugPrint('[VC] 📞 CallKit ended');
+      }
+
+      // Clear incoming call state
+      _incomingCallId = null;
+      _incomingCallerName = null;
+      notifyListeners();
+
+      debugPrint('[VC] 📞 =====================================================');
+      debugPrint('[VC] 📞 [StreamVideoService:rejectIncomingCall] << EXIT: SUCCESS');
+      debugPrint('[VC] 📞 =====================================================');
+    } catch (e, stackTrace) {
+      debugPrint('[VC] ❌ =====================================================');
+      debugPrint('[VC] ❌ [StreamVideoService:rejectIncomingCall] ERROR');
+      debugPrint('[VC] ❌ =====================================================');
+      debugPrint('[VC] ❌ Error: $e');
+      debugPrint('[VC] ❌ Stack trace: $stackTrace');
+
+      // Still try to end CallKit on error
+      if (Platform.isAndroid) {
+        debugPrint('[VC] 📞 Trying to end CallKit despite error...');
+        FlutterCallkitIncoming.endAllCalls().catchError((err) {
+          debugPrint('[VC] ⚠️ Error ending CallKit: $err');
+        });
+      }
+
+      // Still clear the state even on error
+      _incomingCallId = null;
+      _incomingCallerName = null;
+      notifyListeners();
+      debugPrint('[VC] ❌ =====================================================');
+    }
   }
 
   /// Disconnect and cleanup

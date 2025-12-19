@@ -113,4 +113,8 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // WorkManager for reliable background task execution (call rejection)
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+    // Firebase Messaging for native FCM handling (call monitoring)
+    implementation("com.google.firebase:firebase-messaging-ktx:24.0.0")
 }

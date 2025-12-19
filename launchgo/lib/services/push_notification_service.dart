@@ -4,7 +4,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:uuid/uuid.dart';
 import 'api_service_retrofit.dart';
 import 'notifications_api_service.dart';
 import 'pending_navigation_service.dart';
@@ -14,6 +13,7 @@ import 'notification_navigation_service.dart';
 import 'android_notification_display_service.dart';
 import 'notification_parser.dart';
 import 'video_call/video_call_push_handler.dart';
+import 'video_call/video_call_native_bridge.dart';
 
 /// Service for handling FCM token lifecycle and device registration
 class PushNotificationService extends ChangeNotifier {
@@ -268,15 +268,30 @@ class PushNotificationService extends ChangeNotifier {
 
     // Check if this is a video call notification
     if (VideoCallPushHandler.isVideoCallNotification(message.data)) {
-      debugPrint('📞 FOREGROUND VIDEO CALL NOTIFICATION DETECTED');
-      debugPrint('📞 App is in foreground - WebSocket will handle incoming call');
-      debugPrint('📞 NOT showing CallKit notification (in-app UI will show instead)');
+      final notificationType = message.data['type'] as String?;
+      debugPrint('[VC] 📞 FOREGROUND VIDEO CALL NOTIFICATION DETECTED');
+      debugPrint('[VC] 📞 Notification type: $notificationType');
+
+      if (notificationType == 'call.missed' || notificationType == 'call.ended') {
+        // Call was cancelled/missed - ensure CallKit is ended
+        // This is a backup in case WebSocket notification is delayed
+        debugPrint('[VC] 📞 Call missed/ended (type=$notificationType)');
+        debugPrint('[VC] 📞 Ending any active CallKit notifications as backup');
+        if (Platform.isAndroid) {
+          FlutterCallkitIncoming.endAllCalls().catchError((e) {
+            debugPrint('[VC] ❌ Error ending CallKit: $e');
+          });
+        }
+      } else {
+        debugPrint('[VC] 📞 App is in foreground - WebSocket will handle incoming call');
+        debugPrint('[VC] 📞 NOT showing CallKit notification (in-app UI will show instead)');
+      }
       // When app is in foreground:
       // - WebSocket is connected and detects the incoming call
       // - StreamVideoService.incomingCall stream triggers
       // - main.dart listener navigates to video-chat screen
       // - No need for CallKit notification - it would duplicate the UI
-      debugPrint('🔔 ========== END FOREGROUND MESSAGE ==========');
+      debugPrint('[VC] 📞 ========== END FOREGROUND VIDEO CALL ==========');
       return;
     }
 
@@ -466,25 +481,38 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // On Android (terminated): We must manually show CallKit because StreamVideo isn't initialized here
   // On Android (background): SDK should handle via handleRingingFlowNotifications in foreground listener
   if (VideoCallPushHandler.isVideoCallNotification(message.data)) {
-    debugPrint('📞 ========== BACKGROUND VIDEO CALL NOTIFICATION ==========');
-    debugPrint('📞 Background video call notification detected');
-    debugPrint('📞 Message data: ${message.data}');
-    debugPrint('📞 Message notification: ${message.notification?.title}');
+    debugPrint('[VC] 📞 ========== BACKGROUND VIDEO CALL NOTIFICATION ==========');
+    debugPrint('[VC] 📞 Background video call notification detected');
+    debugPrint('[VC] 📞 Message data: ${message.data}');
+    debugPrint('[VC] 📞 Message notification: ${message.notification?.title}');
 
-    // On Android, we need to manually show the incoming call notification
+    final notificationType = message.data['type'] as String?;
+    debugPrint('[VC] 📞 Notification type: $notificationType');
+
+    // On Android, we need to handle both showing and ending CallKit notifications
     // because Stream Video SDK is not initialized in the background isolate.
-    // The flow is:
-    // 1. Show CallKit notification here
-    // 2. User taps Accept -> app launches
-    // 3. StreamVideoService.consumeAndAcceptActiveCall() picks up the call
-    // 4. Navigation happens via callback in main.dart
     if (Platform.isAndroid) {
-      debugPrint('📞 Android: Showing incoming call notification manually (background/terminated)');
-      await _showAndroidIncomingCallNotification(message.data);
+      if (notificationType == 'call.ring') {
+        // Show incoming call notification
+        // The flow is:
+        // 1. Show CallKit notification here
+        // 2. User taps Accept -> app launches
+        // 3. StreamVideoService.consumeAndAcceptActiveCall() picks up the call
+        // 4. Navigation happens via callback in main.dart
+        debugPrint('[VC] 📞 Android: Showing incoming call notification (call.ring)');
+        await _showAndroidIncomingCallNotification(message.data);
+      } else if (notificationType == 'call.missed' || notificationType == 'call.ended') {
+        // Call was missed/ended - end the CallKit notification
+        // This ensures the ringing UI disappears
+        debugPrint('[VC] 📞 Android: Call missed/ended (type=$notificationType), ending CallKit notification');
+        await _endAndroidCallNotification();
+      } else {
+        debugPrint('[VC] 📞 Android: Unhandled video call notification type: $notificationType');
+      }
     } else {
-      debugPrint('📞 iOS: VoIP push + CallKit handled natively via StreamVideoPKDelegateManager');
+      debugPrint('[VC] 📞 iOS: VoIP push + CallKit handled natively via StreamVideoPKDelegateManager');
     }
-    debugPrint('📞 ========== END BACKGROUND VIDEO CALL NOTIFICATION ==========');
+    debugPrint('[VC] 📞 ========== END BACKGROUND VIDEO CALL NOTIFICATION ==========');
     return;
   }
 
@@ -509,33 +537,36 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   }
 }
 
+/// End incoming call notification on Android when call is cancelled
+/// This is called when mentor cancels the call (call.miss or call.ended)
+@pragma('vm:entry-point')
+Future<void> _endAndroidCallNotification() async {
+  debugPrint('[VC] 📞 [Android Background] Ending incoming call notification (caller cancelled)');
+  try {
+    await FlutterCallkitIncoming.endAllCalls();
+    debugPrint('[VC] ✅ [Android Background] CallKit notification ended successfully');
+  } catch (e) {
+    debugPrint('[VC] ❌ [Android Background] Error ending CallKit notification: $e');
+  }
+}
+
 /// Show incoming call notification on Android when app is terminated
 /// Uses flutter_callkit_incoming to display full-screen incoming call UI
 @pragma('vm:entry-point')
 Future<void> _showAndroidIncomingCallNotification(Map<String, dynamic> data) async {
-  debugPrint('📞 [Android Background] Showing incoming call notification');
-  debugPrint('📞 [Android Background] Data: $data');
-
-  // Check the notification type - only show CallKit for actual ring notifications
-  // NOT for call.missed, call.notification, etc.
-  final notificationType = data['type'] as String?;
-  debugPrint('📞 [Android Background] Notification type: $notificationType');
-
-  if (notificationType != 'call.ring') {
-    debugPrint('📞 [Android Background] NOT a call.ring notification (type=$notificationType), skipping CallKit');
-    return;
-  }
+  debugPrint('[VC] 📞 [Android Background] Showing incoming call notification');
+  debugPrint('[VC] 📞 [Android Background] Data: $data');
 
   // End any existing active calls before showing new one
   // This prevents the issue where a previous call blocks the new notification
   // Always try to end calls unconditionally - activeCalls() can return stale data
   try {
-    debugPrint('📞 [Android Background] Ending any existing calls unconditionally');
+    debugPrint('[VC] 📞 [Android Background] Ending any existing calls unconditionally');
     await FlutterCallkitIncoming.endAllCalls();
     // Small delay to ensure previous calls are fully ended
     await Future.delayed(const Duration(milliseconds: 300));
   } catch (e) {
-    debugPrint('📞 [Android Background] Error ending previous calls (continuing anyway): $e');
+    debugPrint('[VC] ⚠️ [Android Background] Error ending previous calls (continuing anyway): $e');
     // Even if endAllCalls fails, we'll try to show the new notification
     // Add extra delay when there's an error
     await Future.delayed(const Duration(milliseconds: 500));
@@ -543,21 +574,21 @@ Future<void> _showAndroidIncomingCallNotification(Map<String, dynamic> data) asy
 
   // Extract call ID from push data
   // Stream Video sends call_cid in format "type:callId" (e.g., "default:abc123")
-  debugPrint('📞 [Android Background] Raw push data keys: ${data.keys.toList()}');
-  debugPrint('📞 [Android Background] call_cid from push: ${data['call_cid']}');
-  debugPrint('📞 [Android Background] call_id from push: ${data['call_id']}');
-  debugPrint('📞 [Android Background] id from push: ${data['id']}');
+  debugPrint('[VC] 📞 [Android Background] Raw push data keys: ${data.keys.toList()}');
+  debugPrint('[VC] 📞 [Android Background] call_cid from push: ${data['call_cid']}');
+  debugPrint('[VC] 📞 [Android Background] call_id from push: ${data['call_id']}');
+  debugPrint('[VC] 📞 [Android Background] id from push: ${data['id']}');
 
   String? callId;
   final callCid = data['call_cid'] as String?;
   if (callCid != null && callCid.contains(':')) {
     callId = callCid.split(':').last;
-    debugPrint('📞 [Android Background] Extracted callId from call_cid: $callId');
+    debugPrint('[VC] 📞 [Android Background] Extracted callId from call_cid: $callId');
   }
   callId ??= data['call_id'] as String? ?? data['id'] as String?;
 
   if (callId == null) {
-    debugPrint('❌ [Android Background] No call ID found in push data');
+    debugPrint('[VC] ❌ [Android Background] No call ID found in push data');
     return;
   }
 
@@ -567,15 +598,16 @@ Future<void> _showAndroidIncomingCallNotification(Map<String, dynamic> data) asy
       data['sender_name'] as String? ??
       'Mentor';
 
-  debugPrint('📞 [Android Background] FINAL Call ID to use: $callId, Caller: $callerName');
-  debugPrint('📞 [Android Background] Storing in extra - call_cid: ${callCid ?? 'default:$callId'}, call_id: $callId');
+  debugPrint('[VC] 📞 [Android Background] FINAL Call ID to use: $callId, Caller: $callerName');
+  debugPrint('[VC] 📞 [Android Background] Storing in extra - call_cid: ${callCid ?? 'default:$callId'}, call_id: $callId');
 
-  // Generate a unique UUID for this call notification
-  final uuid = const Uuid().v4();
+  // Use call_id as notification ID so we can track it
+  // This allows SharedPreferences listener to detect decline by call_id
+  debugPrint('[VC] 📞 [Android Background] Using call_id as notification ID: $callId');
 
   // Configure the incoming call notification
   final params = CallKitParams(
-    id: uuid,
+    id: callId,  // Use actual call_id, not random UUID
     nameCaller: callerName,
     appName: 'launchgo',
     type: 0, // 0 = video call, 1 = audio call
@@ -597,7 +629,7 @@ Future<void> _showAndroidIncomingCallNotification(Map<String, dynamic> data) asy
     ),
   );
 
-  debugPrint('📞 [Android Background] Calling FlutterCallkitIncoming.showCallkitIncoming');
+  debugPrint('[VC] 📞 [Android Background] Calling FlutterCallkitIncoming.showCallkitIncoming');
 
   // Try to show the incoming call notification with retry logic
   int retryCount = 0;
@@ -606,11 +638,37 @@ Future<void> _showAndroidIncomingCallNotification(Map<String, dynamic> data) asy
   while (retryCount <= maxRetries) {
     try {
       await FlutterCallkitIncoming.showCallkitIncoming(params);
-      debugPrint('✅ [Android Background] Incoming call notification shown successfully');
+      debugPrint('[VC] ✅ [Android Background] Incoming call notification shown successfully');
+
+      // Save pending call to SharedPreferences
+      // This is the KEY for detecting decline in terminated state!
+      // When app starts, it checks if pending call is NOT in activeCalls → declined
+      debugPrint('[VC] 📞 [Android Background] Saving pending call to SharedPreferences...');
+      try {
+        await VideoCallNativeBridge.savePendingCall(
+          callId: callId,
+          callCid: callCid,
+        );
+        debugPrint('[VC] 📞 [Android Background] Pending call saved successfully');
+      } catch (e) {
+        debugPrint('[VC] ⚠️ [Android Background] Error saving pending call: $e');
+      }
+
+      // Also try to schedule WorkManager (may not work in isolate)
+      try {
+        await VideoCallNativeBridge.scheduleCallMonitor(
+          callId: callId,
+          callCid: callCid,
+        );
+        debugPrint('[VC] 📞 [Android Background] WorkManager scheduled successfully');
+      } catch (e) {
+        debugPrint('[VC] ⚠️ [Android Background] Could not schedule WorkManager (expected in isolate): $e');
+      }
+
       return;
     } catch (e) {
       retryCount++;
-      debugPrint('❌ [Android Background] Error showing notification (attempt $retryCount/$maxRetries): $e');
+      debugPrint('[VC] ❌ [Android Background] Error showing notification (attempt $retryCount/$maxRetries): $e');
 
       if (retryCount <= maxRetries) {
         // Wait and try again
@@ -626,5 +684,5 @@ Future<void> _showAndroidIncomingCallNotification(Map<String, dynamic> data) asy
     }
   }
 
-  debugPrint('❌ [Android Background] Failed to show notification after $maxRetries retries');
+  debugPrint('[VC] ❌ [Android Background] Failed to show notification after $maxRetries retries');
 }
