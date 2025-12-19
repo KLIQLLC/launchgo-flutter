@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:stream_video_flutter/stream_video_flutter.dart';
@@ -29,12 +30,33 @@ class StreamVideoService extends ChangeNotifier {
   CompositeSubscription? _ringingEventsSubscription;
   OnCallAcceptedCallback? _onCallAcceptedCallback;
 
+  /// iOS method channel for call validity timer
+  static const _iosTimerChannel = MethodChannel('com.launchgo.app/call_validity');
+
   StreamVideo? get client => _client;
   Call? get activeCall => _activeCall;
   bool get hasActiveCall => _activeCall != null;
   String? get incomingCallId => _incomingCallId;
   String? get incomingCallerName => _incomingCallerName;
   bool get isInitialized => _isInitialized;
+
+  /// Start iOS native timer for call cancellation detection
+  void _startIOSTimer(String callCid) {
+    if (!Platform.isIOS) return;
+    debugPrint('[VC] 📞 [iOS] Starting call validity timer for: $callCid');
+    _iosTimerChannel.invokeMethod('startTimer', {'cid': callCid}).catchError((e) {
+      debugPrint('[VC] ⚠️ [iOS] Error starting timer: $e');
+    });
+  }
+
+  /// Stop iOS native timer
+  void _stopIOSTimer() {
+    if (!Platform.isIOS) return;
+    debugPrint('[VC] 📞 [iOS] Stopping call validity timer');
+    _iosTimerChannel.invokeMethod('stopTimer').catchError((e) {
+      debugPrint('[VC] ⚠️ [iOS] Error stopping timer: $e');
+    });
+  }
 
   /// Set callback for when call is accepted via CallKit/push (for navigation)
   void setOnCallAcceptedCallback(OnCallAcceptedCallback? callback) {
@@ -199,6 +221,9 @@ class StreamVideoService extends ChangeNotifier {
           debugPrint('[VC] 📞 [StreamVideoService:incomingCallListener] Incoming call cleared (set to null)');
           debugPrint('[VC] 📞 [StreamVideoService:incomingCallListener] Call was cancelled by caller or timed out');
 
+          // Stop iOS timer since call is no longer active
+          _stopIOSTimer();
+
           // End CallKit notification on Android when call is cancelled by mentor
           // This ensures the ringing stops when mentor cancels the call
           if (Platform.isAndroid && _incomingCallId != null) {
@@ -233,6 +258,9 @@ class StreamVideoService extends ChangeNotifier {
           debugPrint('[VC] 📞 [StreamVideoService:incomingCallListener] No participant name, using default: Mentor');
         }
 
+        // Start iOS native timer to detect call cancellation while in background
+        _startIOSTimer(call.callCid.toString());
+
         debugPrint('[VC] 📞 [StreamVideoService:incomingCallListener] Notifying listeners with new incoming call');
         notifyListeners();
         debugPrint('[VC] 📞 [StreamVideoService:incomingCallListener] ========== INCOMING CALL PROCESSING COMPLETE ==========');
@@ -265,6 +293,9 @@ class StreamVideoService extends ChangeNotifier {
         debugPrint('[VC] 📞 [StreamVideoService:onCallAccepted] Call ID: ${callToJoin.id}');
         debugPrint('[VC] 📞 [StreamVideoService:onCallAccepted] Call CID: ${callToJoin.callCid}');
         debugPrint('[VC] 📞 [StreamVideoService:onCallAccepted] Call already joined: true');
+
+        // Stop iOS timer - call was accepted
+        _stopIOSTimer();
 
         // Cancel WorkManager monitoring and clear pending call since call was accepted
         if (Platform.isAndroid) {
