@@ -21,6 +21,8 @@ import 'package:launchgo/services/weekly_notification_service.dart';
 import 'package:launchgo/services/video_call/stream_video_service.dart';
 import 'package:launchgo/services/video_call/video_call_push_handler.dart';
 import 'package:launchgo/widgets/splash_screen.dart';
+import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
+import 'package:flutter_callkit_incoming/entities/entities.dart' as callkit;
 import 'package:launchgo/features/recaps/presentation/bloc/recap_bloc.dart';
 import 'package:launchgo/features/recaps/data/recap_repository.dart';
 import 'package:provider/provider.dart';
@@ -179,11 +181,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // the call_id to Flutter via this channel
     if (Platform.isAndroid) {
       _setupAndroidCallIntentHandler();
+      _setupCallKitEventListener();
     }
-
-    // NOTE: We DO NOT set up manual CallKit listeners here.
-    // The Stream Video SDK handles CallKit internally via observeCoreRingingEvents.
-    // Manual listeners conflict with the SDK's internal handling.
 
     // Set up ringing events callback for navigation when call is accepted
     // Based on official pattern: observeCoreRingingEvents
@@ -443,6 +442,30 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           debugPrint('[VC] ❌ Call ID is null, cannot navigate');
         }
         debugPrint('[VC] 📞 ========== END CALL ACCEPTED FROM ANDROID INTENT ==========');
+      } else if (call.method == 'onCallDeclinedFromIntent') {
+        final args = call.arguments as Map<dynamic, dynamic>?;
+        final callId = args?['callId'] as String?;
+
+        debugPrint('[VC] 📞 ========== CALL DECLINED FROM ANDROID INTENT ==========');
+        debugPrint('[VC] 📞 Call ID: $callId');
+
+        if (callId != null) {
+          // Wait a bit for auth and video service to be ready
+          await Future.delayed(const Duration(milliseconds: 300));
+
+          // Ensure video service is initialized
+          if (_authService.userInfo != null && !_streamVideoService.isInitialized) {
+            debugPrint('[VC] 📞 Video service not initialized, initializing now...');
+            await _streamVideoService.initialize(_authService.userInfo!);
+          }
+
+          // Reject the call via SDK
+          await _streamVideoService.rejectIncomingCall(callId);
+          debugPrint('[VC] 📞 Call rejected via SDK');
+        } else {
+          debugPrint('[VC] ❌ Call ID is null, cannot reject');
+        }
+        debugPrint('[VC] 📞 ========== END CALL DECLINED FROM ANDROID INTENT ==========');
       }
     });
 
@@ -450,9 +473,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     _checkPendingCallFromAndroid();
   }
 
-  /// Check if there's a pending call ID from Android (terminated state acceptance)
+  /// Check if there's a pending call ID from Android (terminated state acceptance/decline)
   Future<void> _checkPendingCallFromAndroid() async {
     try {
+      // Check for pending accept
       debugPrint('[VC] 📞 Checking for pending call from Android...');
       final callId = await _videoCallChannel.invokeMethod<String>('getPendingCallId');
 
@@ -481,12 +505,191 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             },
           );
         }
+        return; // Don't check for decline if we have an accept
       } else {
-        debugPrint('[VC] 📞 No pending call from Android');
+        debugPrint('[VC] 📞 No pending accept call from Android');
+      }
+
+      // Check for pending decline
+      debugPrint('[VC] 📞 Checking for pending decline from Android...');
+      final declineCallId = await _videoCallChannel.invokeMethod<String>('getPendingDeclineCallId');
+
+      if (declineCallId != null) {
+        debugPrint('[VC] 📞 Found pending decline call ID from Android: $declineCallId');
+
+        // Wait for auth to be ready
+        await Future.delayed(const Duration(milliseconds: 500));
+
+        if (_authService.userInfo != null) {
+          // Ensure video service is initialized
+          if (!_streamVideoService.isInitialized) {
+            await _streamVideoService.initialize(_authService.userInfo!);
+          }
+
+          // Reject the call via SDK
+          await _streamVideoService.rejectIncomingCall(declineCallId);
+          debugPrint('[VC] 📞 Pending decline processed');
+        }
+      } else {
+        debugPrint('[VC] 📞 No pending decline call from Android');
       }
     } catch (e) {
       debugPrint('[VC] 📞 Error checking pending call: $e');
     }
+  }
+
+  /// Check for pending decline that happened while app was in background
+  Future<void> _checkPendingDeclineFromBackground() async {
+    try {
+      debugPrint('[VC] 📞 Checking for pending decline from BroadcastReceiver...');
+      final declineCallId = await _videoCallChannel.invokeMethod<String>('getPendingDeclineCallId');
+
+      if (declineCallId != null) {
+        debugPrint('[VC] 📞 ========== FOUND PENDING DECLINE FROM BACKGROUND ==========');
+        debugPrint('[VC] 📞 Call ID: $declineCallId');
+
+        if (_authService.userInfo != null) {
+          // Ensure video service is initialized
+          if (!_streamVideoService.isInitialized) {
+            debugPrint('[VC] 📞 Initializing video service...');
+            await _streamVideoService.initialize(_authService.userInfo!);
+          }
+
+          // Reject the call via SDK
+          debugPrint('[VC] 📞 Rejecting call via SDK...');
+          await _streamVideoService.rejectIncomingCall(declineCallId);
+          debugPrint('[VC] 📞 Call rejected successfully');
+        } else {
+          debugPrint('[VC] ⚠️ User not authenticated, cannot reject call');
+        }
+
+        debugPrint('[VC] 📞 ========== END PENDING DECLINE ==========');
+      } else {
+        debugPrint('[VC] 📞 No pending decline found');
+      }
+    } catch (e) {
+      debugPrint('[VC] ❌ Error checking pending decline: $e');
+    }
+  }
+
+  /// Set up listener for FlutterCallkitIncoming events
+  /// This handles decline events when app is in foreground or background (not terminated)
+  /// Note: Accept events are handled by Stream Video SDK's observeCoreRingingEvents
+  void _setupCallKitEventListener() {
+    debugPrint('[VC] 📞 ====================================================');
+    debugPrint('[VC] 📞 Setting up CallKit event listener for decline handling');
+    debugPrint('[VC] 📞 ====================================================');
+
+    FlutterCallkitIncoming.onEvent.listen((callkit.CallEvent? event) async {
+      debugPrint('[VC] 📞 ****************************************************');
+      debugPrint('[VC] 📞 CALLKIT EVENT RECEIVED');
+      debugPrint('[VC] 📞 ****************************************************');
+
+      if (event == null) {
+        debugPrint('[VC] 📞 Event is NULL, ignoring');
+        return;
+      }
+
+      debugPrint('[VC] 📞 Event type: ${event.event}');
+      debugPrint('[VC] 📞 Event name: ${event.event?.name}');
+      debugPrint('[VC] 📞 Event body type: ${event.body.runtimeType}');
+      debugPrint('[VC] 📞 Event body: ${event.body}');
+
+      // Log all body contents if it's a map
+      final body = event.body;
+      if (body is Map) {
+        debugPrint('[VC] 📞 Body keys: ${body.keys.toList()}');
+        for (final key in body.keys) {
+          debugPrint('[VC] 📞   body[$key] = ${body[key]} (${body[key].runtimeType})');
+        }
+
+        // Log extra if present
+        final extra = body['extra'];
+        if (extra != null) {
+          debugPrint('[VC] 📞 Extra type: ${extra.runtimeType}');
+          debugPrint('[VC] 📞 Extra value: $extra');
+          if (extra is Map) {
+            for (final key in extra.keys) {
+              debugPrint('[VC] 📞   extra[$key] = ${extra[key]}');
+            }
+          }
+        }
+      }
+
+      // Handle decline events - accept is handled by Stream Video SDK
+      if (event.event == callkit.Event.actionCallDecline) {
+        debugPrint('[VC] 📞 ========== CALL DECLINED VIA CALLKIT EVENT ==========');
+
+        // Extract call ID from event body
+        String? callId;
+        if (body is Map) {
+          // Try to get call_id from extra field
+          final extra = body['extra'];
+          if (extra is Map) {
+            callId = extra['call_id'] as String?;
+            debugPrint('[VC] 📞 call_id from extra: $callId');
+            if (callId == null) {
+              // Try extracting from call_cid
+              final callCid = extra['call_cid'] as String?;
+              debugPrint('[VC] 📞 call_cid from extra: $callCid');
+              if (callCid != null && callCid.contains(':')) {
+                callId = callCid.split(':').last;
+                debugPrint('[VC] 📞 Extracted call_id from call_cid: $callId');
+              }
+            }
+          }
+          // Fallback to direct fields
+          if (callId == null) {
+            callId = body['call_id'] as String? ?? body['id'] as String?;
+            debugPrint('[VC] 📞 call_id from body direct: $callId');
+          }
+        }
+
+        debugPrint('[VC] 📞 FINAL Extracted call ID: $callId');
+
+        if (callId != null) {
+          debugPrint('[VC] 📞 Auth user: ${_authService.userInfo?.id}');
+          debugPrint('[VC] 📞 Video service initialized: ${_streamVideoService.isInitialized}');
+
+          // Ensure video service is initialized
+          if (_authService.userInfo != null) {
+            if (!_streamVideoService.isInitialized) {
+              debugPrint('[VC] 📞 Video service not initialized, initializing...');
+              await _streamVideoService.initialize(_authService.userInfo!);
+              debugPrint('[VC] 📞 Video service initialized: ${_streamVideoService.isInitialized}');
+            }
+
+            // Reject the call via SDK to notify the caller
+            debugPrint('[VC] 📞 Calling rejectIncomingCall($callId)...');
+            await _streamVideoService.rejectIncomingCall(callId);
+            debugPrint('[VC] 📞 rejectIncomingCall completed');
+          } else {
+            debugPrint('[VC] ⚠️ User not authenticated, cannot reject call');
+          }
+        } else {
+          debugPrint('[VC] ⚠️ Could not extract call ID from event');
+        }
+
+        debugPrint('[VC] 📞 ========== END CALL DECLINED VIA CALLKIT EVENT ==========');
+      } else if (event.event == callkit.Event.actionCallAccept) {
+        debugPrint('[VC] 📞 Call ACCEPT event - handled by Stream Video SDK');
+      } else if (event.event == callkit.Event.actionCallTimeout) {
+        debugPrint('[VC] 📞 Call TIMEOUT event - ending all calls');
+        await FlutterCallkitIncoming.endAllCalls();
+      } else if (event.event == callkit.Event.actionCallEnded) {
+        debugPrint('[VC] 📞 Call ENDED event');
+      } else if (event.event == callkit.Event.actionCallIncoming) {
+        debugPrint('[VC] 📞 Call INCOMING event');
+      } else if (event.event == callkit.Event.actionCallStart) {
+        debugPrint('[VC] 📞 Call START event');
+      } else {
+        debugPrint('[VC] 📞 Unknown event type: ${event.event}');
+      }
+
+      debugPrint('[VC] 📞 ****************************************************');
+    });
+
+    debugPrint('[VC] 📞 CallKit event listener configured and active');
   }
 
   @override
@@ -529,6 +732,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         Future.delayed(const Duration(milliseconds: 800), () {
           PendingNavigationService.instance.processPendingNavigation();
         });
+      }
+
+      // Check for pending decline from CallKit (background decline)
+      if (Platform.isAndroid) {
+        debugPrint('[VC] 📞 App resumed - checking for pending decline from background');
+        _checkPendingDeclineFromBackground();
       }
     }
     // Note: Stream Chat automatically sets users offline when WebSocket disconnects

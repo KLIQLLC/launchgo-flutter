@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:stream_video_flutter/stream_video_flutter.dart';
 import 'base_video_chat_screen.dart';
 
 /// Video chat screen for STUDENTS (incoming calls)
@@ -22,6 +25,7 @@ class StudentVideoChatScreen extends BaseVideoChatScreen {
 
 class _StudentVideoChatScreenState extends BaseVideoChatScreenState<StudentVideoChatScreen> {
   bool _isAccepting = false;
+  bool _isCallCancelled = false;
 
   @override
   String get displayName => widget.callerName ?? 'Mentor';
@@ -80,7 +84,106 @@ class _StudentVideoChatScreenState extends BaseVideoChatScreenState<StudentVideo
   }
 
   @override
+  void setupCallStateListener() {
+    debugPrint('[VC] 📞 [StudentVideoChatScreen:setupCallStateListener] Setting up call state listener...');
+
+    callStateSubscription = call!.state.listen((state) {
+      debugPrint('[VC] 📞 [StudentVideoChatScreen:callStateListener] ========== CALL STATE CHANGED ==========');
+      debugPrint('[VC] 📞 [StudentVideoChatScreen:callStateListener] Status: ${state.status}');
+      debugPrint('[VC] 📞 [StudentVideoChatScreen:callStateListener] hasAcceptedCall: $hasAcceptedCall');
+      debugPrint('[VC] 📞 [StudentVideoChatScreen:callStateListener] Total participants: ${state.callParticipants.length}');
+
+      if (mounted) {
+        setState(() {
+          callState = state;
+        });
+      }
+
+      // Handle call cancelled by mentor (before student accepted)
+      if (state.status is CallStatusDisconnected && !hasAcceptedCall && !_isCallCancelled) {
+        debugPrint('[VC] 📞 [StudentVideoChatScreen:callStateListener] Call cancelled by mentor before acceptance');
+        _handleCallCancelled();
+        return;
+      }
+
+      // Handle call disconnected after acceptance (normal end)
+      if (state.status is CallStatusDisconnected && hasAcceptedCall) {
+        debugPrint('[VC] 📞 [StudentVideoChatScreen:callStateListener] Call ended after acceptance');
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted && !isEnding) {
+            isEnding = true;
+            videoService.clearActiveCall();
+            navigateBack();
+          }
+        });
+      }
+
+      // Monitor participant count for 1-on-1 calls
+      if (state.callParticipants.length >= 2) {
+        if (!hadMultipleParticipants) {
+          hadMultipleParticipants = true;
+          debugPrint('[VC] 📞 [StudentVideoChatScreen:callStateListener] Multiple participants (2+) detected');
+        }
+      }
+
+      // End call if other person left (only after both were connected)
+      if (!isEnding && hasAcceptedCall && hadMultipleParticipants) {
+        if (state.callParticipants.length <= 1) {
+          debugPrint('[VC] 📞 [StudentVideoChatScreen:callStateListener] Other participant left, ending call');
+          endCall();
+          return;
+        }
+
+        final myUserId = authService.userInfo?.id.toString();
+        final otherParticipants = state.callParticipants.where(
+          (p) => p.userId != myUserId
+        ).toList();
+
+        if (otherParticipants.isEmpty) {
+          debugPrint('[VC] 📞 [StudentVideoChatScreen:callStateListener] No other participants found, ending call');
+          endCall();
+        }
+      }
+      debugPrint('[VC] 📞 [StudentVideoChatScreen:callStateListener] ========== CALL STATE PROCESSING COMPLETE ==========');
+    });
+
+    debugPrint('[VC] 📞 [StudentVideoChatScreen:setupCallStateListener] Call state listener configured');
+  }
+
+  /// Handle call cancelled by mentor
+  void _handleCallCancelled() {
+    debugPrint('[VC] 📞 [StudentVideoChatScreen:_handleCallCancelled] Mentor cancelled the call');
+
+    setState(() {
+      _isCallCancelled = true;
+    });
+
+    // End CallKit notification on Android
+    if (Platform.isAndroid) {
+      debugPrint('[VC] 📞 [StudentVideoChatScreen:_handleCallCancelled] Ending CallKit notification');
+      FlutterCallkitIncoming.endAllCalls().catchError((e) {
+        debugPrint('[VC] ⚠️ [StudentVideoChatScreen:_handleCallCancelled] Error ending CallKit: $e');
+      });
+    }
+
+    videoService.clearActiveCall();
+
+    // Navigate back after showing cancelled UI briefly
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted && !isEnding) {
+        isEnding = true;
+        navigateBack();
+      }
+    });
+  }
+
+  @override
   Widget buildCallUI() {
+    // If call was cancelled by mentor, show cancelled UI
+    if (_isCallCancelled) {
+      return _buildCallCancelledUI();
+    }
+
     // If not yet accepted, show incoming call UI
     if (!hasAcceptedCall) {
       return _buildIncomingCallUI();
@@ -88,6 +191,63 @@ class _StudentVideoChatScreenState extends BaseVideoChatScreenState<StudentVideo
 
     // Otherwise show active call UI
     return buildActiveCallUI();
+  }
+
+  /// Build UI for cancelled call (mentor cancelled before student accepted)
+  Widget _buildCallCancelledUI() {
+    return Scaffold(
+      backgroundColor: const Color(0xFF020817),
+      body: SafeArea(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Avatar placeholder
+              Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFF1A2332),
+                  border: Border.all(
+                    color: Colors.red.withValues(alpha: 0.5),
+                    width: 3,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.call_end,
+                  size: 60,
+                  color: Colors.red,
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              // Caller name
+              Text(
+                displayName,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              // Call status
+              const Text(
+                'Call cancelled',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   /// Accept the incoming call
@@ -158,10 +318,24 @@ class _StudentVideoChatScreenState extends BaseVideoChatScreenState<StudentVideo
         debugPrint('[VC] 📞 [StudentVideoChatScreen:_declineCall] Call rejected successfully');
       }
 
+      // End CallKit notification on Android
+      if (Platform.isAndroid) {
+        debugPrint('[VC] 📞 [StudentVideoChatScreen:_declineCall] Ending CallKit notification');
+        await FlutterCallkitIncoming.endAllCalls();
+      }
+
       videoService.clearActiveCall();
       navigateBack();
     } catch (e) {
       debugPrint('[VC] ❌ [StudentVideoChatScreen:_declineCall] Error: $e');
+
+      // Still try to end CallKit on error
+      if (Platform.isAndroid) {
+        FlutterCallkitIncoming.endAllCalls().catchError((err) {
+          debugPrint('[VC] ⚠️ [StudentVideoChatScreen:_declineCall] Error ending CallKit: $err');
+        });
+      }
+
       videoService.clearActiveCall();
       navigateBack();
     }

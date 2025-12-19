@@ -90,6 +90,31 @@ class PreferencesService {
     await _prefs.remove('selected_semester_id');
   }
   
+  // Stream Video credentials for native Android access
+  // These are stored without environment suffix so native code can access them
+  static const String _streamVideoTokenKey = 'stream_video_token';
+  static const String _streamVideoApiKeyKey = 'stream_video_api_key';
+  static const String _streamVideoUserIdKey = 'stream_video_user_id';
+
+  /// Save Stream Video credentials for native Android access
+  /// This is needed for background call rejection
+  static Future<void> saveStreamVideoCredentials({
+    required String token,
+    required String apiKey,
+    required String userId,
+  }) async {
+    await _prefs.setString(_streamVideoTokenKey, token);
+    await _prefs.setString(_streamVideoApiKeyKey, apiKey);
+    await _prefs.setString(_streamVideoUserIdKey, userId);
+  }
+
+  /// Clear Stream Video credentials
+  static Future<void> clearStreamVideoCredentials() async {
+    await _prefs.remove(_streamVideoTokenKey);
+    await _prefs.remove(_streamVideoApiKeyKey);
+    await _prefs.remove(_streamVideoUserIdKey);
+  }
+
   /// Migrate old preferences to environment-specific storage
   static Future<void> migrateOldPreferences() async {
     // Check for legacy preferences without environment suffix

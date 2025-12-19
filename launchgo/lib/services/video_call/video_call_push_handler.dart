@@ -28,9 +28,16 @@ class VideoCallPushHandler {
   /// Check if this is a video call notification
   static bool isVideoCallNotification(Map<String, dynamic> data) {
     // Stream Video sends these fields in call notifications
+    // Types:
+    // - call.ring: incoming call (show CallKit)
+    // - call.missed: call was missed/rejected (end CallKit)
+    // - call.ended: call ended (end CallKit)
+    // - call.notification: general call notification
     return data.containsKey('call_cid') ||
         data.containsKey('stream_video') ||
         data['type'] == 'call.ring' ||
+        data['type'] == 'call.missed' ||
+        data['type'] == 'call.ended' ||
         data['type'] == 'call.notification';
   }
 
