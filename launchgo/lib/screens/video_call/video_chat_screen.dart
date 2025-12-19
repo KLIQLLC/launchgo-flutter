@@ -49,13 +49,13 @@ class _VideoChatScreenState extends State<VideoChatScreen> {
   @override
   void initState() {
     super.initState();
-    debugPrint('[VIDEO_CALL] VideoChatScreen.initState()');
-    debugPrint('[VIDEO_CALL]   callId: ${widget.callId}');
-    debugPrint('[VIDEO_CALL]   isIncoming: ${widget.isIncoming}');
-    debugPrint('[VIDEO_CALL]   callAlreadyJoined: ${widget.callAlreadyJoined}');
-    debugPrint('[VIDEO_CALL]   autoAccept: ${widget.autoAccept}');
-    debugPrint('[VIDEO_CALL]   callerName: ${widget.callerName}');
-    debugPrint('[VIDEO_CALL]   recipientName: ${widget.recipientName}');
+    debugPrint('[VC] 📞 [VideoChatScreen:initState] >> ENTRY');
+    debugPrint('[VC] 📞 [VideoChatScreen:initState]   callId: ${widget.callId}');
+    debugPrint('[VC] 📞 [VideoChatScreen:initState]   isIncoming: ${widget.isIncoming}');
+    debugPrint('[VC] 📞 [VideoChatScreen:initState]   callAlreadyJoined: ${widget.callAlreadyJoined}');
+    debugPrint('[VC] 📞 [VideoChatScreen:initState]   autoAccept: ${widget.autoAccept}');
+    debugPrint('[VC] 📞 [VideoChatScreen:initState]   callerName: ${widget.callerName}');
+    debugPrint('[VC] 📞 [VideoChatScreen:initState]   recipientName: ${widget.recipientName}');
 
     _videoService = context.read<StreamVideoService>();
     _authService = context.read<AuthService>();
@@ -308,7 +308,7 @@ class _VideoChatScreenState extends State<VideoChatScreen> {
         }
       }
     } catch (e) {
-      debugPrint('[VIDEO_CALL] Error accepting call: $e');
+      debugPrint('[VC] ❌ [VideoChatScreen:_acceptCall] Error accepting call: $e');
       if (mounted) {
         setState(() {
           _error = 'Failed to accept call: $e';
@@ -319,20 +319,20 @@ class _VideoChatScreenState extends State<VideoChatScreen> {
   }
 
   Future<void> _declineCall() async {
-    debugPrint('[VIDEO_CALL] Student declining call');
-    debugPrint('[VIDEO_CALL] Call ID: ${widget.callId}');
+    debugPrint('[VC] 📞 [VideoChatScreen:_declineCall] >> ENTRY');
+    debugPrint('[VC] 📞 [VideoChatScreen:_declineCall] Call ID: ${widget.callId}');
 
     try {
       if (_call != null) {
         await _call!.reject();
-        debugPrint('[VIDEO_CALL] Call rejected successfully');
+        debugPrint('[VC] 📞 [VideoChatScreen:_declineCall] Call rejected successfully');
       }
 
       if (mounted) {
         context.pop();
       }
     } catch (e) {
-      debugPrint('[VIDEO_CALL] Error declining call: $e');
+      debugPrint('[VC] ❌ [VideoChatScreen:_declineCall] Error declining call: $e');
       if (mounted) {
         context.pop();
       }
@@ -342,12 +342,12 @@ class _VideoChatScreenState extends State<VideoChatScreen> {
   void _endCall() async {
     // Prevent recursive calls
     if (_isEnding) {
-      debugPrint('[VIDEO_CALL] Already ending call, skipping');
+      debugPrint('[VC] 📞 [VideoChatScreen:_endCall] Already ending call, skipping');
       return;
     }
 
-    debugPrint('[VIDEO_CALL] Ending call');
-    debugPrint('[VIDEO_CALL] Call ID: ${widget.callId}');
+    debugPrint('[VC] 📞 [VideoChatScreen:_endCall] >> ENTRY');
+    debugPrint('[VC] 📞 [VideoChatScreen:_endCall] Call ID: ${widget.callId}');
 
     setState(() {
       _isEnding = true;
@@ -356,11 +356,11 @@ class _VideoChatScreenState extends State<VideoChatScreen> {
     try {
       if (_call != null) {
         await _call!.leave();
-        debugPrint('[VIDEO_CALL] Left call successfully');
+        debugPrint('[VC] 📞 [VideoChatScreen:_endCall] Left call successfully');
       }
       _videoService.clearActiveCall();
     } catch (e) {
-      debugPrint('[VIDEO_CALL] Error leaving call: $e');
+      debugPrint('[VC] ❌ [VideoChatScreen:_endCall] Error leaving call: $e');
     }
 
     if (mounted) {
@@ -370,7 +370,7 @@ class _VideoChatScreenState extends State<VideoChatScreen> {
 
   @override
   void dispose() {
-    debugPrint('[VIDEO_CALL] VideoChatScreen.dispose()');
+    debugPrint('[VC] 📞 [VideoChatScreen:dispose] >> ENTRY');
     _callStateSubscription?.cancel();
     WakelockPlus.disable();
     super.dispose();
@@ -437,16 +437,16 @@ class _VideoChatScreenState extends State<VideoChatScreen> {
 
     // Active call state - Use StreamCallContainer
     // This handles both outgoing (mentor) and active (student after accept) calls
-    debugPrint('[VIDEO_CALL] Building StreamCallContainer for call ${_call!.id}');
+    debugPrint('[VC] 📞 [VideoChatScreen:build] Building StreamCallContainer for call ${_call!.id}');
 
     return StreamCallContainer(
       call: _call!,
       onBackPressed: () {
-        debugPrint('[VIDEO_CALL] Back pressed in StreamCallContainer');
+        debugPrint('[VC] 📞 [VideoChatScreen:build] Back pressed in StreamCallContainer');
         _endCall();
       },
       onLeaveCallTap: () {
-        debugPrint('[VIDEO_CALL] Leave call tapped in StreamCallContainer');
+        debugPrint('[VC] 📞 [VideoChatScreen:build] Leave call tapped in StreamCallContainer');
         _endCall();
       },
     );

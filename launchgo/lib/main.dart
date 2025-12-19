@@ -209,13 +209,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // Based on official pattern: observeCoreRingingEvents
     // The call is ALREADY JOINED when this callback fires
     _streamVideoService.setOnCallAcceptedCallback((call) {
-      debugPrint('[VIDEO_CALL] Call accepted via CallKit/push - navigating');
-      debugPrint('[VIDEO_CALL] Call ID: ${call.id}');
-      debugPrint('[VIDEO_CALL] App state: foreground');
+      debugPrint('[VC] 📞 [MyApp:onCallAcceptedCallback] Call accepted via CallKit/push - navigating');
+      debugPrint('[VC] 📞 [MyApp:onCallAcceptedCallback] Call ID: ${call.id}');
+      debugPrint('[VC] 📞 [MyApp:onCallAcceptedCallback] App state: foreground');
 
       // Prevent duplicate navigation
       if (_lastNavigatedCallId == call.id) {
-        debugPrint('[VIDEO_CALL] Already navigated to this call, skipping');
+        debugPrint('[VC] 📞 [MyApp:onCallAcceptedCallback] Already navigated to this call, skipping');
         return;
       }
 
@@ -235,13 +235,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // We only need to navigate on Android where we show a custom incoming call UI
     _streamVideoService.addListener(() {
       final userRole = _authService.userInfo?.role.toString() ?? 'unknown';
-      debugPrint('[VIDEO_CALL] Service listener triggered');
-      debugPrint('[VIDEO_CALL] User role: $userRole');
+      debugPrint('[VC] 📞 [MyApp:videoServiceListener] Service listener triggered');
+      debugPrint('[VC] 📞 [MyApp:videoServiceListener] User role: $userRole');
       debugPrint(
-        '[VIDEO_CALL] Incoming call ID: ${_streamVideoService.incomingCallId}',
+        '[VC] 📞 [MyApp:videoServiceListener] Incoming call ID: ${_streamVideoService.incomingCallId}',
       );
       debugPrint(
-        '[VIDEO_CALL] Incoming caller: ${_streamVideoService.incomingCallerName}',
+        '[VC] 📞 [MyApp:videoServiceListener] Incoming caller: ${_streamVideoService.incomingCallerName}',
       );
 
       // Handle incoming calls (students only, app in foreground)
@@ -256,9 +256,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
         // Prevent duplicate navigation
         if (_lastIncomingCallId != currentCallId) {
-          debugPrint('[VIDEO_CALL] New incoming call detected (Android)');
-          debugPrint('[VIDEO_CALL] App state: foreground');
-          debugPrint('[VIDEO_CALL] Navigating to student-video-chat screen');
+          debugPrint('[VC] 📞 [MyApp:videoServiceListener] New incoming call detected (Android)');
+          debugPrint('[VC] 📞 [MyApp:videoServiceListener] App state: foreground');
+          debugPrint('[VC] 📞 [MyApp:videoServiceListener] Navigating to student-video-chat screen');
 
           _lastIncomingCallId = currentCallId;
 
@@ -303,14 +303,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         if (_authService.userInfo!.callGetStreamToken != null) {
           await _streamVideoService.initialize(_authService.userInfo!);
           debugPrint(
-            '✅ Stream Video initialized for user: ${_authService.userInfo!.id}',
+            '[VC] 📞 [MyApp:authListener] Stream Video initialized for user: ${_authService.userInfo!.id}',
           );
 
           // Consume active call from terminated state (for students)
           // This handles calls accepted via CallKit while app was terminated
           if (_authService.userInfo!.isStudent) {
             debugPrint(
-              '[VIDEO_CALL] Checking for active call from terminated state',
+              '[VC] 📞 [MyApp:authListener] Checking for active call from terminated state',
             );
 
             // Use post frame callback to ensure UI is ready
@@ -319,20 +319,20 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               // The SDK might need time to process the CallKit accept
               for (int attempt = 0; attempt < 3; attempt++) {
                 debugPrint(
-                  '[VIDEO_CALL] consumeAndAcceptActiveCall attempt ${attempt + 1}',
+                  '[VC] 📞 [MyApp:authListener] consumeAndAcceptActiveCall attempt ${attempt + 1}',
                 );
 
                 bool callConsumed = false;
                 _streamVideoService.consumeAndAcceptActiveCall((callToJoin) {
                   debugPrint(
-                    '[VIDEO_CALL] Active call consumed from terminated state (auth listener)',
+                    '[VC] 📞 [MyApp:authListener] Active call consumed from terminated state',
                   );
-                  debugPrint('[VIDEO_CALL] Call ID: ${callToJoin.id}');
+                  debugPrint('[VC] 📞 [MyApp:authListener] Call ID: ${callToJoin.id}');
 
                   // Prevent duplicate navigation
                   if (_lastNavigatedCallId == callToJoin.id) {
                     debugPrint(
-                      '[VIDEO_CALL] Already navigated to this call, skipping',
+                      '[VC] 📞 [MyApp:authListener] Already navigated to this call, skipping',
                     );
                     return;
                   }
@@ -356,7 +356,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                 // If we already navigated (either from this or iOS CallKit handler), stop retrying
                 if (_lastNavigatedCallId != null || callConsumed) {
                   debugPrint(
-                    '[VIDEO_CALL] Call handling complete, stopping retries',
+                    '[VC] 📞 [MyApp:authListener] Call handling complete, stopping retries',
                   );
                   break;
                 }
@@ -429,21 +429,21 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         // Double-check user is still authenticated
         if (_authService.userInfo != null) {
           await _streamVideoService.initialize(_authService.userInfo!);
-          debugPrint('[VIDEO_CALL] Stream Video initialized on startup');
+          debugPrint('[VC] 📞 [MyApp:initState] Stream Video initialized on startup');
 
           // Consume active call from terminated state (Android)
           // Based on official pattern from GetStream tutorial
           if (_authService.userInfo!.isStudent) {
             debugPrint(
-              '[VIDEO_CALL] Attempting to consume active call from terminated state',
+              '[VC] 📞 [MyApp:initState] Attempting to consume active call from terminated state',
             );
             WidgetsBinding.instance.addPostFrameCallback((_) {
               _streamVideoService.consumeAndAcceptActiveCall((callToJoin) {
                 debugPrint(
-                  '[VIDEO_CALL] Active call consumed from terminated state',
+                  '[VC] 📞 [MyApp:initState] Active call consumed from terminated state',
                 );
-                debugPrint('[VIDEO_CALL] Call ID: ${callToJoin.id}');
-                debugPrint('[VIDEO_CALL] App state: terminated -> foreground');
+                debugPrint('[VC] 📞 [MyApp:initState] Call ID: ${callToJoin.id}');
+                debugPrint('[VC] 📞 [MyApp:initState] App state: terminated -> foreground');
 
                 _appRouter.router.pushNamed(
                   'student-video-chat',

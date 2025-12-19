@@ -252,46 +252,38 @@ class PushNotificationService extends ChangeNotifier {
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
     // 🛑 EARLY LOGGING - See raw push data before any processing
     debugPrint('');
-    debugPrint('🔔🔔🔔 ========== PUSH NOTIFICATION RECEIVED (FOREGROUND) ========== 🔔🔔🔔');
-    debugPrint('🔔 TIMESTAMP: ${DateTime.now().toIso8601String()}');
-    debugPrint('🔔 MESSAGE ID: ${message.messageId}');
-    debugPrint('🔔 NOTIFICATION TITLE: ${message.notification?.title}');
-    debugPrint('🔔 NOTIFICATION BODY: ${message.notification?.body}');
-    debugPrint('🔔 DATA PAYLOAD: ${message.data}');
-    debugPrint('🔔 DATA KEYS: ${message.data.keys.toList()}');
-    debugPrint('🔔 FROM: ${message.from}');
-    debugPrint('🔔 SENT TIME: ${message.sentTime}');
-    debugPrint('🔔 CATEGORY: ${message.category}');
-    debugPrint('🔔 COLLAPSE KEY: ${message.collapseKey}');
-    debugPrint('🔔🔔🔔 ========== END RAW PUSH DATA ========== 🔔🔔🔔');
+    debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] ========== PUSH RECEIVED (FOREGROUND) ==========');
+    debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] TIMESTAMP: ${DateTime.now().toIso8601String()}');
+    debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] MESSAGE ID: ${message.messageId}');
+    debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] DATA PAYLOAD: ${message.data}');
+    debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] DATA KEYS: ${message.data.keys.toList()}');
+    debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] TYPE: ${message.data['type']}');
     debugPrint('');
 
     // Check if this is a video call notification
     if (VideoCallPushHandler.isVideoCallNotification(message.data)) {
       final notificationType = message.data['type'] as String?;
-      debugPrint('[VC] 📞 FOREGROUND VIDEO CALL NOTIFICATION DETECTED');
-      debugPrint('[VC] 📞 Notification type: $notificationType');
+      debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] VIDEO CALL NOTIFICATION DETECTED');
+      debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] Notification type: $notificationType');
 
       if (notificationType == 'call.missed' || notificationType == 'call.ended') {
         // Call was cancelled/missed - ensure CallKit is ended
         // This is a backup in case WebSocket notification is delayed
-        debugPrint('[VC] 📞 Call missed/ended (type=$notificationType)');
-        debugPrint('[VC] 📞 Ending any active CallKit notifications as backup');
+        debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] Call missed/ended (type=$notificationType)');
+        debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] Ending any active CallKit notifications');
         if (Platform.isAndroid) {
           FlutterCallkitIncoming.endAllCalls().catchError((e) {
-            debugPrint('[VC] ❌ Error ending CallKit: $e');
+            debugPrint('[VC] ❌ [PushNotificationService:_handleForegroundMessage] Error ending CallKit: $e');
           });
         }
+      } else if (notificationType == 'call.ring') {
+        debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] call.ring - App is in foreground');
+        debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] WebSocket will handle incoming call');
+        debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] NOT showing CallKit notification (in-app UI will show instead)');
       } else {
-        debugPrint('[VC] 📞 App is in foreground - WebSocket will handle incoming call');
-        debugPrint('[VC] 📞 NOT showing CallKit notification (in-app UI will show instead)');
+        debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] Unknown type: $notificationType');
       }
-      // When app is in foreground:
-      // - WebSocket is connected and detects the incoming call
-      // - StreamVideoService.incomingCall stream triggers
-      // - main.dart listener navigates to video-chat screen
-      // - No need for CallKit notification - it would duplicate the UI
-      debugPrint('[VC] 📞 ========== END FOREGROUND VIDEO CALL ==========');
+      debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] ========== END FOREGROUND VIDEO CALL ==========');
       return;
     }
 
@@ -464,16 +456,12 @@ Screen value: ${message.data['screen']}
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // 🛑 EARLY LOGGING - See raw push data before any processing
   debugPrint('');
-  debugPrint('🔔🔔🔔 ========== PUSH NOTIFICATION RECEIVED (BACKGROUND) ========== 🔔🔔🔔');
-  debugPrint('🔔 TIMESTAMP: ${DateTime.now().toIso8601String()}');
-  debugPrint('🔔 MESSAGE ID: ${message.messageId}');
-  debugPrint('🔔 NOTIFICATION TITLE: ${message.notification?.title}');
-  debugPrint('🔔 NOTIFICATION BODY: ${message.notification?.body}');
-  debugPrint('🔔 DATA PAYLOAD: ${message.data}');
-  debugPrint('🔔 DATA KEYS: ${message.data.keys.toList()}');
-  debugPrint('🔔 FROM: ${message.from}');
-  debugPrint('🔔 SENT TIME: ${message.sentTime}');
-  debugPrint('🔔🔔🔔 ========== END RAW PUSH DATA ========== 🔔🔔🔔');
+  debugPrint('[VC] 📞 [BackgroundHandler] ========== PUSH RECEIVED (BACKGROUND) ==========');
+  debugPrint('[VC] 📞 [BackgroundHandler] TIMESTAMP: ${DateTime.now().toIso8601String()}');
+  debugPrint('[VC] 📞 [BackgroundHandler] MESSAGE ID: ${message.messageId}');
+  debugPrint('[VC] 📞 [BackgroundHandler] DATA PAYLOAD: ${message.data}');
+  debugPrint('[VC] 📞 [BackgroundHandler] DATA KEYS: ${message.data.keys.toList()}');
+  debugPrint('[VC] 📞 [BackgroundHandler] TYPE: ${message.data['type']}');
   debugPrint('');
 
   // Handle video call notifications
@@ -481,38 +469,29 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // On Android (terminated): We must manually show CallKit because StreamVideo isn't initialized here
   // On Android (background): SDK should handle via handleRingingFlowNotifications in foreground listener
   if (VideoCallPushHandler.isVideoCallNotification(message.data)) {
-    debugPrint('[VC] 📞 ========== BACKGROUND VIDEO CALL NOTIFICATION ==========');
-    debugPrint('[VC] 📞 Background video call notification detected');
-    debugPrint('[VC] 📞 Message data: ${message.data}');
-    debugPrint('[VC] 📞 Message notification: ${message.notification?.title}');
+    debugPrint('[VC] 📞 [BackgroundHandler] ========== VIDEO CALL NOTIFICATION ==========');
+    debugPrint('[VC] 📞 [BackgroundHandler] Video call notification detected');
+    debugPrint('[VC] 📞 [BackgroundHandler] Message data: ${message.data}');
 
     final notificationType = message.data['type'] as String?;
-    debugPrint('[VC] 📞 Notification type: $notificationType');
+    debugPrint('[VC] 📞 [BackgroundHandler] Notification type: $notificationType');
 
     // On Android, we need to handle both showing and ending CallKit notifications
     // because Stream Video SDK is not initialized in the background isolate.
     if (Platform.isAndroid) {
       if (notificationType == 'call.ring') {
-        // Show incoming call notification
-        // The flow is:
-        // 1. Show CallKit notification here
-        // 2. User taps Accept -> app launches
-        // 3. StreamVideoService.consumeAndAcceptActiveCall() picks up the call
-        // 4. Navigation happens via callback in main.dart
-        debugPrint('[VC] 📞 Android: Showing incoming call notification (call.ring)');
+        debugPrint('[VC] 📞 [BackgroundHandler] Android: call.ring - Showing incoming call notification');
         await _showAndroidIncomingCallNotification(message.data);
       } else if (notificationType == 'call.missed' || notificationType == 'call.ended') {
-        // Call was missed/ended - end the CallKit notification
-        // This ensures the ringing UI disappears
-        debugPrint('[VC] 📞 Android: Call missed/ended (type=$notificationType), ending CallKit notification');
+        debugPrint('[VC] 📞 [BackgroundHandler] Android: $notificationType - Ending CallKit notification');
         await _endAndroidCallNotification();
       } else {
-        debugPrint('[VC] 📞 Android: Unhandled video call notification type: $notificationType');
+        debugPrint('[VC] 📞 [BackgroundHandler] Android: Unhandled type: $notificationType');
       }
     } else {
-      debugPrint('[VC] 📞 iOS: VoIP push + CallKit handled natively via StreamVideoPKDelegateManager');
+      debugPrint('[VC] 📞 [BackgroundHandler] iOS: VoIP push handled natively');
     }
-    debugPrint('[VC] 📞 ========== END BACKGROUND VIDEO CALL NOTIFICATION ==========');
+    debugPrint('[VC] 📞 [BackgroundHandler] ========== END VIDEO CALL NOTIFICATION ==========');
     return;
   }
 

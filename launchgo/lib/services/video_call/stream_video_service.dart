@@ -61,7 +61,7 @@ class StreamVideoService extends ChangeNotifier {
   /// Set callback for when call is accepted via CallKit/push (for navigation)
   void setOnCallAcceptedCallback(OnCallAcceptedCallback? callback) {
     _onCallAcceptedCallback = callback;
-    debugPrint('[VIDEO_CALL] Callback set for call acceptance');
+    debugPrint('[VC] 📞 [StreamVideoService:setOnCallAcceptedCallback] Callback set for call acceptance');
   }
 
   /// Initialize the video client
@@ -194,16 +194,16 @@ class StreamVideoService extends ChangeNotifier {
         final isExpired = DateTime.now().isAfter(expTime);
 
         if (isExpired) {
-          debugPrint('[VIDEO_CALL] Token expired at: $expTime');
+          debugPrint('[VC] 📞 [StreamVideoService:_verifyToken] Token expired at: $expTime');
           return false;
         }
 
-        debugPrint('[VIDEO_CALL] Token valid until: $expTime');
+        debugPrint('[VC] 📞 [StreamVideoService:_verifyToken] Token valid until: $expTime');
       }
 
       return true;
     } catch (e) {
-      debugPrint('[VIDEO_CALL] Error verifying token: $e');
+      debugPrint('[VC] ❌ [StreamVideoService:_verifyToken] Error verifying token: $e');
       return false;
     }
   }
@@ -398,7 +398,7 @@ class StreamVideoService extends ChangeNotifier {
 
   /// Set active call (helper for VideoChatScreen)
   void setActiveCall(Call call) {
-    debugPrint('[VIDEO_CALL] Setting active call: ${call.id}');
+    debugPrint('[VC] 📞 [StreamVideoService:setActiveCall] Setting active call: ${call.id}');
     _activeCall = call;
     _incomingCallId = null;
     _incomingCallerName = null;
@@ -407,7 +407,7 @@ class StreamVideoService extends ChangeNotifier {
 
   /// Clear active call (helper for VideoChatScreen)
   void clearActiveCall() {
-    debugPrint('[VIDEO_CALL] Clearing active call');
+    debugPrint('[VC] 📞 [StreamVideoService:clearActiveCall] Clearing active call');
     _activeCall = null;
     notifyListeners();
   }
@@ -490,7 +490,7 @@ class StreamVideoService extends ChangeNotifier {
 
   /// Disconnect and cleanup
   Future<void> disconnect() async {
-    debugPrint('[VIDEO_CALL] Disconnecting service');
+    debugPrint('[VC] 📞 [StreamVideoService:disconnect] Disconnecting service');
 
     await _incomingCallSubscription?.cancel();
     _incomingCallSubscription = null;
@@ -507,7 +507,7 @@ class StreamVideoService extends ChangeNotifier {
     _isInitialized = false;
 
     notifyListeners();
-    debugPrint('[VIDEO_CALL] Service disconnected');
+    debugPrint('[VC] 📞 [StreamVideoService:disconnect] Service disconnected');
   }
 
   @override

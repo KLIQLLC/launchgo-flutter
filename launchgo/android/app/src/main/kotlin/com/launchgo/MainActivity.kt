@@ -23,6 +23,17 @@ class MainActivity : FlutterActivity() {
     private var lastKnownCallIds: Set<String> = emptySet()
     private var callKitPrefsListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
 
+    companion object {
+        /**
+         * Track if the app is in the foreground.
+         * Used by LaunchgoFirebaseMessagingService to skip CallMonitorService
+         * when app is in foreground (WebSocket handles calls directly).
+         */
+        @Volatile
+        var isAppInForeground: Boolean = false
+            private set
+    }
+
     /**
      * Native callback for CallKit events.
      * This works even when app is in terminated/killed state!
@@ -158,8 +169,15 @@ class MainActivity : FlutterActivity() {
 
     override fun onResume() {
         super.onResume()
-        Log.d(TAG, "📞 onResume - checking for declined calls")
+        isAppInForeground = true
+        Log.d(TAG, "📞 onResume - app is now in foreground, checking for declined calls")
         checkForDeclinedCalls()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        isAppInForeground = false
+        Log.d(TAG, "📞 onPause - app is now in background")
     }
 
     override fun onDestroy() {

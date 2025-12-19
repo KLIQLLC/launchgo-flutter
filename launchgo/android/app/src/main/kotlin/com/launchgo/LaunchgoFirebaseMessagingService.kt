@@ -34,22 +34,30 @@ class LaunchgoFirebaseMessagingService : FirebaseMessagingService() {
         if (type == "call.ring" && callCid != null) {
             Log.d(TAG, "📞 ****************************************************")
             Log.d(TAG, "📞 INCOMING CALL PUSH DETECTED!")
-            Log.d(TAG, "📞 Starting CallMonitorService...")
             Log.d(TAG, "📞 ****************************************************")
 
-            // Extract call_id from call_cid (format: "type:id")
-            val callId = if (callCid.contains(':')) {
-                callCid.split(':').last()
+            // Check if app is in foreground - if so, skip CallMonitorService
+            // because WebSocket will handle the call and show in-app UI directly
+            if (MainActivity.isAppInForeground) {
+                Log.d(TAG, "📞 App is in FOREGROUND - skipping CallMonitorService")
+                Log.d(TAG, "📞 WebSocket will handle incoming call, in-app UI will show")
             } else {
-                data["call_id"] ?: data["id"]
-            }
+                Log.d(TAG, "📞 App is in BACKGROUND/TERMINATED - starting CallMonitorService")
 
-            if (callId != null) {
-                // Start the foreground service to monitor for decline
-                CallMonitorService.startMonitoring(this, callId, callCid)
-                Log.d(TAG, "📞 CallMonitorService started for call: $callId")
-            } else {
-                Log.w(TAG, "📞 Could not extract call_id from push")
+                // Extract call_id from call_cid (format: "type:id")
+                val callId = if (callCid.contains(':')) {
+                    callCid.split(':').last()
+                } else {
+                    data["call_id"] ?: data["id"]
+                }
+
+                if (callId != null) {
+                    // Start the foreground service to monitor for decline
+                    CallMonitorService.startMonitoring(this, callId, callCid)
+                    Log.d(TAG, "📞 CallMonitorService started for call: $callId")
+                } else {
+                    Log.w(TAG, "📞 Could not extract call_id from push")
+                }
             }
         } else if (type == "call.missed" || type == "call.ended") {
             Log.d(TAG, "📞 ****************************************************")
