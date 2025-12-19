@@ -183,6 +183,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       _setupAndroidCallIntentHandler();
       _setupCallKitEventListener();
     }
+    
+    // Set up iOS CallKit event listener for lock screen accepts
+    // On iOS, we also need to listen to CallKit events because the SDK might not
+    // properly trigger observeCoreRingingEvents when app launches from terminated state
+    if (Platform.isIOS) {
+      _setupiOSCallKitEventListener();
+    }
 
     // Set up ringing events callback for navigation when call is accepted
     // Based on official pattern: observeCoreRingingEvents
@@ -191,6 +198,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       debugPrint('[VIDEO_CALL] Call accepted via CallKit/push - navigating');
       debugPrint('[VIDEO_CALL] Call ID: ${call.id}');
       debugPrint('[VIDEO_CALL] App state: foreground');
+      
+      // Prevent duplicate navigation
+      if (_lastNavigatedCallId == call.id) {
+        debugPrint('[VIDEO_CALL] Already navigated to this call, skipping');
+        return;
+      }
 
       _lastNavigatedCallId = call.id;
       _appRouter.router.pushNamed(
@@ -273,23 +286,49 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           debugPrint('✅ Stream Video initialized for user: ${_authService.userInfo!.id}');
 
           // Consume active call from terminated state (for students)
+          // This handles calls accepted via CallKit while app was terminated
           if (_authService.userInfo!.isStudent) {
             debugPrint('[VIDEO_CALL] Checking for active call from terminated state');
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              _streamVideoService.consumeAndAcceptActiveCall((callToJoin) {
-                debugPrint('[VIDEO_CALL] Active call consumed from terminated state (auth listener)');
-                debugPrint('[VIDEO_CALL] Call ID: ${callToJoin.id}');
+            
+            // Use post frame callback to ensure UI is ready
+            WidgetsBinding.instance.addPostFrameCallback((_) async {
+              // Try consuming active call with retries
+              // The SDK might need time to process the CallKit accept
+              for (int attempt = 0; attempt < 3; attempt++) {
+                debugPrint('[VIDEO_CALL] consumeAndAcceptActiveCall attempt ${attempt + 1}');
+                
+                bool callConsumed = false;
+                _streamVideoService.consumeAndAcceptActiveCall((callToJoin) {
+                  debugPrint('[VIDEO_CALL] Active call consumed from terminated state (auth listener)');
+                  debugPrint('[VIDEO_CALL] Call ID: ${callToJoin.id}');
+                  
+                  // Prevent duplicate navigation
+                  if (_lastNavigatedCallId == callToJoin.id) {
+                    debugPrint('[VIDEO_CALL] Already navigated to this call, skipping');
+                    return;
+                  }
 
-                _lastNavigatedCallId = callToJoin.id;
-                _appRouter.router.pushNamed(
-                  'student-video-chat',
-                  pathParameters: {'callId': callToJoin.id},
-                  queryParameters: {
-                    'callerName': 'Mentor',
-                    'autoAccept': 'true',  // Call already accepted from terminated state
-                  },
-                );
-              });
+                  _lastNavigatedCallId = callToJoin.id;
+                  callConsumed = true;
+                  _appRouter.router.pushNamed(
+                    'student-video-chat',
+                    pathParameters: {'callId': callToJoin.id},
+                    queryParameters: {
+                      'callerName': 'Mentor',
+                      'autoAccept': 'true',  // Call already accepted from terminated state
+                    },
+                  );
+                });
+                
+                // Wait a bit and check if call was consumed
+                await Future.delayed(const Duration(milliseconds: 300));
+                
+                // If we already navigated (either from this or iOS CallKit handler), stop retrying
+                if (_lastNavigatedCallId != null || callConsumed) {
+                  debugPrint('[VIDEO_CALL] Call handling complete, stopping retries');
+                  break;
+                }
+              }
             });
           }
         }
@@ -595,7 +634,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       }
 
       debugPrint('[VC] 📞 Event type: ${event.event}');
-      debugPrint('[VC] 📞 Event name: ${event.event?.name}');
+      debugPrint('[VC] 📞 Event name: ${event.event.name}');
       debugPrint('[VC] 📞 Event body type: ${event.body.runtimeType}');
       debugPrint('[VC] 📞 Event body: ${event.body}');
 
@@ -694,6 +733,159 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     });
 
     debugPrint('[VC] 📞 CallKit event listener configured and active');
+  }
+
+  /// Set up iOS-specific CallKit event listener
+  /// This handles accept events when app launches from terminated/lock screen state
+  /// The Stream Video SDK's observeCoreRingingEvents might not fire in time
+  void _setupiOSCallKitEventListener() {
+    debugPrint('[VC] 📞 ====================================================');
+    debugPrint('[VC] 📞 Setting up iOS CallKit event listener');
+    debugPrint('[VC] 📞 ====================================================');
+
+    FlutterCallkitIncoming.onEvent.listen((callkit.CallEvent? event) async {
+      debugPrint('[VC] 📞 [iOS] ****************************************************');
+      debugPrint('[VC] 📞 [iOS] CALLKIT EVENT RECEIVED');
+      debugPrint('[VC] 📞 [iOS] ****************************************************');
+
+      if (event == null) {
+        debugPrint('[VC] 📞 [iOS] Event is NULL, ignoring');
+        return;
+      }
+
+      debugPrint('[VC] 📞 [iOS] Event type: ${event.event}');
+      debugPrint('[VC] 📞 [iOS] Event body: ${event.body}');
+
+      if (event.event == callkit.Event.actionCallAccept) {
+        debugPrint('[VC] 📞 [iOS] ========== CALL ACCEPT EVENT ==========');
+        
+        // Extract call ID from event body
+        String? callId;
+        final body = event.body;
+        if (body is Map) {
+          final extra = body['extra'];
+          if (extra is Map) {
+            callId = extra['call_id'] as String?;
+            if (callId == null) {
+              // Try extracting from call_cid
+              final callCid = extra['call_cid'] as String?;
+              if (callCid != null && callCid.contains(':')) {
+                callId = callCid.split(':').last;
+              }
+            }
+          }
+          callId ??= body['call_id'] as String? ?? body['id'] as String?;
+        }
+        
+        debugPrint('[VC] 📞 [iOS] Extracted call ID: $callId');
+        
+        if (callId != null) {
+          // Check if we already navigated to this call
+          if (_lastNavigatedCallId == callId) {
+            debugPrint('[VC] 📞 [iOS] Already navigated to this call, skipping');
+            return;
+          }
+          
+          debugPrint('[VC] 📞 [iOS] Waiting for auth and video service to be ready...');
+          
+          // Wait for auth and video service with retries
+          for (int i = 0; i < 30; i++) { // Wait up to 3 seconds
+            if (_authService.userInfo != null && 
+                _authService.userInfo!.isStudent &&
+                _streamVideoService.isInitialized) {
+              debugPrint('[VC] 📞 [iOS] Services ready after ${i * 100}ms');
+              break;
+            }
+            await Future.delayed(const Duration(milliseconds: 100));
+          }
+          
+          if (_authService.userInfo == null || !_streamVideoService.isInitialized) {
+            debugPrint('[VC] ⚠️ [iOS] Services not ready after timeout');
+            return;
+          }
+          
+          // Check if SDK already handled this (activeCall is set)
+          final activeCall = _streamVideoService.activeCall;
+          if (activeCall != null && activeCall.id == callId) {
+            debugPrint('[VC] 📞 [iOS] SDK already handled this call, navigating...');
+            _lastNavigatedCallId = callId;
+            _appRouter.router.pushNamed(
+              'student-video-chat',
+              pathParameters: {'callId': callId},
+              queryParameters: {
+                'callerName': 'Mentor',
+                'autoAccept': 'true',
+              },
+            );
+          } else {
+            // SDK might not have processed yet, try consumeAndAcceptActiveCall
+            debugPrint('[VC] 📞 [iOS] Trying consumeAndAcceptActiveCall...');
+            _streamVideoService.consumeAndAcceptActiveCall((callToJoin) {
+              debugPrint('[VC] 📞 [iOS] Call consumed: ${callToJoin.id}');
+              if (_lastNavigatedCallId != callToJoin.id) {
+                _lastNavigatedCallId = callToJoin.id;
+                _appRouter.router.pushNamed(
+                  'student-video-chat',
+                  pathParameters: {'callId': callToJoin.id},
+                  queryParameters: {
+                    'callerName': 'Mentor',
+                    'autoAccept': 'true',
+                  },
+                );
+              }
+            });
+            
+            // Also try direct navigation as fallback after a short delay
+            await Future.delayed(const Duration(milliseconds: 500));
+            if (_lastNavigatedCallId != callId) {
+              debugPrint('[VC] 📞 [iOS] Fallback: Direct navigation to call $callId');
+              _lastNavigatedCallId = callId;
+              _appRouter.router.pushNamed(
+                'student-video-chat',
+                pathParameters: {'callId': callId},
+                queryParameters: {
+                  'callerName': 'Mentor',
+                  'autoAccept': 'true',
+                },
+              );
+            }
+          }
+        } else {
+          debugPrint('[VC] ⚠️ [iOS] Could not extract call ID from event');
+        }
+        
+        debugPrint('[VC] 📞 [iOS] ========== END CALL ACCEPT EVENT ==========');
+      } else if (event.event == callkit.Event.actionCallDecline) {
+        debugPrint('[VC] 📞 [iOS] Call DECLINE event');
+        // Handle decline similar to Android
+        String? callId;
+        final body = event.body;
+        if (body is Map) {
+          final extra = body['extra'];
+          if (extra is Map) {
+            callId = extra['call_id'] as String?;
+            if (callId == null) {
+              final callCid = extra['call_cid'] as String?;
+              if (callCid != null && callCid.contains(':')) {
+                callId = callCid.split(':').last;
+              }
+            }
+          }
+          callId ??= body['call_id'] as String? ?? body['id'] as String?;
+        }
+        
+        if (callId != null && _authService.userInfo != null) {
+          if (!_streamVideoService.isInitialized) {
+            await _streamVideoService.initialize(_authService.userInfo!);
+          }
+          await _streamVideoService.rejectIncomingCall(callId);
+        }
+      }
+      
+      debugPrint('[VC] 📞 [iOS] ****************************************************');
+    });
+
+    debugPrint('[VC] 📞 [iOS] CallKit event listener configured');
   }
 
   @override
