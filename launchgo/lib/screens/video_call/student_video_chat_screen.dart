@@ -1,3 +1,4 @@
+// screens/video_call/student_video_chat_screen.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
@@ -23,7 +24,8 @@ class StudentVideoChatScreen extends BaseVideoChatScreen {
   State<StudentVideoChatScreen> createState() => _StudentVideoChatScreenState();
 }
 
-class _StudentVideoChatScreenState extends BaseVideoChatScreenState<StudentVideoChatScreen> {
+class _StudentVideoChatScreenState
+    extends BaseVideoChatScreenState<StudentVideoChatScreen> {
   bool _isAccepting = false;
   bool _isCallCancelled = false;
 
@@ -33,8 +35,12 @@ class _StudentVideoChatScreenState extends BaseVideoChatScreenState<StudentVideo
   @override
   void initState() {
     super.initState();
-    debugPrint('[VC] 📞 [StudentVideoChatScreen] callerName: ${widget.callerName}');
-    debugPrint('[VC] 📞 [StudentVideoChatScreen] autoAccept: ${widget.autoAccept}');
+    debugPrint(
+      '[VC] 📞 [StudentVideoChatScreen] callerName: ${widget.callerName}',
+    );
+    debugPrint(
+      '[VC] 📞 [StudentVideoChatScreen] autoAccept: ${widget.autoAccept}',
+    );
 
     // If autoAccept, mark as accepted
     if (widget.autoAccept) {
@@ -47,18 +53,48 @@ class _StudentVideoChatScreenState extends BaseVideoChatScreenState<StudentVideo
     debugPrint('[VC] 📞 [StudentVideoChatScreen:initializeCall] >> ENTRY');
 
     try {
-      // Setup the call
-      final newCall = await setupCall();
+      Call newCall;
 
       if (widget.autoAccept) {
-        // User already tapped Answer on notification - auto-accept
-        debugPrint('[VC] 📞 [StudentVideoChatScreen:initializeCall] autoAccept=true, accepting call automatically...');
-        await newCall.accept();
-        videoService.setActiveCall(newCall);
-        debugPrint('[VC] 📞 [StudentVideoChatScreen:initializeCall] Auto-accepted call successfully');
+        // User already tapped Answer on notification (CallKit/push)
+        // On iOS: The call is ALREADY JOINED by Stream SDK via observeCoreRingingEvents
+        // On Android from terminated state: The call is ALREADY JOINED via consumeAndAcceptActiveCall
+        // We must use the existing active call from the service, NOT create a new reference
+        debugPrint(
+          '[VC] 📞 [StudentVideoChatScreen:initializeCall] autoAccept=true',
+        );
+        debugPrint(
+          '[VC] 📞 [StudentVideoChatScreen:initializeCall] Checking for active call from service...',
+        );
+
+        final existingCall = videoService.activeCall;
+        if (existingCall != null && existingCall.id == widget.callId) {
+          // Use the already-joined call from the service
+          debugPrint(
+            '[VC] 📞 [StudentVideoChatScreen:initializeCall] Using existing active call from service (already joined)',
+          );
+          newCall = existingCall;
+        } else {
+          // Fallback: Call might not be in service yet, setup and accept
+          debugPrint(
+            '[VC] 📞 [StudentVideoChatScreen:initializeCall] No active call in service, setting up new call...',
+          );
+          newCall = await setupCall();
+          debugPrint(
+            '[VC] 📞 [StudentVideoChatScreen:initializeCall] Accepting call...',
+          );
+          await newCall.accept();
+          videoService.setActiveCall(newCall);
+          debugPrint(
+            '[VC] 📞 [StudentVideoChatScreen:initializeCall] Call accepted and set as active',
+          );
+        }
       } else {
-        // Wait for user to manually accept
-        debugPrint('[VC] 📞 [StudentVideoChatScreen:initializeCall] Waiting for user to accept call');
+        // Manual accept flow - setup call and wait for user to accept
+        debugPrint(
+          '[VC] 📞 [StudentVideoChatScreen:initializeCall] Waiting for user to accept call',
+        );
+        newCall = await setupCall();
       }
 
       if (mounted) {
@@ -71,9 +107,13 @@ class _StudentVideoChatScreenState extends BaseVideoChatScreenState<StudentVideo
       // Setup state listener
       setupCallStateListener();
 
-      debugPrint('[VC] 📞 [StudentVideoChatScreen:initializeCall] << EXIT: Initialization complete');
+      debugPrint(
+        '[VC] 📞 [StudentVideoChatScreen:initializeCall] << EXIT: Initialization complete',
+      );
     } catch (e) {
-      debugPrint('[VC] ❌ [StudentVideoChatScreen:initializeCall] << EXIT: Error: $e');
+      debugPrint(
+        '[VC] ❌ [StudentVideoChatScreen:initializeCall] << EXIT: Error: $e',
+      );
       if (mounted) {
         setState(() {
           error = 'Failed to connect to call: $e';
@@ -85,13 +125,23 @@ class _StudentVideoChatScreenState extends BaseVideoChatScreenState<StudentVideo
 
   @override
   void setupCallStateListener() {
-    debugPrint('[VC] 📞 [StudentVideoChatScreen:setupCallStateListener] Setting up call state listener...');
+    debugPrint(
+      '[VC] 📞 [StudentVideoChatScreen:setupCallStateListener] Setting up call state listener...',
+    );
 
     callStateSubscription = call!.state.listen((state) {
-      debugPrint('[VC] 📞 [StudentVideoChatScreen:callStateListener] ========== CALL STATE CHANGED ==========');
-      debugPrint('[VC] 📞 [StudentVideoChatScreen:callStateListener] Status: ${state.status}');
-      debugPrint('[VC] 📞 [StudentVideoChatScreen:callStateListener] hasAcceptedCall: $hasAcceptedCall');
-      debugPrint('[VC] 📞 [StudentVideoChatScreen:callStateListener] Total participants: ${state.callParticipants.length}');
+      debugPrint(
+        '[VC] 📞 [StudentVideoChatScreen:callStateListener] ========== CALL STATE CHANGED ==========',
+      );
+      debugPrint(
+        '[VC] 📞 [StudentVideoChatScreen:callStateListener] Status: ${state.status}',
+      );
+      debugPrint(
+        '[VC] 📞 [StudentVideoChatScreen:callStateListener] hasAcceptedCall: $hasAcceptedCall',
+      );
+      debugPrint(
+        '[VC] 📞 [StudentVideoChatScreen:callStateListener] Total participants: ${state.callParticipants.length}',
+      );
 
       if (mounted) {
         setState(() {
@@ -100,15 +150,21 @@ class _StudentVideoChatScreenState extends BaseVideoChatScreenState<StudentVideo
       }
 
       // Handle call cancelled by mentor (before student accepted)
-      if (state.status is CallStatusDisconnected && !hasAcceptedCall && !_isCallCancelled) {
-        debugPrint('[VC] 📞 [StudentVideoChatScreen:callStateListener] Call cancelled by mentor before acceptance');
+      if (state.status is CallStatusDisconnected &&
+          !hasAcceptedCall &&
+          !_isCallCancelled) {
+        debugPrint(
+          '[VC] 📞 [StudentVideoChatScreen:callStateListener] Call cancelled by mentor before acceptance',
+        );
         _handleCallCancelled();
         return;
       }
 
       // Handle call disconnected after acceptance (normal end)
       if (state.status is CallStatusDisconnected && hasAcceptedCall) {
-        debugPrint('[VC] 📞 [StudentVideoChatScreen:callStateListener] Call ended after acceptance');
+        debugPrint(
+          '[VC] 📞 [StudentVideoChatScreen:callStateListener] Call ended after acceptance',
+        );
         Future.delayed(const Duration(seconds: 2), () {
           if (mounted && !isEnding) {
             isEnding = true;
@@ -122,37 +178,49 @@ class _StudentVideoChatScreenState extends BaseVideoChatScreenState<StudentVideo
       if (state.callParticipants.length >= 2) {
         if (!hadMultipleParticipants) {
           hadMultipleParticipants = true;
-          debugPrint('[VC] 📞 [StudentVideoChatScreen:callStateListener] Multiple participants (2+) detected');
+          debugPrint(
+            '[VC] 📞 [StudentVideoChatScreen:callStateListener] Multiple participants (2+) detected',
+          );
         }
       }
 
       // End call if other person left (only after both were connected)
       if (!isEnding && hasAcceptedCall && hadMultipleParticipants) {
         if (state.callParticipants.length <= 1) {
-          debugPrint('[VC] 📞 [StudentVideoChatScreen:callStateListener] Other participant left, ending call');
+          debugPrint(
+            '[VC] 📞 [StudentVideoChatScreen:callStateListener] Other participant left, ending call',
+          );
           endCall();
           return;
         }
 
         final myUserId = authService.userInfo?.id.toString();
-        final otherParticipants = state.callParticipants.where(
-          (p) => p.userId != myUserId
-        ).toList();
+        final otherParticipants = state.callParticipants
+            .where((p) => p.userId != myUserId)
+            .toList();
 
         if (otherParticipants.isEmpty) {
-          debugPrint('[VC] 📞 [StudentVideoChatScreen:callStateListener] No other participants found, ending call');
+          debugPrint(
+            '[VC] 📞 [StudentVideoChatScreen:callStateListener] No other participants found, ending call',
+          );
           endCall();
         }
       }
-      debugPrint('[VC] 📞 [StudentVideoChatScreen:callStateListener] ========== CALL STATE PROCESSING COMPLETE ==========');
+      debugPrint(
+        '[VC] 📞 [StudentVideoChatScreen:callStateListener] ========== CALL STATE PROCESSING COMPLETE ==========',
+      );
     });
 
-    debugPrint('[VC] 📞 [StudentVideoChatScreen:setupCallStateListener] Call state listener configured');
+    debugPrint(
+      '[VC] 📞 [StudentVideoChatScreen:setupCallStateListener] Call state listener configured',
+    );
   }
 
   /// Handle call cancelled by mentor
   void _handleCallCancelled() {
-    debugPrint('[VC] 📞 [StudentVideoChatScreen:_handleCallCancelled] Mentor cancelled the call');
+    debugPrint(
+      '[VC] 📞 [StudentVideoChatScreen:_handleCallCancelled] Mentor cancelled the call',
+    );
 
     setState(() {
       _isCallCancelled = true;
@@ -160,9 +228,13 @@ class _StudentVideoChatScreenState extends BaseVideoChatScreenState<StudentVideo
 
     // End CallKit notification on Android
     if (Platform.isAndroid) {
-      debugPrint('[VC] 📞 [StudentVideoChatScreen:_handleCallCancelled] Ending CallKit notification');
+      debugPrint(
+        '[VC] 📞 [StudentVideoChatScreen:_handleCallCancelled] Ending CallKit notification',
+      );
       FlutterCallkitIncoming.endAllCalls().catchError((e) {
-        debugPrint('[VC] ⚠️ [StudentVideoChatScreen:_handleCallCancelled] Error ending CallKit: $e');
+        debugPrint(
+          '[VC] ⚠️ [StudentVideoChatScreen:_handleCallCancelled] Error ending CallKit: $e',
+        );
       });
     }
 
@@ -214,11 +286,7 @@ class _StudentVideoChatScreenState extends BaseVideoChatScreenState<StudentVideo
                     width: 3,
                   ),
                 ),
-                child: const Icon(
-                  Icons.call_end,
-                  size: 60,
-                  color: Colors.red,
-                ),
+                child: const Icon(Icons.call_end, size: 60, color: Colors.red),
               ),
 
               const SizedBox(height: 32),
@@ -238,10 +306,7 @@ class _StudentVideoChatScreenState extends BaseVideoChatScreenState<StudentVideo
               // Call status
               const Text(
                 'Call cancelled',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 16,
-                ),
+                style: TextStyle(color: Colors.white70, fontSize: 16),
               ),
             ],
           ),
@@ -260,19 +325,27 @@ class _StudentVideoChatScreenState extends BaseVideoChatScreenState<StudentVideo
 
     try {
       // Request permissions
-      debugPrint('[VC] 📞 [StudentVideoChatScreen:_acceptCall] Requesting permissions...');
+      debugPrint(
+        '[VC] 📞 [StudentVideoChatScreen:_acceptCall] Requesting permissions...',
+      );
       final Map<Permission, PermissionStatus> statuses = await [
         Permission.camera,
         Permission.microphone,
       ].request();
 
-      debugPrint('[VC] 📞 [StudentVideoChatScreen:_acceptCall] Camera: ${statuses[Permission.camera]}');
-      debugPrint('[VC] 📞 [StudentVideoChatScreen:_acceptCall] Microphone: ${statuses[Permission.microphone]}');
+      debugPrint(
+        '[VC] 📞 [StudentVideoChatScreen:_acceptCall] Camera: ${statuses[Permission.camera]}',
+      );
+      debugPrint(
+        '[VC] 📞 [StudentVideoChatScreen:_acceptCall] Microphone: ${statuses[Permission.microphone]}',
+      );
 
       final allGranted = statuses.values.every((status) => status.isGranted);
 
       if (!allGranted) {
-        debugPrint('[VC] ❌ [StudentVideoChatScreen:_acceptCall] Permissions NOT granted');
+        debugPrint(
+          '[VC] ❌ [StudentVideoChatScreen:_acceptCall] Permissions NOT granted',
+        );
         if (mounted) {
           _showPermissionSettingsDialog();
         }
@@ -284,9 +357,13 @@ class _StudentVideoChatScreenState extends BaseVideoChatScreenState<StudentVideo
 
       // Accept the call
       if (call != null) {
-        debugPrint('[VC] 📞 [StudentVideoChatScreen:_acceptCall] Calling accept()...');
+        debugPrint(
+          '[VC] 📞 [StudentVideoChatScreen:_acceptCall] Calling accept()...',
+        );
         await call!.accept();
-        debugPrint('[VC] 📞 [StudentVideoChatScreen:_acceptCall] Call accepted successfully');
+        debugPrint(
+          '[VC] 📞 [StudentVideoChatScreen:_acceptCall] Call accepted successfully',
+        );
 
         videoService.setActiveCall(call!);
 
@@ -315,12 +392,16 @@ class _StudentVideoChatScreenState extends BaseVideoChatScreenState<StudentVideo
     try {
       if (call != null) {
         await call!.reject();
-        debugPrint('[VC] 📞 [StudentVideoChatScreen:_declineCall] Call rejected successfully');
+        debugPrint(
+          '[VC] 📞 [StudentVideoChatScreen:_declineCall] Call rejected successfully',
+        );
       }
 
       // End CallKit notification on Android
       if (Platform.isAndroid) {
-        debugPrint('[VC] 📞 [StudentVideoChatScreen:_declineCall] Ending CallKit notification');
+        debugPrint(
+          '[VC] 📞 [StudentVideoChatScreen:_declineCall] Ending CallKit notification',
+        );
         await FlutterCallkitIncoming.endAllCalls();
       }
 
@@ -332,7 +413,9 @@ class _StudentVideoChatScreenState extends BaseVideoChatScreenState<StudentVideo
       // Still try to end CallKit on error
       if (Platform.isAndroid) {
         FlutterCallkitIncoming.endAllCalls().catchError((err) {
-          debugPrint('[VC] ⚠️ [StudentVideoChatScreen:_declineCall] Error ending CallKit: $err');
+          debugPrint(
+            '[VC] ⚠️ [StudentVideoChatScreen:_declineCall] Error ending CallKit: $err',
+          );
         });
       }
 
@@ -411,10 +494,7 @@ class _StudentVideoChatScreenState extends BaseVideoChatScreenState<StudentVideo
               // Call status
               const Text(
                 'Incoming video call',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 16,
-                ),
+                style: TextStyle(color: Colors.white70, fontSize: 16),
               ),
 
               const SizedBox(height: 64),
@@ -436,7 +516,10 @@ class _StudentVideoChatScreenState extends BaseVideoChatScreenState<StudentVideo
                           ),
                           child: IconButton(
                             iconSize: 40,
-                            icon: const Icon(Icons.call_end, color: Colors.white),
+                            icon: const Icon(
+                              Icons.call_end,
+                              color: Colors.white,
+                            ),
                             onPressed: _declineCall,
                           ),
                         ),
@@ -460,7 +543,10 @@ class _StudentVideoChatScreenState extends BaseVideoChatScreenState<StudentVideo
                           ),
                           child: IconButton(
                             iconSize: 40,
-                            icon: const Icon(Icons.videocam, color: Colors.white),
+                            icon: const Icon(
+                              Icons.videocam,
+                              color: Colors.white,
+                            ),
                             onPressed: _acceptCall,
                           ),
                         ),
