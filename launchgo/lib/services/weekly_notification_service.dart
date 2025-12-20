@@ -126,7 +126,6 @@ class WeeklyNotificationService {
         nextFridayAt9AM,
         platformChannelSpecifics,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
         payload: payload,
       );
       

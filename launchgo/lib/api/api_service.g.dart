@@ -48,7 +48,7 @@ class _ApiService implements ApiService {
     try {
       _value = GoogleAuthResponse.fromJson(_result.data!);
     } on Object catch (e, s) {
-      errorLogger?.logError(e, s, _options);
+      // errorLogger?.logError(e, s, _options); // Commented out due to API incompatibility
       rethrow;
     }
     return _value;
