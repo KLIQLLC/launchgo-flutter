@@ -209,13 +209,19 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // Based on official pattern: observeCoreRingingEvents
     // The call is ALREADY JOINED when this callback fires
     _streamVideoService.setOnCallAcceptedCallback((call) {
-      debugPrint('[VC] 📞 [MyApp:onCallAcceptedCallback] Call accepted via CallKit/push - navigating');
+      debugPrint(
+        '[VC] 📞 [MyApp:onCallAcceptedCallback] Call accepted via CallKit/push - navigating',
+      );
       debugPrint('[VC] 📞 [MyApp:onCallAcceptedCallback] Call ID: ${call.id}');
-      debugPrint('[VC] 📞 [MyApp:onCallAcceptedCallback] App state: foreground');
+      debugPrint(
+        '[VC] 📞 [MyApp:onCallAcceptedCallback] App state: foreground',
+      );
 
       // Prevent duplicate navigation
       if (_lastNavigatedCallId == call.id) {
-        debugPrint('[VC] 📞 [MyApp:onCallAcceptedCallback] Already navigated to this call, skipping');
+        debugPrint(
+          '[VC] 📞 [MyApp:onCallAcceptedCallback] Already navigated to this call, skipping',
+        );
         return;
       }
 
@@ -235,7 +241,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // We only need to navigate on Android where we show a custom incoming call UI
     _streamVideoService.addListener(() {
       final userRole = _authService.userInfo?.role.toString() ?? 'unknown';
-      debugPrint('[VC] 📞 [MyApp:videoServiceListener] Service listener triggered');
+      debugPrint(
+        '[VC] 📞 [MyApp:videoServiceListener] Service listener triggered',
+      );
       debugPrint('[VC] 📞 [MyApp:videoServiceListener] User role: $userRole');
       debugPrint(
         '[VC] 📞 [MyApp:videoServiceListener] Incoming call ID: ${_streamVideoService.incomingCallId}',
@@ -256,9 +264,15 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
         // Prevent duplicate navigation
         if (_lastIncomingCallId != currentCallId) {
-          debugPrint('[VC] 📞 [MyApp:videoServiceListener] New incoming call detected (Android)');
-          debugPrint('[VC] 📞 [MyApp:videoServiceListener] App state: foreground');
-          debugPrint('[VC] 📞 [MyApp:videoServiceListener] Navigating to student-video-chat screen');
+          debugPrint(
+            '[VC] 📞 [MyApp:videoServiceListener] New incoming call detected (Android)',
+          );
+          debugPrint(
+            '[VC] 📞 [MyApp:videoServiceListener] App state: foreground',
+          );
+          debugPrint(
+            '[VC] 📞 [MyApp:videoServiceListener] Navigating to student-video-chat screen',
+          );
 
           _lastIncomingCallId = currentCallId;
 
@@ -327,7 +341,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                   debugPrint(
                     '[VC] 📞 [MyApp:authListener] Active call consumed from terminated state',
                   );
-                  debugPrint('[VC] 📞 [MyApp:authListener] Call ID: ${callToJoin.id}');
+                  debugPrint(
+                    '[VC] 📞 [MyApp:authListener] Call ID: ${callToJoin.id}',
+                  );
 
                   // Prevent duplicate navigation
                   if (_lastNavigatedCallId == callToJoin.id) {
@@ -438,12 +454,24 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               '[VC] 📞 [MyApp:initState] Attempting to consume active call from terminated state',
             );
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              _streamVideoService.consumeAndAcceptActiveCall((callToJoin) {
+              _streamVideoService.consumeAndAcceptActiveCall((
+                callToJoin,
+              ) async {
                 debugPrint(
                   '[VC] 📞 [MyApp:initState] Active call consumed from terminated state',
                 );
-                debugPrint('[VC] 📞 [MyApp:initState] Call ID: ${callToJoin.id}');
-                debugPrint('[VC] 📞 [MyApp:initState] App state: terminated -> foreground');
+                debugPrint(
+                  '[VC] 📞 [MyApp:initState] Call ID: ${callToJoin.id}',
+                );
+                debugPrint(
+                  '[VC] 📞 [MyApp:initState] App state: terminated -> foreground',
+                );
+
+                // Wait for splash screen to finish before navigating
+                while (_showSplash) {
+                  await Future.delayed(const Duration(milliseconds: 100));
+                }
+                await Future.delayed(const Duration(milliseconds: 300));
 
                 _appRouter.router.pushNamed(
                   'student-video-chat',
@@ -507,8 +535,18 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         debugPrint('[VC] 📞 Call ID: $callId');
 
         if (callId != null) {
-          // Wait a bit for auth and video service to be ready
-          await Future.delayed(const Duration(milliseconds: 500));
+          // Wait for splash screen to finish before navigating
+          while (_showSplash) {
+            await Future.delayed(const Duration(milliseconds: 100));
+          }
+
+          // Wait for auth to be ready (max 5 seconds)
+          var authWaitCount = 0;
+          while (_authService.userInfo == null && authWaitCount < 50) {
+            await Future.delayed(const Duration(milliseconds: 100));
+            authWaitCount++;
+          }
+          await Future.delayed(const Duration(milliseconds: 300));
 
           // Ensure video service is initialized
           if (_authService.userInfo != null &&
@@ -591,8 +629,18 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       if (callId != null) {
         debugPrint('[VC] 📞 Found pending call ID from Android: $callId');
 
-        // Wait for auth to be ready
-        await Future.delayed(const Duration(milliseconds: 800));
+        // Wait for splash screen to finish before navigating
+        while (_showSplash) {
+          await Future.delayed(const Duration(milliseconds: 100));
+        }
+
+        // Wait for auth to be ready (max 5 seconds)
+        var authWaitCount = 0;
+        while (_authService.userInfo == null && authWaitCount < 50) {
+          await Future.delayed(const Duration(milliseconds: 100));
+          authWaitCount++;
+        }
+        await Future.delayed(const Duration(milliseconds: 300));
 
         if (_authService.userInfo != null) {
           // Ensure video service is initialized

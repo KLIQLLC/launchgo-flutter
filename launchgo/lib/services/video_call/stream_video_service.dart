@@ -1,3 +1,4 @@
+// services/video_call/stream_video_service.dart
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -371,12 +372,11 @@ class StreamVideoService extends ChangeNotifier {
     _stopIOSTimer();
 
     // End CallKit notification on both platforms
-    if (_incomingCallId != null) {
-      debugPrint('[VC] 📞 [StreamVideoService:_handleCallCancelled] Ending CallKit...');
-      FlutterCallkitIncoming.endAllCalls().catchError((e) {
-        debugPrint('[VC] ⚠️ [StreamVideoService:_handleCallCancelled] Error: $e');
-      });
-    }
+    // Always try to end, regardless of _incomingCallId state (may be cleared already)
+    debugPrint('[VC] 📞 [StreamVideoService:_handleCallCancelled] Ending CallKit...');
+    FlutterCallkitIncoming.endAllCalls().catchError((e) {
+      debugPrint('[VC] ⚠️ [StreamVideoService:_handleCallCancelled] Error: $e');
+    });
 
     // Clear state
     _incomingCallId = null;
