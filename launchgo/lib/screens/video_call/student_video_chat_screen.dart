@@ -46,6 +46,38 @@ class _StudentVideoChatScreenState
     if (widget.autoAccept) {
       hasAcceptedCall = true;
     }
+
+    // Listen to videoService for call cancellation
+    // When mentor cancels, incomingCallId becomes null
+    videoService.addListener(_onVideoServiceChanged);
+  }
+
+  @override
+  void dispose() {
+    videoService.removeListener(_onVideoServiceChanged);
+    super.dispose();
+  }
+
+  /// Called when videoService state changes
+  void _onVideoServiceChanged() {
+    debugPrint(
+      '[VC] 📞 [StudentVideoChatScreen:_onVideoServiceChanged] incomingCallId: ${videoService.incomingCallId}, hasActiveCall: ${videoService.hasActiveCall}, hasAcceptedCall: $hasAcceptedCall, _isCallCancelled: $_isCallCancelled',
+    );
+
+    // If call was cancelled by mentor:
+    // - incomingCallId is null (no longer ringing)
+    // - hasActiveCall is false (not accepted - if accepted, activeCall would be set)
+    // - we haven't already handled it
+    if (videoService.incomingCallId == null &&
+        !videoService.hasActiveCall &&
+        !hasAcceptedCall &&
+        !_isCallCancelled &&
+        !isEnding) {
+      debugPrint(
+        '[VC] 📞 [StudentVideoChatScreen:_onVideoServiceChanged] Call cancelled by mentor - closing screen',
+      );
+      _handleCallCancelled();
+    }
   }
 
   @override

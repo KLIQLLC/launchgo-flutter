@@ -28,6 +28,7 @@ class StreamVideoService extends ChangeNotifier {
 
   StreamSubscription<Call?>? _incomingCallSubscription;
   CompositeSubscription? _ringingEventsSubscription;
+  StreamSubscription<CoordinatorEvent>? _coordinatorEventsSubscription;
   OnCallAcceptedCallback? _onCallAcceptedCallback;
 
   /// iOS method channel for call validity timer
@@ -157,6 +158,7 @@ class StreamVideoService extends ChangeNotifier {
         debugPrint('[VC] 📞 [StreamVideoService:initialize] User is STUDENT, setting up incoming call listeners...');
         _listenForIncomingCalls();
         _observeRingingEvents();
+        _listenForCoordinatorEvents();
         debugPrint('[VC] 📞 [StreamVideoService:initialize] Student listeners configured');
       } else {
         debugPrint('[VC] 📞 [StreamVideoService:initialize] User is MENTOR, skipping incoming call listeners');
@@ -330,6 +332,60 @@ class StreamVideoService extends ChangeNotifier {
     debugPrint('[VC] 📞 [StreamVideoService:_observeRingingEvents] << EXIT: Observer configured');
   }
 
+  /// Listen for coordinator events (call rejected, ended, etc.)
+  /// This provides explicit handling for when mentor cancels the call
+  void _listenForCoordinatorEvents() {
+    debugPrint('[VC] 📞 [StreamVideoService:_listenForCoordinatorEvents] >> ENTRY');
+
+    _coordinatorEventsSubscription?.cancel();
+
+    _coordinatorEventsSubscription = _client?.events.listen((event) {
+      debugPrint('[VC] 📞 [CoordinatorEvent] Received: ${event.runtimeType}');
+
+      if (event is CoordinatorCallRejectedEvent) {
+        debugPrint('[VC] 📞 [CoordinatorEvent] ========== CALL REJECTED ==========');
+        debugPrint('[VC] 📞 [CoordinatorEvent] Call CID: ${event.callCid}');
+        _handleCallCancelled('rejected');
+      } else if (event is CoordinatorCallEndedEvent) {
+        debugPrint('[VC] 📞 [CoordinatorEvent] ========== CALL ENDED ==========');
+        debugPrint('[VC] 📞 [CoordinatorEvent] Call CID: ${event.callCid}');
+        _handleCallCancelled('ended');
+      } else if (event is CoordinatorCallSessionParticipantLeftEvent) {
+        debugPrint('[VC] 📞 [CoordinatorEvent] ========== PARTICIPANT LEFT ==========');
+        debugPrint('[VC] 📞 [CoordinatorEvent] Call CID: ${event.callCid}');
+        // Only handle if it's the caller who left while we're still ringing
+        if (_incomingCallId != null && _activeCall == null) {
+          _handleCallCancelled('caller_left');
+        }
+      }
+    });
+
+    debugPrint('[VC] 📞 [StreamVideoService:_listenForCoordinatorEvents] << EXIT');
+  }
+
+  /// Handle call cancellation (rejected, ended, or caller left)
+  void _handleCallCancelled(String reason) {
+    debugPrint('[VC] 📞 [StreamVideoService:_handleCallCancelled] Reason: $reason');
+
+    // Stop iOS timer
+    _stopIOSTimer();
+
+    // End CallKit notification on both platforms
+    if (_incomingCallId != null) {
+      debugPrint('[VC] 📞 [StreamVideoService:_handleCallCancelled] Ending CallKit...');
+      FlutterCallkitIncoming.endAllCalls().catchError((e) {
+        debugPrint('[VC] ⚠️ [StreamVideoService:_handleCallCancelled] Error: $e');
+      });
+    }
+
+    // Clear state
+    _incomingCallId = null;
+    _incomingCallerName = null;
+    notifyListeners();
+
+    debugPrint('[VC] 📞 [StreamVideoService:_handleCallCancelled] Call cancelled handling complete');
+  }
+
   /// Consume and accept active call from terminated state (Android)
   /// Based on official pattern from:
   /// https://getstream.io/video/sdk/flutter/tutorial/ringing/
@@ -497,6 +553,9 @@ class StreamVideoService extends ChangeNotifier {
 
     _ringingEventsSubscription?.cancel();
     _ringingEventsSubscription = null;
+
+    await _coordinatorEventsSubscription?.cancel();
+    _coordinatorEventsSubscription = null;
 
     await _client?.disconnect();
     _client = null;
