@@ -13,21 +13,26 @@ import android.os.IBinder
 import android.os.Looper
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import org.json.JSONObject
 import org.json.JSONArray
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.concurrent.Executors
 
 /**
- * Foreground Service that monitors for call decline WITHOUT opening the app.
+ * Foreground Service that monitors incoming call state WITHOUT opening the app.
  *
- * This service starts when an incoming call push arrives and monitors
- * flutter_callkit_incoming's SharedPreferences. When our call disappears
- * from ACTIVE_CALLS (and wasn't accepted), we know it was declined.
+ * This service starts when an incoming call push arrives and monitors:
+ * - **Student decline while locked**: call disappears from ACTIVE_CALLS and wasn't accepted -> reject via API.
+ * - **Mentor cancels while locked**: call is still in ACTIVE_CALLS, but server indicates call is cancelled -> end CallKit UI.
  *
  * Flow:
  * 1. Push arrives (call.ring) → This service starts
  * 2. Service monitors ACTIVE_CALLS in SharedPreferences every 1 second
  * 3. When call_id disappears → Check if it was accepted
  * 4. If not accepted → Call was DECLINED → Reject via API
- * 5. Service stops itself
+ * 5. While call is ACTIVE, also poll Stream server to detect mentor cancellation
+ * 6. Service stops itself
  */
 class CallMonitorService : Service() {
 
@@ -46,6 +51,10 @@ class CallMonitorService : Service() {
         private const val WAIT_FOR_CALL_TIMEOUT_MS = 10_000L
         // Max monitoring time after call appears (35 seconds - slightly more than ring duration)
         private const val MAX_MONITOR_TIME_MS = 35_000L
+
+        // While call is actively ringing, poll server for mentor cancellation.
+        // (No fixed "grace period". We require two consecutive cancel signals instead.)
+        private const val SERVER_CHECK_INTERVAL_MS = 2000L
 
         fun startMonitoring(context: Context, callId: String, callCid: String?) {
             Log.d(TAG, "📞 ========== STARTING CALL MONITOR SERVICE ==========")
@@ -87,6 +96,11 @@ class CallMonitorService : Service() {
     private var hasSeenCallActive = false
     private var waitingForCallToAppear = true
 
+    // Server polling (mentor cancel detection)
+    private val networkExecutor = Executors.newSingleThreadExecutor()
+    private var lastServerCheckTime = 0L
+    private var consecutiveCancelSignals = 0
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -115,6 +129,8 @@ class CallMonitorService : Service() {
         hasSeenCallActive = false
         waitingForCallToAppear = true
         wasAccepted = false
+        consecutiveCancelSignals = 0
+        lastServerCheckTime = 0L
 
         // Start as foreground service with minimal notification
         startForeground(NOTIFICATION_ID, createNotification())
@@ -223,6 +239,10 @@ class CallMonitorService : Service() {
                 hasSeenCallActive = true
                 waitingForCallToAppear = false
             }
+
+            // While call is ringing/active in CallKit, poll server to detect mentor cancellation.
+            // This is what fixes: "phone locked + mentor cancels -> keeps ringing".
+            checkCallValidityWithServer(currentCallId, elapsed)
         } else {
             // Call is not active
             if (waitingForCallToAppear) {
@@ -269,6 +289,139 @@ class CallMonitorService : Service() {
             // Stop monitoring
             cleanup()
         }
+    }
+
+    /**
+     * Detect mentor cancellation while the phone is locked by checking Stream server.
+     *
+     * IMPORTANT:
+     * - This method must NEVER reject the call (student decline is handled elsewhere).
+     * - To avoid false positives, we require TWO consecutive "cancel" signals.
+     */
+    private fun checkCallValidityWithServer(callId: String, elapsed: Long) {
+        val now = System.currentTimeMillis()
+        if (now - lastServerCheckTime < SERVER_CHECK_INTERVAL_MS) return
+        lastServerCheckTime = now
+
+        val cid = callCid
+        val callType = if (!cid.isNullOrEmpty() && cid.contains(":")) cid.split(":").first() else "default"
+
+        networkExecutor.execute {
+            try {
+                val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+
+                val apiKey = prefs.getString("flutter.stream_video_api_key", null)
+                    ?: prefs.getString("flutter.streamVideoApiKey", null)
+                val token = prefs.getString("flutter.stream_video_token", null)
+                    ?: prefs.getString("flutter.call_get_stream_token", null)
+                    ?: prefs.getString("flutter.callGetStreamToken", null)
+                    ?: prefs.getString("flutter.user_token", null)
+
+                if (apiKey.isNullOrEmpty() || token.isNullOrEmpty()) {
+                    Log.w(TAG, "📞 Server check skipped: missing apiKey/token in FlutterSharedPreferences")
+                    return@execute
+                }
+
+                val endpoint = "https://video.stream-io-api.com/video/call/$callType/$callId?api_key=$apiKey"
+                Log.d(TAG, "📞 [ServerCheck] elapsed=${elapsed}ms -> GET $endpoint")
+
+                val url = URL(endpoint)
+                val conn = (url.openConnection() as HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    setRequestProperty("Accept", "application/json")
+                    setRequestProperty("Authorization", "Bearer $token")
+                    setRequestProperty("Stream-Auth-Type", "jwt")
+                    connectTimeout = 10000
+                    readTimeout = 10000
+                }
+
+                val code = conn.responseCode
+                if (code == HttpURLConnection.HTTP_NOT_FOUND) {
+                    Log.d(TAG, "📞 [ServerCheck] 404 -> treat as CANCELLED")
+                    onMentorCancelledDetected(callId, "404_not_found")
+                    conn.disconnect()
+                    return@execute
+                }
+
+                if (code != HttpURLConnection.HTTP_OK) {
+                    Log.w(TAG, "📞 [ServerCheck] non-200: $code (ignoring)")
+                    conn.disconnect()
+                    resetCancelSignals()
+                    return@execute
+                }
+
+                val body = conn.inputStream.bufferedReader().readText()
+                conn.disconnect()
+
+                val json = JSONObject(body)
+                val call = json.optJSONObject("call")
+                val session = call?.optJSONObject("session")
+
+                val endedAt = call?.optString("ended_at", "") ?: ""
+                val sessionEndedAt = session?.optString("ended_at", "") ?: ""
+                val sessionEndedById = session?.optString("ended_by_id", "") ?: ""
+                val rejectedBy = session?.optJSONArray("rejected_by")
+                val acceptedBy = session?.optJSONArray("accepted_by")
+
+                val isEnded =
+                    (endedAt.isNotEmpty() && endedAt != "null") ||
+                        (sessionEndedAt.isNotEmpty() && sessionEndedAt != "null") ||
+                        (sessionEndedById.isNotEmpty() && sessionEndedById != "null")
+
+                val hasRejects = rejectedBy != null && rejectedBy.length() > 0
+                val hasAccepts = acceptedBy != null && acceptedBy.length() > 0
+
+                // Cancel signal:
+                // - ended timestamps set
+                // - OR session has rejects and no accepts (caller cancelled / session rejected)
+                val cancelSignal = isEnded || (hasRejects && !hasAccepts)
+
+                Log.d(
+                    TAG,
+                    "📞 [ServerCheck] cancelSignal=$cancelSignal endedAt='$endedAt' sessionEndedAt='$sessionEndedAt' " +
+                        "endedById='$sessionEndedById' rejectedByCount=${rejectedBy?.length() ?: 0} acceptedByCount=${acceptedBy?.length() ?: 0}"
+                )
+
+                if (cancelSignal) {
+                    onMentorCancelledDetected(callId, "server_cancel_signal")
+                } else {
+                    resetCancelSignals()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "📞 [ServerCheck] error: ${e.message}", e)
+                resetCancelSignals()
+            }
+        }
+    }
+
+    private fun onMentorCancelledDetected(callId: String, reason: String) {
+        consecutiveCancelSignals += 1
+        Log.d(TAG, "📞 [ServerCheck] cancel signal #$consecutiveCancelSignals reason=$reason")
+
+        // Require two consecutive cancel signals to avoid false positives.
+        if (consecutiveCancelSignals < 2) return
+
+        handler?.post {
+            try {
+                Log.d(TAG, "📞 ****************************************************")
+                Log.d(TAG, "📞 MENTOR CANCELLATION DETECTED (SERVICE)")
+                Log.d(TAG, "📞 Ending CallKit ringing UI. callId=$callId")
+                Log.d(TAG, "📞 ****************************************************")
+                CallKitHelper.endCall(this, callId)
+            } catch (e: Exception) {
+                Log.e(TAG, "📞 Error ending CallKit for cancelled call: ${e.message}", e)
+                try {
+                    CallKitHelper.endAllCalls(this)
+                } catch (_: Exception) {
+                }
+            } finally {
+                cleanup()
+            }
+        }
+    }
+
+    private fun resetCancelSignals() {
+        consecutiveCancelSignals = 0
     }
 
     private fun isCallActive(callId: String): Boolean {
@@ -374,6 +527,11 @@ class CallMonitorService : Service() {
             getCallKitPrefs()?.unregisterOnSharedPreferenceChangeListener(listener)
         }
         prefsListener = null
+
+        try {
+            networkExecutor.shutdownNow()
+        } catch (_: Exception) {
+        }
 
         // Stop service
         stopForeground(STOP_FOREGROUND_REMOVE)

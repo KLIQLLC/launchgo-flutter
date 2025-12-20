@@ -1,3 +1,4 @@
+// screens/video_call/mentor_video_chat_screen.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:stream_video_flutter/stream_video_flutter.dart';
@@ -18,7 +19,8 @@ class MentorVideoChatScreen extends BaseVideoChatScreen {
   State<MentorVideoChatScreen> createState() => _MentorVideoChatScreenState();
 }
 
-class _MentorVideoChatScreenState extends BaseVideoChatScreenState<MentorVideoChatScreen> {
+class _MentorVideoChatScreenState
+    extends BaseVideoChatScreenState<MentorVideoChatScreen> {
   /// Timeout duration for unanswered calls (30 seconds)
   static const _callTimeoutDuration = Duration(seconds: 30);
 
@@ -37,7 +39,9 @@ class _MentorVideoChatScreenState extends BaseVideoChatScreenState<MentorVideoCh
   @override
   void initState() {
     super.initState();
-    debugPrint('[VC] 📞 [MentorVideoChatScreen] recipientName: ${widget.recipientName}');
+    debugPrint(
+      '[VC] 📞 [MentorVideoChatScreen] recipientName: ${widget.recipientName}',
+    );
     // Mentor always starts in "accepted" state - they initiated the call
     hasAcceptedCall = true;
   }
@@ -50,12 +54,16 @@ class _MentorVideoChatScreenState extends BaseVideoChatScreenState<MentorVideoCh
 
   /// Start timeout timer - if student doesn't answer within 30 seconds, end call
   void _startCallTimeoutTimer() {
-    debugPrint('[VC] 📞 [MentorVideoChatScreen:_startCallTimeoutTimer] Starting ${_callTimeoutDuration.inSeconds}s timeout timer');
+    debugPrint(
+      '[VC] 📞 [MentorVideoChatScreen:_startCallTimeoutTimer] Starting ${_callTimeoutDuration.inSeconds}s timeout timer',
+    );
 
     _callTimeoutTimer?.cancel();
     _callTimeoutTimer = Timer(_callTimeoutDuration, () {
       if (mounted && !_isStudentConnected && !_isCallRejected && !isEnding) {
-        debugPrint('[VC] 📞 [MentorVideoChatScreen:_startCallTimeoutTimer] Timeout! No answer from student');
+        debugPrint(
+          '[VC] 📞 [MentorVideoChatScreen:_startCallTimeoutTimer] Timeout! No answer from student',
+        );
         _handleCallTimeout();
       }
     });
@@ -63,7 +71,9 @@ class _MentorVideoChatScreenState extends BaseVideoChatScreenState<MentorVideoCh
 
   /// Handle call timeout - student didn't answer
   void _handleCallTimeout() {
-    debugPrint('[VC] 📞 [MentorVideoChatScreen:_handleCallTimeout] Call timed out, ending call');
+    debugPrint(
+      '[VC] 📞 [MentorVideoChatScreen:_handleCallTimeout] Call timed out, ending call',
+    );
 
     setState(() {
       _isCallRejected = true;
@@ -77,11 +87,36 @@ class _MentorVideoChatScreenState extends BaseVideoChatScreenState<MentorVideoCh
   Future<void> _cancelCall() async {
     if (isEnding) return;
 
-    debugPrint('[VC] 📞 [MentorVideoChatScreen:_cancelCall] Cancelling outgoing call');
+    debugPrint(
+      '[VC] 📞 [MentorVideoChatScreen:_cancelCall] Cancelling outgoing call',
+    );
 
     _callTimeoutTimer?.cancel();
 
-    // Use endCall from base class which properly handles leaving and cleanup
+    // IMPORTANT:
+    // If mentor cancels while the student is still ringing (especially when student's phone is locked),
+    // we MUST end the call on the server. Otherwise the call may keep ringing on Android because
+    // the server never reports it as ended and no cancellation push arrives.
+    //
+    // `endCall()` in the base class only does `call.leave()` (client-side), so we call `call.end()`
+    // first to mark the call as ended for all participants.
+    if (!_isStudentConnected && call != null) {
+      try {
+        debugPrint(
+          '[VC] 📞 [MentorVideoChatScreen:_cancelCall] Calling call.end() to end ringing for student...',
+        );
+        await call!.end();
+        debugPrint(
+          '[VC] 📞 [MentorVideoChatScreen:_cancelCall] call.end() completed',
+        );
+      } catch (e) {
+        debugPrint(
+          '[VC] ⚠️ [MentorVideoChatScreen:_cancelCall] call.end() failed: $e (continuing cleanup)',
+        );
+      }
+    }
+
+    // Base cleanup (leave + clear state + close screen)
     await endCall();
   }
 
@@ -94,10 +129,14 @@ class _MentorVideoChatScreenState extends BaseVideoChatScreenState<MentorVideoCh
       final newCall = await setupCall();
 
       // Mentor joins immediately
-      debugPrint('[VC] 📞 [MentorVideoChatScreen:initializeCall] Joining call as mentor...');
+      debugPrint(
+        '[VC] 📞 [MentorVideoChatScreen:initializeCall] Joining call as mentor...',
+      );
       await newCall.join();
       videoService.setActiveCall(newCall);
-      debugPrint('[VC] 📞 [MentorVideoChatScreen:initializeCall] Joined call successfully');
+      debugPrint(
+        '[VC] 📞 [MentorVideoChatScreen:initializeCall] Joined call successfully',
+      );
 
       if (mounted) {
         setState(() {
@@ -112,9 +151,13 @@ class _MentorVideoChatScreenState extends BaseVideoChatScreenState<MentorVideoCh
       // Start timeout timer - will cancel call if student doesn't answer in 30 seconds
       _startCallTimeoutTimer();
 
-      debugPrint('[VC] 📞 [MentorVideoChatScreen:initializeCall] << EXIT: Initialization complete');
+      debugPrint(
+        '[VC] 📞 [MentorVideoChatScreen:initializeCall] << EXIT: Initialization complete',
+      );
     } catch (e) {
-      debugPrint('[VC] ❌ [MentorVideoChatScreen:initializeCall] << EXIT: Error: $e');
+      debugPrint(
+        '[VC] ❌ [MentorVideoChatScreen:initializeCall] << EXIT: Error: $e',
+      );
       if (mounted) {
         setState(() {
           error = 'Failed to connect to call: $e';
@@ -126,15 +169,25 @@ class _MentorVideoChatScreenState extends BaseVideoChatScreenState<MentorVideoCh
 
   @override
   void setupCallStateListener() {
-    debugPrint('[VC] 📞 [MentorVideoChatScreen:setupCallStateListener] Setting up call state listener...');
+    debugPrint(
+      '[VC] 📞 [MentorVideoChatScreen:setupCallStateListener] Setting up call state listener...',
+    );
 
     callStateSubscription = call!.state.listen((state) {
-      debugPrint('[VC] 📞 [MentorVideoChatScreen:callStateListener] ========== CALL STATE CHANGED ==========');
-      debugPrint('[VC] 📞 [MentorVideoChatScreen:callStateListener] Status: ${state.status}');
-      debugPrint('[VC] 📞 [MentorVideoChatScreen:callStateListener] Total participants: ${state.callParticipants.length}');
+      debugPrint(
+        '[VC] 📞 [MentorVideoChatScreen:callStateListener] ========== CALL STATE CHANGED ==========',
+      );
+      debugPrint(
+        '[VC] 📞 [MentorVideoChatScreen:callStateListener] Status: ${state.status}',
+      );
+      debugPrint(
+        '[VC] 📞 [MentorVideoChatScreen:callStateListener] Total participants: ${state.callParticipants.length}',
+      );
 
       for (var p in state.callParticipants) {
-        debugPrint('[VC] 📞 [MentorVideoChatScreen:callStateListener]   - Participant: userId=${p.userId}, name=${p.name}');
+        debugPrint(
+          '[VC] 📞 [MentorVideoChatScreen:callStateListener]   - Participant: userId=${p.userId}, name=${p.name}',
+        );
       }
 
       if (mounted) {
@@ -145,7 +198,9 @@ class _MentorVideoChatScreenState extends BaseVideoChatScreenState<MentorVideoCh
 
       // Check if student has connected (2+ participants means student joined)
       if (state.callParticipants.length >= 2 && !_isStudentConnected) {
-        debugPrint('[VC] 📞 [MentorVideoChatScreen:callStateListener] Student connected! Stopping timeout timer.');
+        debugPrint(
+          '[VC] 📞 [MentorVideoChatScreen:callStateListener] Student connected! Stopping timeout timer.',
+        );
         _isStudentConnected = true;
         hadMultipleParticipants = true;
         _callTimeoutTimer?.cancel();
@@ -154,11 +209,15 @@ class _MentorVideoChatScreenState extends BaseVideoChatScreenState<MentorVideoCh
       // Handle call rejection (CallStatusDisconnected with reject reason)
       // or when call is ended by other party
       if (state.status is CallStatusDisconnected) {
-        debugPrint('[VC] 📞 [MentorVideoChatScreen:callStateListener] Call status is DISCONNECTED');
+        debugPrint(
+          '[VC] 📞 [MentorVideoChatScreen:callStateListener] Call status is DISCONNECTED',
+        );
 
         if (!_isStudentConnected && !_isCallRejected) {
           // Student rejected or call was cancelled before connection
-          debugPrint('[VC] 📞 [MentorVideoChatScreen:callStateListener] Call rejected/cancelled before connection');
+          debugPrint(
+            '[VC] 📞 [MentorVideoChatScreen:callStateListener] Call rejected/cancelled before connection',
+          );
           _isCallRejected = true;
           _callTimeoutTimer?.cancel();
         }
@@ -166,7 +225,9 @@ class _MentorVideoChatScreenState extends BaseVideoChatScreenState<MentorVideoCh
         // Dismiss screen after delay
         Future.delayed(const Duration(seconds: 2), () {
           if (mounted && !isEnding) {
-            debugPrint('[VC] 📞 [MentorVideoChatScreen:callStateListener] Navigating back after disconnect');
+            debugPrint(
+              '[VC] 📞 [MentorVideoChatScreen:callStateListener] Navigating back after disconnect',
+            );
             isEnding = true;
             videoService.clearActiveCall();
             navigateBack();
@@ -178,32 +239,42 @@ class _MentorVideoChatScreenState extends BaseVideoChatScreenState<MentorVideoCh
       if (state.callParticipants.length >= 2) {
         if (!hadMultipleParticipants) {
           hadMultipleParticipants = true;
-          debugPrint('[VC] 📞 [MentorVideoChatScreen:callStateListener] Multiple participants (2+) detected for first time');
+          debugPrint(
+            '[VC] 📞 [MentorVideoChatScreen:callStateListener] Multiple participants (2+) detected for first time',
+          );
         }
       }
 
       // End call if other person left (only after they were connected)
       if (!isEnding && hasAcceptedCall && hadMultipleParticipants) {
         if (state.callParticipants.length <= 1) {
-          debugPrint('[VC] 📞 [MentorVideoChatScreen:callStateListener] Participant count <= 1 (was 2+), other person left, ending call');
+          debugPrint(
+            '[VC] 📞 [MentorVideoChatScreen:callStateListener] Participant count <= 1 (was 2+), other person left, ending call',
+          );
           endCall();
           return;
         }
 
         final myUserId = authService.userInfo?.id.toString();
-        final otherParticipants = state.callParticipants.where(
-          (p) => p.userId != myUserId
-        ).toList();
+        final otherParticipants = state.callParticipants
+            .where((p) => p.userId != myUserId)
+            .toList();
 
         if (otherParticipants.isEmpty) {
-          debugPrint('[VC] 📞 [MentorVideoChatScreen:callStateListener] No other participants found, ending call');
+          debugPrint(
+            '[VC] 📞 [MentorVideoChatScreen:callStateListener] No other participants found, ending call',
+          );
           endCall();
         }
       }
-      debugPrint('[VC] 📞 [MentorVideoChatScreen:callStateListener] ========== CALL STATE PROCESSING COMPLETE ==========');
+      debugPrint(
+        '[VC] 📞 [MentorVideoChatScreen:callStateListener] ========== CALL STATE PROCESSING COMPLETE ==========',
+      );
     });
 
-    debugPrint('[VC] 📞 [MentorVideoChatScreen:setupCallStateListener] Call state listener configured');
+    debugPrint(
+      '[VC] 📞 [MentorVideoChatScreen:setupCallStateListener] Call state listener configured',
+    );
   }
 
   @override
@@ -267,10 +338,7 @@ class _MentorVideoChatScreenState extends BaseVideoChatScreenState<MentorVideoCh
               // Call status
               const Text(
                 'Calling...',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 16,
-                ),
+                style: TextStyle(color: Colors.white70, fontSize: 16),
               ),
 
               const SizedBox(height: 64),
@@ -324,11 +392,7 @@ class _MentorVideoChatScreenState extends BaseVideoChatScreenState<MentorVideoCh
                     width: 3,
                   ),
                 ),
-                child: const Icon(
-                  Icons.call_end,
-                  size: 60,
-                  color: Colors.red,
-                ),
+                child: const Icon(Icons.call_end, size: 60, color: Colors.red),
               ),
 
               const SizedBox(height: 32),
@@ -348,10 +412,7 @@ class _MentorVideoChatScreenState extends BaseVideoChatScreenState<MentorVideoCh
               // Call status
               const Text(
                 'Call not answered',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 16,
-                ),
+                style: TextStyle(color: Colors.white70, fontSize: 16),
               ),
             ],
           ),
