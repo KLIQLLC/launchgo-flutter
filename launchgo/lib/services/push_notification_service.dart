@@ -1,3 +1,4 @@
+// services/push_notification_service.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -14,6 +15,34 @@ import 'android_notification_display_service.dart';
 import 'notification_parser.dart';
 import 'video_call/video_call_push_handler.dart';
 import 'video_call/video_call_native_bridge.dart';
+
+/// Check if Stream Chat message is call-related (system message about call)
+/// Stream sends regular FCM pushes for call log messages, but we don't want to show them
+/// because VoIP push already handles the call UI
+bool _isCallRelatedStreamMessage(Map<String, dynamic> data) {
+  // Check message body/title for call-related text
+  final body = (data['body'] as String? ?? '').toLowerCase();
+  final title = (data['title'] as String? ?? '').toLowerCase();
+  
+  final isCallText = body.contains('call started') ||
+      body.contains('call ended') ||
+      body.contains('call missed') ||
+      body.contains('call declined') ||
+      title.contains('call started') ||
+      title.contains('call ended') ||
+      title.contains('call missed') ||
+      title.contains('call declined');
+
+  // Also check stream.* fields if available
+  final streamType = data['stream.type'] as String?;
+  final streamChannelType = data['stream.channel_type'] as String?;
+  
+  // Stream may put call-related info in stream fields
+  final isStreamCallRelated = streamType != null && streamType.contains('call') ||
+      streamChannelType != null && streamChannelType.contains('call');
+
+  return isCallText || isStreamCallRelated;
+}
 
 /// Service for handling FCM token lifecycle and device registration
 class PushNotificationService extends ChangeNotifier {
@@ -247,6 +276,7 @@ class PushNotificationService extends ChangeNotifier {
       debugPrint('Error getting APNS token: $e');
     }
   }
+
   
   /// Handle foreground messages
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
@@ -290,6 +320,15 @@ class PushNotificationService extends ChangeNotifier {
     // Show the notification even when app is in foreground
     // For Stream Chat data-only notifications, show them manually
     if (NotificationParser.isStreamChatMessage(message.data)) {
+      // Check if this is a call-related message (system message about call)
+      // Stream sends regular FCM pushes for call log messages, but we don't want to show them
+      // because VoIP push already handles the call UI
+      if (_isCallRelatedStreamMessage(message.data)) {
+        debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] Call-related Stream Chat message detected - skipping notification display');
+        debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] Only VoIP push will show call UI');
+        return;
+      }
+
       final chatData = NotificationParser.parseStreamChatData(message.data);
       AndroidNotificationDisplayService.instance.showStreamChatNotification(
         title: chatData.title,
@@ -500,6 +539,15 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
   // For Stream Chat data-only notifications, we need to show them manually
   if (NotificationParser.isStreamChatMessage(message.data)) {
+    // Check if this is a call-related message (system message about call)
+    // Stream sends regular FCM pushes for call log messages, but we don't want to show them
+    // because VoIP push already handles the call UI
+    if (_isCallRelatedStreamMessage(message.data)) {
+      debugPrint('[VC] 📞 [BackgroundHandler] Call-related Stream Chat message detected - skipping notification display');
+      debugPrint('[VC] 📞 [BackgroundHandler] Only VoIP push will show call UI');
+      return;
+    }
+
     final chatData = NotificationParser.parseStreamChatData(message.data);
     await AndroidNotificationDisplayService.instance.showStreamChatNotification(
       title: chatData.title,
