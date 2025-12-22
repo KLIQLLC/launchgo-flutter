@@ -1,3 +1,4 @@
+// screens/video_call/custom_chat_widget.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
@@ -111,8 +112,75 @@ class _CustomChatWidgetState extends State<CustomChatWidget> {
             children: <Widget>[
               Expanded(
                 child: StreamMessageListView(
+                  systemMessageBuilder: (context, message) {
+                    final rawText = message.text ?? '';
+                    if (rawText.isEmpty) {
+                      // Fallback to Stream's default renderer for empty system messages
+                      return StreamSystemMessage(message: message);
+                    }
+
+                    // Only customize the "call" system messages (keep other system messages default).
+                    final lower = rawText.toLowerCase();
+                    final isCallSystemMessage = lower.contains('call started') ||
+                        lower.contains('call ended') ||
+                        lower.contains('call declined') ||
+                        lower.contains('call missed');
+
+                    if (!isCallSystemMessage) {
+                      return StreamSystemMessage(message: message);
+                    }
+
+                    // Extract call event type from text
+                    String event = 'call';
+                    if (lower.contains('started')) event = 'started';
+                    else if (lower.contains('ended')) event = 'ended';
+                    else if (lower.contains('declined')) event = 'declined';
+                    else if (lower.contains('missed')) event = 'missed';
+
+                    // Format time from message.createdAt
+                    final time = TimeOfDay.fromDateTime(message.createdAt);
+                    final timeStr = MaterialLocalizations.of(context).formatTimeOfDay(
+                      time,
+                      alwaysUse24HourFormat: MediaQuery.of(context).alwaysUse24HourFormat,
+                    );
+
+                    final displayText = 'Call $event ($timeStr)';
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1F2937),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.call,
+                                size: 14,
+                                color: Color(0xFFCBD5E1),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                displayText,
+                                style: const TextStyle(
+                                  color: Color(0xFFCBD5E1),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                   messageBuilder: (context, details, messages, defaultWidget) {
-                    // You can return custom message widget here if needed
                     return defaultWidget.copyWith(
                       showUsername: true,
                       showTimestamp: true,
@@ -396,6 +464,27 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
       result.fold(
         success: (success) {
           debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Call created successfully');
+
+          // Send call started message (system message, time added on render from createdAt)
+          try {
+            unawaited(
+              widget.channel.sendMessage(
+                Message(
+                  type: 'system',
+                  text: '📞 Call started',
+                  extraData: const {
+                    'event_type': 'call',
+                    'call_event': 'started',
+                  },
+                ),
+              ).then((_) {}, onError: (e) {
+                debugPrint('[VC] ⚠️ [CustomChatWidget] Error sending call started: $e');
+              }),
+            );
+          } catch (e) {
+            debugPrint('[VC] ⚠️ [CustomChatWidget] Error sending call started: $e');
+          }
+
           debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Navigating to mentor-video-chat screen');
 
           if (context.mounted) {

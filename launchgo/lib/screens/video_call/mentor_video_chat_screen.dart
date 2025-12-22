@@ -1,6 +1,7 @@
 // screens/video_call/mentor_video_chat_screen.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:stream_chat_flutter/stream_chat_flutter.dart';
 import 'package:stream_video_flutter/stream_video_flutter.dart';
 import 'base_video_chat_screen.dart';
 
@@ -32,6 +33,28 @@ class _MentorVideoChatScreenState
 
   /// Whether the call was rejected/cancelled
   bool _isCallRejected = false;
+  bool _sentFinalCallLog = false;
+
+  void _sendCallLog(String event) {
+    if (!mounted) return;
+    final chatClient = StreamChat.of(context).client;
+    if (chatClient.state.currentUser == null) return;
+
+    final channelId = widget.callId.split('_').first;
+    final channel = chatClient.channel('messaging', id: channelId);
+
+    unawaited(
+      channel.sendMessage(
+        Message(
+          type: 'system',
+          text: '📞 Call $event',
+          extraData: const {'event_type': 'call'},
+        ),
+      ).then((_) {}, onError: (e) {
+        debugPrint('[VC] ⚠️ [MentorVideoChatScreen] Error sending call $event: $e');
+      }),
+    );
+  }
 
   @override
   String get displayName => widget.recipientName ?? 'Student';
@@ -79,6 +102,11 @@ class _MentorVideoChatScreenState
       _isCallRejected = true;
     });
 
+    if (!_sentFinalCallLog) {
+      _sentFinalCallLog = true;
+      _sendCallLog('missed');
+    }
+
     // End the call
     _cancelCall();
   }
@@ -92,6 +120,11 @@ class _MentorVideoChatScreenState
     );
 
     _callTimeoutTimer?.cancel();
+
+    if (!_sentFinalCallLog) {
+      _sentFinalCallLog = true;
+      _sendCallLog('ended');
+    }
 
     // IMPORTANT:
     // If mentor cancels while the student is still ringing (especially when student's phone is locked),
@@ -118,6 +151,15 @@ class _MentorVideoChatScreenState
 
     // Base cleanup (leave + clear state + close screen)
     await endCall();
+  }
+
+  @override
+  Future<void> endCall() async {
+    if (!_sentFinalCallLog) {
+      _sentFinalCallLog = true;
+      _sendCallLog('ended');
+    }
+    await super.endCall();
   }
 
   @override
@@ -218,6 +260,10 @@ class _MentorVideoChatScreenState
           debugPrint(
             '[VC] 📞 [MentorVideoChatScreen:callStateListener] Call rejected/cancelled before connection',
           );
+          if (!_sentFinalCallLog) {
+            _sentFinalCallLog = true;
+            _sendCallLog('declined');
+          }
           _isCallRejected = true;
           _callTimeoutTimer?.cancel();
         }
