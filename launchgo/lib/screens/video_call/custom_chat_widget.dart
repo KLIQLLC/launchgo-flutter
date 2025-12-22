@@ -137,8 +137,9 @@ class _CustomChatWidgetState extends State<CustomChatWidget> {
                     else if (lower.contains('declined')) event = 'declined';
                     else if (lower.contains('missed')) event = 'missed';
 
-                    // Format time from message.createdAt
-                    final time = TimeOfDay.fromDateTime(message.createdAt);
+                    // Format time from message.createdAt (convert UTC to local time)
+                    final localTime = message.createdAt.toLocal();
+                    final time = TimeOfDay.fromDateTime(localTime);
                     final timeStr = MaterialLocalizations.of(context).formatTimeOfDay(
                       time,
                       alwaysUse24HourFormat: MediaQuery.of(context).alwaysUse24HourFormat,
@@ -380,7 +381,59 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
   Future<void> _initiateVideoCall(BuildContext context, AuthService authService) async {
     debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] >> ENTRY: Mentor initiating video call');
 
-    // Request permissions immediately
+    // First, ensure video service is initialized BEFORE requesting permissions
+    // This ensures the service is ready even if permissions are denied
+    if (!context.mounted) return;
+    final videoService = context.read<StreamVideoService>();
+
+    if (videoService.client == null) {
+      debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Video service not initialized, initializing now (before permissions)');
+      final userInfo = authService.userInfo;
+      if (userInfo != null && userInfo.callGetStreamToken != null) {
+        try {
+          await videoService.initialize(userInfo);
+          debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Video service initialized successfully');
+        } catch (e) {
+          debugPrint('[VC] ❌ [CustomChatWidget:_initiateVideoCall] Failed to initialize video service: $e');
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to initialize video service: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+      } else {
+        debugPrint('[VC] ❌ [CustomChatWidget:_initiateVideoCall] Cannot initialize: userInfo or token is null');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Video service not available. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    // Verify client is available after initialization
+    if (videoService.client == null) {
+      debugPrint('[VC] ❌ [CustomChatWidget:_initiateVideoCall] Video client is still null after initialization');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Video service not ready. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Now request permissions (after service is initialized)
     debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Requesting camera and microphone permissions');
     final Map<Permission, PermissionStatus> statuses = await [
       Permission.camera,
@@ -418,30 +471,6 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
     debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Selected student: ${selectedStudent.name} (${selectedStudent.id})');
 
     if (!context.mounted) return;
-    final videoService = context.read<StreamVideoService>();
-
-    // Ensure video service is initialized
-    if (videoService.client == null) {
-      debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Video service not initialized, initializing now');
-      final userInfo = authService.userInfo;
-      if (userInfo != null && userInfo.callGetStreamToken != null) {
-        await videoService.initialize(userInfo);
-        debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Video service initialized');
-      } else {
-        debugPrint('[VC] ❌ [CustomChatWidget:_initiateVideoCall] Cannot initialize video service - no token');
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Video service initialization failed'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
-      }
-    }
-
-    if (!context.mounted) return;
 
     // Generate unique call ID with timestamp
     final uniqueCallId = '${selectedStudent.id}_${DateTime.now().millisecondsSinceEpoch}';
@@ -449,7 +478,19 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
 
     try {
       // Create call using the official pattern with ringing: true
-      final client = videoService.client!;
+      final client = videoService.client;
+      if (client == null) {
+        debugPrint('[VC] ❌ [CustomChatWidget:_initiateVideoCall] Video client is null');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Video service not ready. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
       final call = client.makeCall(
         callType: StreamCallType.defaultType(),
         id: uniqueCallId,
