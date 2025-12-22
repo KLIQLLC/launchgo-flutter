@@ -472,11 +472,13 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
                 Message(
                   type: 'system',
                   text: '📞 Call started',
+                  silent: true, // does not increase unread count, does not mark channel as unread
                   extraData: const {
                     'event_type': 'call',
                     'call_event': 'started',
                   },
                 ),
+                skipPush: true, // do not send push notification
               ).then((_) {}, onError: (e) {
                 debugPrint('[VC] ⚠️ [CustomChatWidget] Error sending call started: $e');
               }),

@@ -48,8 +48,10 @@ class _MentorVideoChatScreenState
         Message(
           type: 'system',
           text: '📞 Call $event',
+          silent: true, // does not increase unread count, does not mark channel as unread
           extraData: const {'event_type': 'call'},
         ),
+        skipPush: true, // do not send push notification
       ).then((_) {}, onError: (e) {
         debugPrint('[VC] ⚠️ [MentorVideoChatScreen] Error sending call $event: $e');
       }),
