@@ -111,7 +111,7 @@ class StreamChatService extends ChangeNotifier {
       if (pushNotificationService.fcmToken != null) {
         debugPrint('🔔 Stream Chat: Registering FCM token: ${pushNotificationService.fcmToken!.substring(0, 20)}...');
         await _client.addDevice(pushNotificationService.fcmToken!, PushProvider.firebase, 
-          pushProviderName: EnvironmentConfig.environmentName.toLowerCase());
+          pushProviderName: 'firebase');
         debugPrint('✅ Stream Chat: FCM token registered successfully for push notifications');
         
         // Verify registration by listing devices
@@ -128,7 +128,7 @@ class StreamChatService extends ChangeNotifier {
         Future.delayed(const Duration(seconds: 2), () async {
           if (pushNotificationService.fcmToken != null) {
             await _client.addDevice(pushNotificationService.fcmToken!, PushProvider.firebase, 
-          pushProviderName: EnvironmentConfig.environmentName.toLowerCase());
+          pushProviderName: 'firebase');
             debugPrint('✅ Stream Chat: FCM token registered successfully on retry');
           } else {
             debugPrint('❌ Stream Chat: FCM token still not available after retry');
