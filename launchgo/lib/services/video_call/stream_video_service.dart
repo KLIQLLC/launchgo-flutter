@@ -26,6 +26,7 @@ class StreamVideoService extends ChangeNotifier {
   String? _incomingCallerName;
   bool _isInitialized = false;
   bool _isInitializing = false; // Prevent concurrent initialization
+  Completer<void>? _initializeCompleter; // Allows callers to await in-flight initialization
 
   StreamSubscription<Call?>? _incomingCallSubscription;
   CompositeSubscription? _ringingEventsSubscription;
@@ -82,11 +83,17 @@ class StreamVideoService extends ChangeNotifier {
     }
 
     if (_isInitializing) {
-      debugPrint('[VC] 📞 [StreamVideoService:initialize] << EXIT: Already initializing in progress, skipping');
+      debugPrint('[VC] 📞 [StreamVideoService:initialize] Initialization already in progress, awaiting existing init...');
+      final existing = _initializeCompleter?.future;
+      if (existing != null) {
+        return await existing;
+      }
+      // Fallback: should not happen, but avoid leaving callers hanging.
       return;
     }
 
     _isInitializing = true;
+    _initializeCompleter = Completer<void>();
 
     try {
       final apiKey = EnvironmentConfig.streamVideoApiKey;
@@ -94,16 +101,14 @@ class StreamVideoService extends ChangeNotifier {
 
       if (token.isEmpty) {
         debugPrint('[VC] ❌ [StreamVideoService:initialize] << EXIT: No video token available');
-        _isInitializing = false;
-        return;
+        throw Exception('No Stream Video token available');
       }
 
       // Verify token not expired
       debugPrint('[VC] 📞 [StreamVideoService:initialize] Verifying token validity...');
       if (!_verifyToken(token)) {
         debugPrint('[VC] ❌ [StreamVideoService:initialize] << EXIT: Token expired');
-        _isInitializing = false;
-        return;
+        throw Exception('Stream Video token is expired or invalid');
       }
       debugPrint('[VC] 📞 [StreamVideoService:initialize] Token is valid');
 
@@ -172,20 +177,39 @@ class StreamVideoService extends ChangeNotifier {
 
       notifyListeners();
       debugPrint('[VC] 📞 [StreamVideoService:initialize] << EXIT: Initialization complete successfully');
+      _initializeCompleter?.complete();
+      _initializeCompleter = null;
     } catch (e) {
       debugPrint('[VC] ❌ [StreamVideoService:initialize] << EXIT: Error during initialization: $e');
       debugPrint('[VC] ❌ [StreamVideoService:initialize] Stack trace: ${StackTrace.current}');
       _isInitialized = false;
       _isInitializing = false;
       _client = null;
+      _initializeCompleter?.completeError(e, StackTrace.current);
+      _initializeCompleter = null;
+      rethrow;
     }
   }
 
   /// Verify token is not expired
   bool _verifyToken(String token) {
+    return isTokenValid(token);
+  }
+
+  /// Check if a video token is valid (not expired).
+  /// This is a static method so it can be called before initialization.
+  static bool isTokenValid(String? token) {
+    if (token == null || token.isEmpty) {
+      debugPrint('[VC] 📞 [StreamVideoService:isTokenValid] Token is null or empty');
+      return false;
+    }
+
     try {
       final parts = token.split('.');
-      if (parts.length != 3) return false;
+      if (parts.length != 3) {
+        debugPrint('[VC] 📞 [StreamVideoService:isTokenValid] Token is not a valid JWT (wrong number of parts)');
+        return false;
+      }
 
       final payload = parts[1];
       final normalized = base64.normalize(payload);
@@ -197,16 +221,16 @@ class StreamVideoService extends ChangeNotifier {
         final isExpired = DateTime.now().isAfter(expTime);
 
         if (isExpired) {
-          debugPrint('[VC] 📞 [StreamVideoService:_verifyToken] Token expired at: $expTime');
+          debugPrint('[VC] 📞 [StreamVideoService:isTokenValid] Token expired at: $expTime');
           return false;
         }
 
-        debugPrint('[VC] 📞 [StreamVideoService:_verifyToken] Token valid until: $expTime');
+        debugPrint('[VC] 📞 [StreamVideoService:isTokenValid] Token valid until: $expTime');
       }
 
       return true;
     } catch (e) {
-      debugPrint('[VC] ❌ [StreamVideoService:_verifyToken] Error verifying token: $e');
+      debugPrint('[VC] ❌ [StreamVideoService:isTokenValid] Error verifying token: $e');
       return false;
     }
   }
@@ -494,7 +518,7 @@ class StreamVideoService extends ChangeNotifier {
 
       // Fetch the call to ensure it exists
       debugPrint('[VC] 📞 Calling getOrCreate()...');
-      final result = await call.getOrCreate();
+      await call.getOrCreate();
       debugPrint('[VC] 📞 getOrCreate() completed');
       debugPrint('[VC] 📞 Call state status: ${call.state.value.status}');
       debugPrint('[VC] 📞 Call participants: ${call.state.value.callParticipants.length}');
@@ -547,6 +571,13 @@ class StreamVideoService extends ChangeNotifier {
   /// Disconnect and cleanup
   Future<void> disconnect() async {
     debugPrint('[VC] 📞 [StreamVideoService:disconnect] Disconnecting service');
+
+    // Cancel any in-flight initialization so callers don't wait forever.
+    _isInitializing = false;
+    if (_initializeCompleter != null && !_initializeCompleter!.isCompleted) {
+      _initializeCompleter!.completeError(Exception('StreamVideoService disconnected during initialization'));
+    }
+    _initializeCompleter = null;
 
     await _incomingCallSubscription?.cancel();
     _incomingCallSubscription = null;

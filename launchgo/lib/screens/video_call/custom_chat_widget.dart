@@ -386,9 +386,33 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
     if (!context.mounted) return;
     final videoService = context.read<StreamVideoService>();
 
+    // We don't proactively refresh based on token expiry (video token is long-lived).
+    // Only refresh user info if the token is missing.
+    var userInfo = authService.userInfo;
+    if (userInfo == null || userInfo.callGetStreamToken == null || userInfo.callGetStreamToken!.isEmpty) {
+      debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Video token missing, refreshing user info...');
+      try {
+        await authService.refreshUserInfo();
+        userInfo = authService.userInfo;
+        debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] User info refreshed, token available: ${userInfo?.callGetStreamToken != null && userInfo!.callGetStreamToken!.isNotEmpty}');
+      } catch (e) {
+        debugPrint('[VC] ❌ [CustomChatWidget:_initiateVideoCall] Failed to refresh user info: $e');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to refresh session: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    if (!context.mounted) return;
+
     if (videoService.client == null) {
       debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Video service not initialized, initializing now (before permissions)');
-      final userInfo = authService.userInfo;
       if (userInfo != null && userInfo.callGetStreamToken != null) {
         try {
           await videoService.initialize(userInfo);

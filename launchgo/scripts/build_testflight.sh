@@ -3,7 +3,10 @@
 # Build script for Production TestFlight distribution
 # Usage: bash scripts/build_stage_testflight.sh
 
-echo "🚀 Building LaunchGo Production for TestFlight..."
+echo "🚀 Building LaunchGo Production for TestFlight..# Always operate relative to repo root (prevents reading a different pubspec.yaml
+# if the script is launched from another working directory).
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+PUBSPEC_FILE="$ROOT_DIR/pubspec.yaml"
 
 # Colors for output
 RED='\033[0;31m'
@@ -13,16 +16,19 @@ NC='\033[0m' # No Color
 
 # Increment build number automatically
 echo -e "${YELLOW}🔢 Incrementing build number...${NC}"
-current_version=$(grep "version:" pubspec.yaml | sed 's/version: //' | tr -d ' ')
+echo -e "${YELLOW}📄 Using pubspec: ${PUBSPEC_FILE}${NC}"
+current_version=$(grep "^version:" "$PUBSPEC_FILE" | sed 's/version: //' | tr -d ' ')
+echo -e "${YELLOW}📌 Current version: ${current_version}${NC}"
 version_name=$(echo $current_version | cut -d'+' -f1)
 build_number=$(echo $current_version | cut -d'+' -f2)
 new_build_number=$((build_number + 1))
 new_version="${version_name}+${new_build_number}"
-sed -i '' "s/version: .*/version: ${new_version}/" pubspec.yaml
+sed -i '' "s/^version: .*/version: ${new_version}/" "$PUBSPEC_FILE"
 echo -e "${GREEN}✅ Updated version to: ${new_version}${NC}"
 
 # Clean and get dependencies
 echo -e "${YELLOW}📦 Cleaning and updating dependencies...${NC}"
+cd "$ROOT_DIR"
 fvm flutter clean
 fvm flutter pub get
 
