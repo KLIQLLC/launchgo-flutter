@@ -129,6 +129,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   late final StreamChatService _streamChatService;
   late final StreamVideoService _streamVideoService;
   late final NotificationsApiService _notificationsService;
+  bool _videoInitInProgress = false;
   String?
   _lastNavigatedCallId; // Track last call we navigated to (video call screen)
   String?
@@ -147,6 +148,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     _streamVideoService = context.read<StreamVideoService>();
     _notificationsService = context.read<NotificationsApiService>();
     _appRouter = AppRouter(_authService);
+
+    // React to auth finishing (userInfo loaded) after cold start.
+    // Without this, Stream Video may never initialize if userInfo wasn't ready at initState.
+    _authService.addListener(_handleAuthChanged);
 
     // Set router in navigation service
     PendingNavigationService.instance.setRouter(_appRouter.router);
@@ -512,6 +517,28 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         });
       }
     });
+  }
+
+  void _handleAuthChanged() {
+    final user = _authService.userInfo;
+    if (user == null) return;
+
+    // Ensure Stream Video initializes as soon as we have userInfo (needed for CallKit accept flows).
+    if (user.callGetStreamToken != null &&
+        !_streamVideoService.isInitialized &&
+        !_videoInitInProgress) {
+      _videoInitInProgress = true;
+      Future.microtask(() async {
+        try {
+          await _streamVideoService.initialize(user);
+          debugPrint('[VC] 📞 [MyApp:_handleAuthChanged] Stream Video initialized after auth');
+        } catch (e) {
+          debugPrint('[VC] ⚠️ [MyApp:_handleAuthChanged] Stream Video init failed: $e');
+        } finally {
+          _videoInitInProgress = false;
+        }
+      });
+    }
   }
 
   /// Set up handler for video call intents from Android native code
@@ -1124,6 +1151,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _authService.removeListener(_handleAuthChanged);
     super.dispose();
   }
 
@@ -1135,6 +1163,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // Stream Chat automatically manages presence based on WebSocket connection
     // When app resumes, ensure connection is active for presence
     if (state == AppLifecycleState.resumed) {
+      // If secure storage was temporarily unavailable during a lock-screen wakeup,
+      // retry restoring auth now that the device is unlocked/foregrounded.
+      if (!_authService.isAuthenticated) {
+        Future.microtask(() => _authService.refreshFromStorageIfPossible());
+      }
+
       if (_authService.userInfo != null &&
           _authService.userInfo!.chatGetStreamToken != null) {
         // Only auto-reconnect students - mentors will reconnect when they select students

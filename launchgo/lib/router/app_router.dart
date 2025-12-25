@@ -45,12 +45,15 @@ class AppRouter {
       initialLocation: '/login',
       refreshListenable: authService,
       redirect: (context, state) {
+        // During cold start / CallKit wakeup, auth may still be initializing.
+        // Redirecting too early can send the user to /login even if a valid token
+        // exists but hasn't been loaded yet.
+        if (!authService.isInitialized) {
+          return null;
+        }
+
         final isAuthenticated = authService.isAuthenticated;
         final isLoginRoute = state.matchedLocation == '/login';
-        // Special case: If we have a token but auth isn't complete, wait for it to finish
-        if (!isAuthenticated && authService.hasAccessToken && !authService.isInitialized) {
-          return null; // Stay on current route until auth completes
-        }
 
         if (!isAuthenticated && !isLoginRoute) {
           return '/login';
