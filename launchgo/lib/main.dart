@@ -970,8 +970,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           );
 
           // Wait for auth and video service with retries
-          for (int i = 0; i < 30; i++) {
-            // Wait up to 3 seconds
+          for (int i = 0; i < 50; i++) {
+            // Wait up to 5 seconds
             if (_authService.userInfo != null &&
                 _authService.userInfo!.isStudent &&
                 _streamVideoService.isInitialized) {
@@ -987,42 +987,19 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             return;
           }
 
-          // Check if SDK already handled this (activeCall is set)
-          final activeCall = _streamVideoService.activeCall;
-          if (activeCall != null && activeCall.id == callId) {
-            debugPrint(
-              '[VC] 📞 [iOS] SDK already handled this call, navigating...',
-            );
-            _lastNavigatedCallId = callId;
-            _appRouter.router.pushNamed(
-              'student-video-chat',
-              pathParameters: {'callId': callId},
-              queryParameters: {'callerName': 'Mentor', 'autoAccept': 'true'},
-            );
-          } else {
-            // SDK might not have processed yet, try consumeAndAcceptActiveCall
-            debugPrint('[VC] 📞 [iOS] Trying consumeAndAcceptActiveCall...');
-            _streamVideoService.consumeAndAcceptActiveCall((callToJoin) {
-              debugPrint('[VC] 📞 [iOS] Call consumed: ${callToJoin.id}');
-              if (_lastNavigatedCallId != callToJoin.id) {
-                _lastNavigatedCallId = callToJoin.id;
-                _appRouter.router.pushNamed(
-                  'student-video-chat',
-                  pathParameters: {'callId': callToJoin.id},
-                  queryParameters: {
-                    'callerName': 'Mentor',
-                    'autoAccept': 'true',
-                  },
-                );
-              }
-            });
-
-            // Also try direct navigation as fallback after a short delay
-            await Future.delayed(const Duration(milliseconds: 500));
-            if (_lastNavigatedCallId != callId) {
-              debugPrint(
-                '[VC] 📞 [iOS] Fallback: Direct navigation to call $callId',
+          // CRITICAL FIX: Explicitly accept the call via Stream SDK
+          // This ensures the mentor is notified that the student answered
+          try {
+            final client = _streamVideoService.client;
+            if (client != null) {
+              final call = client.makeCall(
+                callType: StreamCallType.defaultType(),
+                id: callId,
               );
+              await call.getOrCreate();
+              await call.accept();
+              _streamVideoService.setActiveCall(call);
+              
               _lastNavigatedCallId = callId;
               _appRouter.router.pushNamed(
                 'student-video-chat',
@@ -1030,6 +1007,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                 queryParameters: {'callerName': 'Mentor', 'autoAccept': 'true'},
               );
             }
+          } catch (e) {
+            debugPrint('[VC] ❌ [iOS] Error accepting call: $e');
           }
         } else {
           debugPrint('[VC] ⚠️ [iOS] Could not extract call ID from event');
