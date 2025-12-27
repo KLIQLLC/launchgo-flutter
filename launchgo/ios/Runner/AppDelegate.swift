@@ -164,91 +164,108 @@ extension AppDelegate: PKPushRegistryDelegate {
   ) {
     print("[AppDelegate] 📞 VoIP push received")
     
-    // Extract Stream call info from payload
-    var streamCallCid: String? = nil
-    var pushType: String? = nil
-    var callerName: String = "Incoming Call"
-    
-    let streamPayload = payload.dictionaryPayload["stream"] as? [String: Any] 
-                        ?? payload.dictionaryPayload["stream_video"] as? [String: Any]
-    
-    if let stream = streamPayload {
-      streamCallCid = stream["call_cid"] as? String
-      pushType = stream["type"] as? String
-      callerName = stream["created_by_display_name"] as? String ?? "Incoming Call"
-      print("[AppDelegate] 📞 Push type=\(pushType ?? "nil") call_cid=\(streamCallCid ?? "nil") caller=\(callerName)")
-    }
-    
-    // Handle call cancellation pushes
-    if pushType == "call.miss" || pushType == "call.ended" || pushType == "call.rejected" {
-      print("[AppDelegate] 📞 Call cancel push - ending CallKit")
-      forceEndAllCallKitCalls()
-      completion()
-      return
-    }
-    
-    // Only show CallKit for call.ring pushes
-    guard pushType == "call.ring", let callCid = streamCallCid else {
-      print("[AppDelegate] 📞 Not a call.ring or no call_cid, ignoring")
-      completion()
-      return
-    }
-    
-    // Extract just the call ID from the call_cid (format: "default:xxx")
-    let callId = callCid.components(separatedBy: ":").last ?? callCid
-    
-    // FIX #3: End any previous CallKit calls before showing new one
-    // This prevents multiple CallKit UIs from stacking up
-    print("[AppDelegate] 📞 Clearing previous CallKit calls before showing new one")
-    forceEndAllCallKitCalls()
-    
-    print("[AppDelegate] 📞 Showing CallKit for callId=\(callId)")
-    
-    // Create a unique UUID for CallKit
-    let uuid = UUID()
-    
-    // Build CallKitParams for flutter_callkit_incoming
-    let callKitParams: [String: Any] = [
-      "id": uuid.uuidString,
-      "nameCaller": callerName,
-      "appName": "LaunchGo",
-      "handle": "Video Call",
-      "type": 1, // 1 = video call
-      "textAccept": "Accept",
-      "textDecline": "Decline",
-      "duration": 60000, // 60 seconds ring
-      "extra": [
-        "call_cid": callCid,
-        "call_id": callId,
-        "stream_call_cid": callCid
-      ],
-      "ios": [
-        "iconName": "CallKitIcon",
-        "handleType": "generic",
-        "supportsVideo": true,
-        "maximumCallGroups": 1,
-        "maximumCallsPerCallGroup": 1,
-        "audioSessionMode": "videoChat",
-        "audioSessionActive": true,
-        "audioSessionPreferredSampleRate": 44100.0,
-        "audioSessionPreferredIOBufferDuration": 0.005,
-        "supportsDTMF": false,
-        "supportsHolding": false,
-        "supportsGrouping": false,
-        "supportsUngrouping": false,
-        "ringtonePath": nil
+    // Check if user is authenticated before showing CallKit
+    // This prevents CallKit UI from appearing after logout
+    methodChannel?.invokeMethod("isUserAuthenticated", arguments: nil) { [weak self] result in
+      guard let self = self else {
+        completion()
+        return
+      }
+      
+      let isAuthenticated = result as? Bool ?? false
+      
+      if !isAuthenticated {
+        print("[AppDelegate] 📞 User not authenticated, ignoring VoIP push")
+        completion()
+        return
+      }
+      
+      // Extract Stream call info from payload
+      var streamCallCid: String? = nil
+      var pushType: String? = nil
+      var callerName: String = "Incoming Call"
+      
+      let streamPayload = payload.dictionaryPayload["stream"] as? [String: Any] 
+                          ?? payload.dictionaryPayload["stream_video"] as? [String: Any]
+      
+      if let stream = streamPayload {
+        streamCallCid = stream["call_cid"] as? String
+        pushType = stream["type"] as? String
+        callerName = stream["created_by_display_name"] as? String ?? "Incoming Call"
+        print("[AppDelegate] 📞 Push type=\(pushType ?? "nil") call_cid=\(streamCallCid ?? "nil") caller=\(callerName)")
+      }
+      
+      // Handle call cancellation pushes
+      if pushType == "call.miss" || pushType == "call.ended" || pushType == "call.rejected" {
+        print("[AppDelegate] 📞 Call cancel push - ending CallKit")
+        self.forceEndAllCallKitCalls()
+        completion()
+        return
+      }
+      
+      // Only show CallKit for call.ring pushes
+      guard pushType == "call.ring", let callCid = streamCallCid else {
+        print("[AppDelegate] 📞 Not a call.ring or no call_cid, ignoring")
+        completion()
+        return
+      }
+      
+      // Extract just the call ID from the call_cid (format: "default:xxx")
+      let callId = callCid.components(separatedBy: ":").last ?? callCid
+      
+      // FIX #3: End any previous CallKit calls before showing new one
+      // This prevents multiple CallKit UIs from stacking up
+      print("[AppDelegate] 📞 Clearing previous CallKit calls before showing new one")
+      self.forceEndAllCallKitCalls()
+      
+      print("[AppDelegate] 📞 Showing CallKit for callId=\(callId)")
+      
+      // Create a unique UUID for CallKit
+      let uuid = UUID()
+      
+      // Build CallKitParams for flutter_callkit_incoming
+      let callKitParams: [String: Any] = [
+        "id": uuid.uuidString,
+        "nameCaller": callerName,
+        "appName": "LaunchGo",
+        "handle": "Video Call",
+        "type": 1, // 1 = video call
+        "textAccept": "Accept",
+        "textDecline": "Decline",
+        "duration": 60000, // 60 seconds ring
+        "extra": [
+          "call_cid": callCid,
+          "call_id": callId,
+          "stream_call_cid": callCid
+        ],
+        "ios": [
+          "iconName": "CallKitIcon",
+          "handleType": "generic",
+          "supportsVideo": true,
+          "maximumCallGroups": 1,
+          "maximumCallsPerCallGroup": 1,
+          "audioSessionMode": "videoChat",
+          "audioSessionActive": true,
+          "audioSessionPreferredSampleRate": 44100.0,
+          "audioSessionPreferredIOBufferDuration": 0.005,
+          "supportsDTMF": false,
+          "supportsHolding": false,
+          "supportsGrouping": false,
+          "supportsUngrouping": false,
+          "ringtonePath": nil
+        ]
       ]
-    ]
-    
-    // Show CallKit via flutter_callkit_incoming
-    let callData = flutter_callkit_incoming.Data(args: callKitParams as NSDictionary)
-    SwiftFlutterCallkitIncomingPlugin.sharedInstance?.showCallkitIncoming(
-      callData,
-      fromPushKit: true
-    )
-    
-    print("[AppDelegate] 📞 CallKit shown uuid=\(uuid.uuidString)")
-    
-    completion()
+      
+      // Show CallKit via flutter_callkit_incoming
+      let callData = flutter_callkit_incoming.Data(args: callKitParams as NSDictionary)
+      SwiftFlutterCallkitIncomingPlugin.sharedInstance?.showCallkitIncoming(
+        callData,
+        fromPushKit: true
+      )
+      
+      print("[AppDelegate] 📞 CallKit shown uuid=\(uuid.uuidString)")
+      
+      completion()
+    }
   }
 }

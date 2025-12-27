@@ -642,6 +642,34 @@ class StreamVideoService extends ChangeNotifier {
     await _coordinatorEventsSubscription?.cancel();
     _coordinatorEventsSubscription = null;
 
+    // IMPORTANT: Unregister ALL devices from Stream Video before disconnecting
+    // This stops VoIP pushes from being sent to this device after logout
+    if (_client != null) {
+      try {
+        debugPrint('[VC] 📞 [StreamVideoService:disconnect] Unregistering devices from Stream Video...');
+        final devicesResult = await _client!.getDevices();
+        
+        if (devicesResult.isSuccess) {
+          final devices = devicesResult.getDataOrNull() ?? [];
+          debugPrint('[VC] 📞 [StreamVideoService:disconnect] Found ${devices.length} registered devices');
+          for (final device in devices) {
+            debugPrint('[VC] 📞 [StreamVideoService:disconnect] Removing device: ${device.pushToken}');
+            try {
+              await _client!.removeDevice(pushToken: device.pushToken);
+              debugPrint('[VC] ✅ [StreamVideoService:disconnect] Device removed: ${device.pushToken}');
+            } catch (e) {
+              debugPrint('[VC] ⚠️ [StreamVideoService:disconnect] Error removing device: $e');
+            }
+          }
+        } else {
+          debugPrint('[VC] ⚠️ [StreamVideoService:disconnect] Error getting devices: ${devicesResult.toString()}');
+        }
+      } catch (e) {
+        debugPrint('[VC] ⚠️ [StreamVideoService:disconnect] Error unregistering devices: $e');
+        // Don't fail disconnect if device unregistration fails
+      }
+    }
+
     await _client?.disconnect();
     _client = null;
 

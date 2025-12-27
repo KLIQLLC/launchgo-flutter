@@ -1128,6 +1128,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         // No incoming call and no active call -> cancelled
         debugPrint('[VC] 📞 [iOS] No call -> invalid');
         return false;
+      } else if (call.method == 'isUserAuthenticated') {
+        // Check if user is authenticated for VoIP push filtering
+        final isAuthenticated = _authService.isAuthenticated;
+        debugPrint('[VC] 📞 [iOS] isUserAuthenticated check: $isAuthenticated');
+        return isAuthenticated;
       }
       return null;
     });
