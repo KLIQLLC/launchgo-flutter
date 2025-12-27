@@ -21,7 +21,6 @@ import 'package:launchgo/services/notification_navigation_service.dart';
 import 'package:launchgo/services/weekly_notification_service.dart';
 import 'package:launchgo/services/video_call/stream_video_service.dart';
 import 'package:launchgo/services/video_call/video_call_push_handler.dart';
-import 'package:launchgo/utils/call_debug_logger.dart';
 import 'package:stream_video_flutter/stream_video_flutter.dart';
 import 'package:launchgo/widgets/splash_screen.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
@@ -63,11 +62,6 @@ void main() async {
 
   // Initialize Firebase
   await Firebase.initializeApp();
-
-  // Initialize call debug logger
-  await CallDebugLogger.init();
-  await CallDebugLogger.log('APP_START');
-  await CallDebugLogger.log('BUILD_MARKER=iOS_callkit_v3_native_fallback_RELEASE');
 
   // Don't initialize push notifications here - will be done after router is ready
 
@@ -849,7 +843,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
       // Handle decline events - accept is handled by Stream Video SDK
       if (event.event == callkit.Event.actionCallDecline) {
-        await CallDebugLogger.log('[CallKit] EVENT: actionCallDecline');
         debugPrint(
           '[VC] 📞 ========== CALL DECLINED VIA CALLKIT EVENT ==========',
         );
@@ -879,7 +872,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           }
         }
 
-        await CallDebugLogger.log('[CallKit] Extracted callId=$callId incomingCallId=${_streamVideoService.incomingCallId}');
         debugPrint('[VC] 📞 FINAL Extracted call ID: $callId');
 
         if (callId != null) {
@@ -901,17 +893,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             }
 
             // Reject the call via SDK to notify the caller
-            await CallDebugLogger.log('[CallKit] Calling rejectIncomingCall($callId)');
             debugPrint('[VC] 📞 Calling rejectIncomingCall($callId)...');
             await _streamVideoService.rejectIncomingCall(callId);
-            await CallDebugLogger.log('[CallKit] rejectIncomingCall completed');
             debugPrint('[VC] 📞 rejectIncomingCall completed');
           } else {
-            await CallDebugLogger.log('[CallKit] ERROR: User not authenticated');
             debugPrint('[VC] ⚠️ User not authenticated, cannot reject call');
           }
         } else {
-          await CallDebugLogger.log('[CallKit] ERROR: Could not extract callId from event');
           debugPrint('[VC] ⚠️ Could not extract call ID from event');
         }
 
@@ -919,24 +907,17 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           '[VC] 📞 ========== END CALL DECLINED VIA CALLKIT EVENT ==========',
         );
       } else if (event.event == callkit.Event.actionCallAccept) {
-        await CallDebugLogger.log('[CallKit] EVENT: actionCallAccept');
         debugPrint('[VC] 📞 Call ACCEPT event - handled by Stream Video SDK');
       } else if (event.event == callkit.Event.actionCallTimeout) {
-        await CallDebugLogger.log('[CallKit] EVENT: actionCallTimeout');
         debugPrint('[VC] 📞 Call TIMEOUT event - ending all calls');
         await FlutterCallkitIncoming.endAllCalls();
-        await CallDebugLogger.log('[CallKit] endAllCalls completed');
       } else if (event.event == callkit.Event.actionCallEnded) {
-        await CallDebugLogger.log('[CallKit] EVENT: actionCallEnded');
         debugPrint('[VC] 📞 Call ENDED event');
       } else if (event.event == callkit.Event.actionCallIncoming) {
-        await CallDebugLogger.log('[CallKit] EVENT: actionCallIncoming');
         debugPrint('[VC] 📞 Call INCOMING event');
       } else if (event.event == callkit.Event.actionCallStart) {
-        await CallDebugLogger.log('[CallKit] EVENT: actionCallStart');
         debugPrint('[VC] 📞 Call START event');
       } else {
-        await CallDebugLogger.log('[CallKit] EVENT: unknown ${event.event}');
         debugPrint('[VC] 📞 Unknown event type: ${event.event}');
       }
 
@@ -974,7 +955,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       debugPrint('[VC] 📞 [iOS] Event body: ${event.body}');
 
       if (event.event == callkit.Event.actionCallAccept) {
-        await CallDebugLogger.log('[iOS-CallKit] EVENT: actionCallAccept');
         debugPrint('[VC] 📞 [iOS] ========== CALL ACCEPT EVENT ==========');
 
         // Extract call ID from event body
@@ -995,13 +975,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           callId ??= body['call_id'] as String? ?? body['id'] as String?;
         }
 
-        await CallDebugLogger.log('[iOS-CallKit] Extracted callId=$callId');
         debugPrint('[VC] 📞 [iOS] Extracted call ID: $callId');
 
         if (callId != null) {
           // Check if we already navigated to this call
           if (_lastNavigatedCallId == callId) {
-            await CallDebugLogger.log('[iOS-CallKit] Already navigated to $callId, skipping');
             debugPrint(
               '[VC] 📞 [iOS] Already navigated to this call, skipping',
             );
@@ -1018,7 +996,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             if (_authService.userInfo != null &&
                 _authService.userInfo!.isStudent &&
                 _streamVideoService.isInitialized) {
-              await CallDebugLogger.log('[iOS-CallKit] Services ready after ${i * 100}ms');
               debugPrint('[VC] 📞 [iOS] Services ready after ${i * 100}ms');
               break;
             }
@@ -1027,7 +1004,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
           if (_authService.userInfo == null ||
               !_streamVideoService.isInitialized) {
-            await CallDebugLogger.log('[iOS-CallKit] ERROR: Services not ready after timeout');
             debugPrint('[VC] ⚠️ [iOS] Services not ready after timeout');
             return;
           }
@@ -1035,7 +1011,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           // CRITICAL FIX: Explicitly accept the call via Stream SDK
           // This ensures the mentor is notified that the student answered
           try {
-            await CallDebugLogger.log('[iOS-CallKit] Accepting call via Stream SDK');
             final client = _streamVideoService.client;
             if (client != null) {
               final call = client.makeCall(
@@ -1046,7 +1021,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               await call.accept();
               _streamVideoService.setActiveCall(call);
               
-              await CallDebugLogger.log('[iOS-CallKit] Call accepted, navigating to video-chat');
               _lastNavigatedCallId = callId;
               _appRouter.router.pushNamed(
                 'student-video-chat',
@@ -1055,17 +1029,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               );
             }
           } catch (e) {
-            await CallDebugLogger.log('[iOS-CallKit] ERROR accepting call: $e');
             debugPrint('[VC] ❌ [iOS] Error accepting call: $e');
           }
         } else {
-          await CallDebugLogger.log('[iOS-CallKit] ERROR: Could not extract callId');
           debugPrint('[VC] ⚠️ [iOS] Could not extract call ID from event');
         }
 
         debugPrint('[VC] 📞 [iOS] ========== END CALL ACCEPT EVENT ==========');
       } else if (event.event == callkit.Event.actionCallDecline) {
-        await CallDebugLogger.log('[iOS-CallKit] EVENT: actionCallDecline');
         debugPrint('[VC] 📞 [iOS] Call DECLINE event');
         // Handle decline similar to Android
         String? callId;
@@ -1084,14 +1055,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           callId ??= body['call_id'] as String? ?? body['id'] as String?;
         }
 
-        await CallDebugLogger.log('[iOS-CallKit] Decline for callId=$callId');
         if (callId != null && _authService.userInfo != null) {
           if (!_streamVideoService.isInitialized) {
             await _streamVideoService.initialize(_authService.userInfo!);
           }
-          await CallDebugLogger.log('[iOS-CallKit] Calling rejectIncomingCall($callId)');
           await _streamVideoService.rejectIncomingCall(callId);
-          await CallDebugLogger.log('[iOS-CallKit] rejectIncomingCall completed');
         }
       }
 
@@ -1114,12 +1082,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         final cid = args?['cid'] as String?;
 
         if (cid == null) {
-          await CallDebugLogger.log('[iOS-Validity] ERROR: no cid provided');
           debugPrint('[VC] ⚠️ [iOS] checkCallValidity: no cid');
           return false;
         }
 
-        await CallDebugLogger.log('[iOS-Validity] Checking cid=$cid incomingCallId=${_streamVideoService.incomingCallId} activeCall=${_streamVideoService.activeCall?.id}');
         debugPrint('[VC] 📞 [iOS] Checking validity for: $cid');
 
         // Extract call ID from cid (format: "default:callId")
@@ -1129,12 +1095,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         if (_streamVideoService.hasActiveCall) {
           final activeCallId = _streamVideoService.activeCall?.id;
           if (activeCallId == requestedCallId) {
-            await CallDebugLogger.log('[iOS-Validity] Active call matches -> VALID');
             debugPrint('[VC] 📞 [iOS] Active call matches requested cid -> valid');
             return true;
           } else {
             // Different call is active - the requested call is no longer valid
-            await CallDebugLogger.log('[iOS-Validity] Active call mismatch ($activeCallId != $requestedCallId) -> INVALID');
             debugPrint('[VC] 📞 [iOS] Active call ($activeCallId) != requested ($requestedCallId) -> invalid');
             return false;
           }
@@ -1145,20 +1109,16 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           final incomingId = _streamVideoService.incomingCallId;
           if (incomingId != requestedCallId) {
             // Different incoming call - requested call is stale
-            await CallDebugLogger.log('[iOS-Validity] Incoming call mismatch ($incomingId != $requestedCallId) -> INVALID');
             debugPrint('[VC] 📞 [iOS] Incoming call ($incomingId) != requested ($requestedCallId) -> invalid');
             return false;
           }
           
-          await CallDebugLogger.log('[iOS-Validity] Incoming call matches, checking server...');
           debugPrint('[VC] 📞 [iOS] Incoming call matches, checking server...');
           try {
             final isValid = await _checkCallStillValid(cid);
-            await CallDebugLogger.log('[iOS-Validity] Server says: $isValid');
             debugPrint('[VC] 📞 [iOS] Server says: $isValid');
             return isValid;
           } catch (e) {
-            await CallDebugLogger.log('[iOS-Validity] ERROR checking server: $e, assuming VALID');
             debugPrint('[VC] ⚠️ [iOS] Error checking server: $e');
             // On error, assume valid to avoid premature dismissal
             return true;
@@ -1166,7 +1126,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         }
 
         // No incoming call and no active call -> cancelled
-        await CallDebugLogger.log('[iOS-Validity] No call state -> INVALID');
         debugPrint('[VC] 📞 [iOS] No call -> invalid');
         return false;
       }

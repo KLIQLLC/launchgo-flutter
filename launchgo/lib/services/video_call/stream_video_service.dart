@@ -246,7 +246,6 @@ class StreamVideoService extends ChangeNotifier {
     _incomingCallSubscription = _client?.state.incomingCall.listen(
       (call) async {
         if (call == null) {
-          await CallDebugLogger.log('[StreamVideoService] incomingCall=NULL (cancelled/timeout) prevIncomingCallId=$_incomingCallId activeCall=${_activeCall?.id}');
           debugPrint('[VC] 📞 [StreamVideoService:incomingCallListener] Incoming call cleared (set to null)');
           debugPrint('[VC] 📞 [StreamVideoService:incomingCallListener] Call was cancelled by caller or timed out');
 
@@ -256,7 +255,6 @@ class StreamVideoService extends ChangeNotifier {
           // End CallKit notification on Android when call is cancelled by mentor
           // This ensures the ringing stops when mentor cancels the call
           if (Platform.isAndroid && _incomingCallId != null) {
-            await CallDebugLogger.log('[StreamVideoService] Android: ending CallKit for cancelled call $_incomingCallId');
             debugPrint('[VC] 📞 [StreamVideoService:incomingCallListener] Ending CallKit notification for cancelled call');
             FlutterCallkitIncoming.endAllCalls().catchError((e) {
               debugPrint('[VC] ⚠️ [StreamVideoService:incomingCallListener] Error ending CallKit: $e');
@@ -265,12 +263,9 @@ class StreamVideoService extends ChangeNotifier {
 
           // iOS: End CallKit when call is cancelled
           if (Platform.isIOS && _incomingCallId != null) {
-            await CallDebugLogger.log('[StreamVideoService] iOS: ending CallKit for cancelled call $_incomingCallId');
             final activeCalls = await FlutterCallkitIncoming.activeCalls();
-            await CallDebugLogger.log('[StreamVideoService] iOS: active CallKit calls before endAllCalls: ${activeCalls.length}');
             await FlutterCallkitIncoming.endAllCalls();
             final afterCalls = await FlutterCallkitIncoming.activeCalls();
-            await CallDebugLogger.log('[StreamVideoService] iOS: active CallKit calls after endAllCalls: ${afterCalls.length}');
           }
 
           _incomingCallId = null;
@@ -280,7 +275,6 @@ class StreamVideoService extends ChangeNotifier {
         }
 
         final callId = call.callCid.id;
-        await CallDebugLogger.log('[StreamVideoService] incomingCall DETECTED callId=$callId callCid=${call.callCid}');
         debugPrint('[VC] 📞 [StreamVideoService:incomingCallListener] ========== INCOMING CALL DETECTED ==========');
         debugPrint('[VC] 📞 [StreamVideoService:incomingCallListener] Call ID: $callId');
         debugPrint('[VC] 📞 [StreamVideoService:incomingCallListener] Call CID: ${call.callCid}');
@@ -330,7 +324,6 @@ class StreamVideoService extends ChangeNotifier {
     // Note: Only onCallAccepted is available. Rejection/end are handled by incomingCall stream
     _ringingEventsSubscription = _client?.observeCoreRingingEvents(
       onCallAccepted: (callToJoin) async {
-        await CallDebugLogger.log('[StreamVideoService] onCallAccepted callId=${callToJoin.id} callCid=${callToJoin.callCid}');
         debugPrint('[VC] 📞 [StreamVideoService:onCallAccepted] ========== CALL ACCEPTED VIA SDK ==========');
         debugPrint('[VC] 📞 [StreamVideoService:onCallAccepted] Call ID: ${callToJoin.id}');
         debugPrint('[VC] 📞 [StreamVideoService:onCallAccepted] Call CID: ${callToJoin.callCid}');
@@ -351,7 +344,6 @@ class StreamVideoService extends ChangeNotifier {
         _incomingCallId = null;
         _incomingCallerName = null;
 
-        await CallDebugLogger.log('[StreamVideoService] onCallAccepted activeCall set, incoming cleared');
         debugPrint('[VC] 📞 [StreamVideoService:onCallAccepted] Updated service state: activeCall set, incoming call cleared');
         debugPrint('[VC] 📞 [StreamVideoService:onCallAccepted] Callback registered: ${_onCallAcceptedCallback != null}');
 
@@ -381,21 +373,17 @@ class StreamVideoService extends ChangeNotifier {
     _coordinatorEventsSubscription?.cancel();
 
     _coordinatorEventsSubscription = _client?.events.listen((event) async {
-      await CallDebugLogger.log('[StreamVideoService] CoordinatorEvent: ${event.runtimeType}');
       debugPrint('[VC] 📞 [CoordinatorEvent] Received: ${event.runtimeType}');
 
       if (event is CoordinatorCallRejectedEvent) {
-        await CallDebugLogger.log('[StreamVideoService] CoordinatorCallRejectedEvent callCid=${event.callCid} incomingCallId=$_incomingCallId activeCall=${_activeCall?.id}');
         debugPrint('[VC] 📞 [CoordinatorEvent] ========== CALL REJECTED ==========');
         debugPrint('[VC] 📞 [CoordinatorEvent] Call CID: ${event.callCid}');
         _handleCallCancelled('rejected');
       } else if (event is CoordinatorCallEndedEvent) {
-        await CallDebugLogger.log('[StreamVideoService] CoordinatorCallEndedEvent callCid=${event.callCid} incomingCallId=$_incomingCallId activeCall=${_activeCall?.id}');
         debugPrint('[VC] 📞 [CoordinatorEvent] ========== CALL ENDED ==========');
         debugPrint('[VC] 📞 [CoordinatorEvent] Call CID: ${event.callCid}');
         _handleCallCancelled('ended');
       } else if (event is CoordinatorCallSessionParticipantLeftEvent) {
-        await CallDebugLogger.log('[StreamVideoService] CoordinatorCallSessionParticipantLeftEvent callCid=${event.callCid} incomingCallId=$_incomingCallId activeCall=${_activeCall?.id}');
         debugPrint('[VC] 📞 [CoordinatorEvent] ========== PARTICIPANT LEFT ==========');
         debugPrint('[VC] 📞 [CoordinatorEvent] Call CID: ${event.callCid}');
         // Only handle if it's the caller who left while we're still ringing
@@ -410,7 +398,6 @@ class StreamVideoService extends ChangeNotifier {
 
   /// Handle call cancellation (rejected, ended, or caller left)
   void _handleCallCancelled(String reason) async {
-    await CallDebugLogger.log('[StreamVideoService] _handleCallCancelled reason=$reason incomingCallId=$_incomingCallId activeCall=${_activeCall?.id}');
     debugPrint('[VC] 📞 [StreamVideoService:_handleCallCancelled] Reason: $reason');
 
     // Stop iOS timer
@@ -418,39 +405,31 @@ class StreamVideoService extends ChangeNotifier {
 
     // End CallKit notification on both platforms
     // Always try to end, regardless of _incomingCallId state (may be cleared already)
-    await CallDebugLogger.log('[StreamVideoService] _handleCallCancelled calling endAllCalls...');
     debugPrint('[VC] 📞 [StreamVideoService:_handleCallCancelled] Ending CallKit...');
     
     try {
       if (Platform.isIOS) {
         final before = await FlutterCallkitIncoming.activeCalls();
-        await CallDebugLogger.log('[StreamVideoService] _handleCallCancelled BEFORE endAllCalls: ${before.length} active calls');
       }
       
       await FlutterCallkitIncoming.endAllCalls();
       
       if (Platform.isIOS) {
         final after = await FlutterCallkitIncoming.activeCalls();
-        await CallDebugLogger.log('[StreamVideoService] _handleCallCancelled AFTER endAllCalls: ${after.length} active calls');
         
         // If endAllCalls failed to clear, use native fallback
         if (after.isNotEmpty) {
-          await CallDebugLogger.log('[StreamVideoService] _handleCallCancelled FAILED to clear ${after.length} calls, using native forceEndAllCalls');
           const nativeChannel = MethodChannel('com.launchgo.app/callkit');
           try {
             await nativeChannel.invokeMethod('forceEndAllCalls');
-            await CallDebugLogger.log('[StreamVideoService] _handleCallCancelled native forceEndAllCalls OK');
             
             // Re-check
             final afterNative = await FlutterCallkitIncoming.activeCalls();
-            await CallDebugLogger.log('[StreamVideoService] _handleCallCancelled AFTER native forceEndAllCalls: ${afterNative.length} active calls');
           } catch (e) {
-            await CallDebugLogger.log('[StreamVideoService] _handleCallCancelled native forceEndAllCalls ERROR: $e');
           }
         }
       }
     } catch (e) {
-      await CallDebugLogger.log('[StreamVideoService] _handleCallCancelled endAllCalls ERROR: $e');
       debugPrint('[VC] ⚠️ [StreamVideoService:_handleCallCancelled] Error: $e');
     }
 
@@ -459,7 +438,6 @@ class StreamVideoService extends ChangeNotifier {
     _incomingCallerName = null;
     notifyListeners();
 
-    await CallDebugLogger.log('[StreamVideoService] _handleCallCancelled complete');
     debugPrint('[VC] 📞 [StreamVideoService:_handleCallCancelled] Call cancelled handling complete');
   }
 
@@ -540,36 +518,27 @@ class StreamVideoService extends ChangeNotifier {
 
   /// Clear active call (helper for VideoChatScreen)
   void clearActiveCall() async {
-    await CallDebugLogger.log('[StreamVideoService] clearActiveCall prevActiveCall=${_activeCall?.id}');
     debugPrint('[VC] 📞 [StreamVideoService:clearActiveCall] Clearing active call');
     
     // End CallKit when clearing active call
     if (Platform.isIOS) {
-      await CallDebugLogger.log('[StreamVideoService] clearActiveCall iOS: ending CallKit');
       try {
         final before = await FlutterCallkitIncoming.activeCalls();
-        await CallDebugLogger.log('[StreamVideoService] clearActiveCall BEFORE endAllCalls: ${before.length} active calls');
         await FlutterCallkitIncoming.endAllCalls();
         final after = await FlutterCallkitIncoming.activeCalls();
-        await CallDebugLogger.log('[StreamVideoService] clearActiveCall AFTER endAllCalls: ${after.length} active calls');
         
         // If endAllCalls failed to clear, use native fallback
         if (after.isNotEmpty) {
-          await CallDebugLogger.log('[StreamVideoService] clearActiveCall FAILED to clear ${after.length} calls, using native forceEndAllCalls');
           const nativeChannel = MethodChannel('com.launchgo.app/callkit');
           try {
             await nativeChannel.invokeMethod('forceEndAllCalls');
-            await CallDebugLogger.log('[StreamVideoService] clearActiveCall native forceEndAllCalls OK');
             
             // Re-check
             final afterNative = await FlutterCallkitIncoming.activeCalls();
-            await CallDebugLogger.log('[StreamVideoService] clearActiveCall AFTER native forceEndAllCalls: ${afterNative.length} active calls');
           } catch (e) {
-            await CallDebugLogger.log('[StreamVideoService] clearActiveCall native forceEndAllCalls ERROR: $e');
           }
         }
       } catch (e) {
-        await CallDebugLogger.log('[StreamVideoService] clearActiveCall endAllCalls ERROR: $e');
       }
     }
     
@@ -580,7 +549,6 @@ class StreamVideoService extends ChangeNotifier {
   /// Reject an incoming call by ID (for CallKit decline action)
   /// This is used when user taps Decline on the notification
   Future<void> rejectIncomingCall(String callId) async {
-    await CallDebugLogger.log('[StreamVideoService] rejectIncomingCall ENTRY callId=$callId');
     debugPrint('[VC] 📞 =====================================================');
     debugPrint('[VC] 📞 [StreamVideoService:rejectIncomingCall] >> ENTRY');
     debugPrint('[VC] 📞 =====================================================');
@@ -589,14 +557,12 @@ class StreamVideoService extends ChangeNotifier {
     debugPrint('[VC] 📞 Is initialized flag: $_isInitialized');
 
     if (_client == null) {
-      await CallDebugLogger.log('[StreamVideoService] rejectIncomingCall ERROR: Client not initialized');
       debugPrint('[VC] ❌ [StreamVideoService:rejectIncomingCall] << EXIT: Client not initialized');
       return;
     }
 
     try {
       // Create call reference
-      await CallDebugLogger.log('[StreamVideoService] Creating call reference...');
       debugPrint('[VC] 📞 Creating call reference with StreamCallType.defaultType()...');
       final call = _client!.makeCall(
         callType: StreamCallType.defaultType(),
@@ -605,7 +571,6 @@ class StreamVideoService extends ChangeNotifier {
       debugPrint('[VC] 📞 Call reference created: ${call.callCid}');
 
       // Fetch the call to ensure it exists
-      await CallDebugLogger.log('[StreamVideoService] Calling getOrCreate()...');
       debugPrint('[VC] 📞 Calling getOrCreate()...');
       await call.getOrCreate();
       debugPrint('[VC] 📞 getOrCreate() completed');
@@ -613,10 +578,8 @@ class StreamVideoService extends ChangeNotifier {
       debugPrint('[VC] 📞 Call participants: ${call.state.value.callParticipants.length}');
 
       // Reject the call
-      await CallDebugLogger.log('[StreamVideoService] Calling call.reject()...');
       debugPrint('[VC] 📞 Calling call.reject()...');
       await call.reject();
-      await CallDebugLogger.log('[StreamVideoService] call.reject() completed');
       debugPrint('[VC] 📞 call.reject() completed');
 
       debugPrint('[VC] 📞 Call rejected successfully - caller should receive notification');
@@ -633,12 +596,10 @@ class StreamVideoService extends ChangeNotifier {
       _incomingCallerName = null;
       notifyListeners();
 
-      await CallDebugLogger.log('[StreamVideoService] rejectIncomingCall EXIT SUCCESS');
       debugPrint('[VC] 📞 =====================================================');
       debugPrint('[VC] 📞 [StreamVideoService:rejectIncomingCall] << EXIT: SUCCESS');
       debugPrint('[VC] 📞 =====================================================');
     } catch (e, stackTrace) {
-      await CallDebugLogger.log('[StreamVideoService] rejectIncomingCall ERROR: $e');
       debugPrint('[VC] ❌ =====================================================');
       debugPrint('[VC] ❌ [StreamVideoService:rejectIncomingCall] ERROR');
       debugPrint('[VC] ❌ =====================================================');
