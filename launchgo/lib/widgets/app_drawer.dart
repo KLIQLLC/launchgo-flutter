@@ -185,21 +185,20 @@ class _AppDrawerState extends State<AppDrawer> {
                 ],
                 
                 const SizedBox(height: 8),
-                // Settings with indent (only in debug mode)
-                if (kDebugMode)
-                  Padding(
-                    padding: const EdgeInsets.only(left: _itemIndentPadding),
-                    child: _buildDrawerItem(
-                      context: context,
-                      title: 'Settings',
-                      isSelected: currentRoute == '/settings',
-                      svgPath: 'assets/icons/ic_settings.svg',
-                      onTap: () {
-                        Navigator.pop(context); // Close drawer
-                        context.push('/settings');
-                      },
-                    ),
+                // Settings with indent (always visible for log access)
+                Padding(
+                  padding: const EdgeInsets.only(left: _itemIndentPadding),
+                  child: _buildDrawerItem(
+                    context: context,
+                    title: 'Settings',
+                    isSelected: currentRoute == '/settings',
+                    svgPath: 'assets/icons/ic_settings.svg',
+                    onTap: () {
+                      Navigator.pop(context); // Close drawer
+                      context.push('/settings');
+                    },
                   ),
+                ),
                 // Logout Button with indent
                 Padding(
                   padding: const EdgeInsets.only(left: _itemIndentPadding),

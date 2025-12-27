@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
+import 'package:launchgo/utils/call_debug_logger.dart';
 import 'package:provider/provider.dart';
 import 'package:stream_video_flutter/stream_video_flutter.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -82,7 +83,8 @@ abstract class BaseVideoChatScreenState<T extends BaseVideoChatScreen> extends S
   void setupCallStateListener() {
     debugPrint('[VC] 📞 [$runtimeType:setupCallStateListener] Setting up call state listener...');
 
-    callStateSubscription = call!.state.listen((state) {
+    callStateSubscription = call!.state.listen((state) async {
+      await CallDebugLogger.log('[$runtimeType] callState=${state.status} participants=${state.callParticipants.length} callId=${widget.callId}');
       debugPrint('[VC] 📞 [$runtimeType:callStateListener] ========== CALL STATE CHANGED ==========');
       debugPrint('[VC] 📞 [$runtimeType:callStateListener] Status: ${state.status}');
       debugPrint('[VC] 📞 [$runtimeType:callStateListener] Total participants: ${state.callParticipants.length}');
@@ -99,9 +101,11 @@ abstract class BaseVideoChatScreenState<T extends BaseVideoChatScreen> extends S
 
       // Auto-dismiss screen when call ends
       if (state.status is CallStatusDisconnected) {
+        await CallDebugLogger.log('[$runtimeType] CallStatusDisconnected detected, dismissing in 2s');
         debugPrint('[VC] 📞 [$runtimeType:callStateListener] Call status is DISCONNECTED, dismissing screen in 2s');
-        Future.delayed(const Duration(seconds: 2), () {
+        Future.delayed(const Duration(seconds: 2), () async {
           if (mounted && !isEnding) {
+            await CallDebugLogger.log('[$runtimeType] Navigating back after disconnect, clearing active call');
             debugPrint('[VC] 📞 [$runtimeType:callStateListener] Navigating back after disconnect');
             isEnding = true; // Prevent multiple navigation attempts
             videoService.clearActiveCall();
@@ -149,6 +153,7 @@ abstract class BaseVideoChatScreenState<T extends BaseVideoChatScreen> extends S
       return;
     }
 
+    await CallDebugLogger.log('[$runtimeType] endCall START callId=${widget.callId}');
     debugPrint('[VC] 📞 [$runtimeType:endCall] Ending call ${widget.callId}');
 
     setState(() {
@@ -158,10 +163,13 @@ abstract class BaseVideoChatScreenState<T extends BaseVideoChatScreen> extends S
     try {
       if (call != null) {
         await call!.leave();
+        await CallDebugLogger.log('[$runtimeType] call.leave() OK');
         debugPrint('[VC] 📞 [$runtimeType:endCall] Left call successfully');
       }
+      await CallDebugLogger.log('[$runtimeType] calling clearActiveCall()');
       videoService.clearActiveCall();
     } catch (e) {
+      await CallDebugLogger.log('[$runtimeType] endCall ERROR: $e');
       debugPrint('[VC] ❌ [$runtimeType:endCall] Error leaving call: $e');
     }
 
@@ -177,6 +185,7 @@ abstract class BaseVideoChatScreenState<T extends BaseVideoChatScreen> extends S
       }
     }
 
+    await CallDebugLogger.log('[$runtimeType] endCall COMPLETE, navigating back');
     navigateBack();
   }
 
