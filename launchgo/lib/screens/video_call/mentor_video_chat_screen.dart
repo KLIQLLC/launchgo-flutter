@@ -23,7 +23,7 @@ class MentorVideoChatScreen extends BaseVideoChatScreen {
 class _MentorVideoChatScreenState
     extends BaseVideoChatScreenState<MentorVideoChatScreen> {
   /// Timeout duration for unanswered calls (30 seconds)
-  static const _callTimeoutDuration = Duration(seconds: 30);
+  static const _callTimeoutDuration = Duration(seconds: 60);
 
   /// Timer for call timeout
   Timer? _callTimeoutTimer;
