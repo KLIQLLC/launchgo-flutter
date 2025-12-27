@@ -271,6 +271,9 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
   StreamSubscription? _channelSubscription;
   Timer? _statusRefreshTimer;
   bool isOnline = false;
+  
+  /// Prevents duplicate calls when mentor taps call button multiple times
+  bool _startingVideoCall = false;
 
   String displayName = '';
   String displayAvatar = '';
@@ -379,128 +382,135 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
   }
 
   Future<void> _initiateVideoCall(BuildContext context, AuthService authService) async {
-    debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] >> ENTRY: Mentor initiating video call');
-
-    // First, ensure video service is initialized BEFORE requesting permissions
-    // This ensures the service is ready even if permissions are denied
-    if (!context.mounted) return;
-    final videoService = context.read<StreamVideoService>();
-
-    // We don't proactively refresh based on token expiry (video token is long-lived).
-    // Only refresh user info if the token is missing.
-    var userInfo = authService.userInfo;
-    if (userInfo == null || userInfo.callGetStreamToken == null || userInfo.callGetStreamToken!.isEmpty) {
-      debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Video token missing, refreshing user info...');
-      try {
-        await authService.refreshUserInfo();
-        userInfo = authService.userInfo;
-        debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] User info refreshed, token available: ${userInfo?.callGetStreamToken != null && userInfo!.callGetStreamToken!.isNotEmpty}');
-      } catch (e) {
-        debugPrint('[VC] ❌ [CustomChatWidget:_initiateVideoCall] Failed to refresh user info: $e');
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to refresh session: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
-      }
+    // Prevent duplicate calls if mentor taps rapidly
+    if (_startingVideoCall) {
+      debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Already starting call, ignoring');
+      return;
     }
+    _startingVideoCall = true;
+    
+    try {
+      debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] >> ENTRY: Mentor initiating video call');
 
-    if (!context.mounted) return;
+      // First, ensure video service is initialized BEFORE requesting permissions
+      // This ensures the service is ready even if permissions are denied
+      if (!context.mounted) return;
+      final videoService = context.read<StreamVideoService>();
 
-    if (videoService.client == null) {
-      debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Video service not initialized, initializing now (before permissions)');
-      if (userInfo != null && userInfo.callGetStreamToken != null) {
+      // We don't proactively refresh based on token expiry (video token is long-lived).
+      // Only refresh user info if the token is missing.
+      var userInfo = authService.userInfo;
+      if (userInfo == null || userInfo.callGetStreamToken == null || userInfo.callGetStreamToken!.isEmpty) {
+        debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Video token missing, refreshing user info...');
         try {
-          await videoService.initialize(userInfo);
-          debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Video service initialized successfully');
+          await authService.refreshUserInfo();
+          userInfo = authService.userInfo;
+          debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] User info refreshed, token available: ${userInfo?.callGetStreamToken != null && userInfo!.callGetStreamToken!.isNotEmpty}');
         } catch (e) {
-          debugPrint('[VC] ❌ [CustomChatWidget:_initiateVideoCall] Failed to initialize video service: $e');
+          debugPrint('[VC] ❌ [CustomChatWidget:_initiateVideoCall] Failed to refresh user info: $e');
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Failed to initialize video service: $e'),
+                content: Text('Failed to refresh session: $e'),
                 backgroundColor: Colors.red,
               ),
             );
           }
           return;
         }
-      } else {
-        debugPrint('[VC] ❌ [CustomChatWidget:_initiateVideoCall] Cannot initialize: userInfo or token is null');
+      }
+
+      if (!context.mounted) return;
+
+      if (videoService.client == null) {
+        debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Video service not initialized, initializing now (before permissions)');
+        if (userInfo != null && userInfo.callGetStreamToken != null) {
+          try {
+            await videoService.initialize(userInfo);
+            debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Video service initialized successfully');
+          } catch (e) {
+            debugPrint('[VC] ❌ [CustomChatWidget:_initiateVideoCall] Failed to initialize video service: $e');
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Failed to initialize video service: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+            return;
+          }
+        } else {
+          debugPrint('[VC] ❌ [CustomChatWidget:_initiateVideoCall] Cannot initialize: userInfo or token is null');
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Video service not available. Please try again.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+      }
+
+      // Verify client is available after initialization
+      if (videoService.client == null) {
+        debugPrint('[VC] ❌ [CustomChatWidget:_initiateVideoCall] Video client is still null after initialization');
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Video service not available. Please try again.'),
+              content: Text('Video service not ready. Please try again.'),
               backgroundColor: Colors.red,
             ),
           );
         }
         return;
       }
-    }
 
-    // Verify client is available after initialization
-    if (videoService.client == null) {
-      debugPrint('[VC] ❌ [CustomChatWidget:_initiateVideoCall] Video client is still null after initialization');
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Video service not ready. Please try again.'),
-            backgroundColor: Colors.red,
-          ),
-        );
+      // Now request permissions (after service is initialized)
+      debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Requesting camera and microphone permissions');
+      final Map<Permission, PermissionStatus> statuses = await [
+        Permission.camera,
+        Permission.microphone,
+      ].request();
+
+      debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Permission results - Camera: ${statuses[Permission.camera]}, Microphone: ${statuses[Permission.microphone]}');
+
+      final allGranted = statuses.values.every((status) => status.isGranted);
+
+      if (!allGranted) {
+        debugPrint('[VC] ⚠️ [CustomChatWidget:_initiateVideoCall] Permissions not granted, showing settings dialog');
+        if (context.mounted) {
+          _showPermissionSettingsDialog(context);
+        }
+        return;
       }
-      return;
-    }
 
-    // Now request permissions (after service is initialized)
-    debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Requesting camera and microphone permissions');
-    final Map<Permission, PermissionStatus> statuses = await [
-      Permission.camera,
-      Permission.microphone,
-    ].request();
+      debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Permissions granted');
 
-    debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Permission results - Camera: ${statuses[Permission.camera]}, Microphone: ${statuses[Permission.microphone]}');
-
-    final allGranted = statuses.values.every((status) => status.isGranted);
-
-    if (!allGranted) {
-      debugPrint('[VC] ⚠️ [CustomChatWidget:_initiateVideoCall] Permissions not granted, showing settings dialog');
-      if (context.mounted) {
-        _showPermissionSettingsDialog(context);
+      final selectedStudent = authService.getSelectedStudent();
+      if (selectedStudent == null) {
+        debugPrint('[VC] ⚠️ [CustomChatWidget:_initiateVideoCall] No student selected');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No student selected'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
       }
-      return;
-    }
 
-    debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Permissions granted');
+      debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Selected student: ${selectedStudent.name} (${selectedStudent.id})');
 
-    final selectedStudent = authService.getSelectedStudent();
-    if (selectedStudent == null) {
-      debugPrint('[VC] ⚠️ [CustomChatWidget:_initiateVideoCall] No student selected');
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No student selected'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-      return;
-    }
+      if (!context.mounted) return;
 
-    debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Selected student: ${selectedStudent.name} (${selectedStudent.id})');
+      // Generate unique call ID with timestamp
+      final uniqueCallId = '${selectedStudent.id}_${DateTime.now().millisecondsSinceEpoch}';
+      debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Creating call with ID: $uniqueCallId');
 
-    if (!context.mounted) return;
-
-    // Generate unique call ID with timestamp
-    final uniqueCallId = '${selectedStudent.id}_${DateTime.now().millisecondsSinceEpoch}';
-    debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Creating call with ID: $uniqueCallId');
-
-    try {
       // Create call using the official pattern with ringing: true
       final client = videoService.client;
       if (client == null) {
@@ -586,6 +596,8 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
           ),
         );
       }
+    } finally {
+      _startingVideoCall = false;
     }
   }
 

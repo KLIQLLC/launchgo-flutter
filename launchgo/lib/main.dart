@@ -33,6 +33,27 @@ import 'package:stream_chat_flutter/stream_chat_flutter.dart';
 /// MethodChannel for receiving video call intents from Android native code
 const _videoCallChannel = MethodChannel('com.launchgo/video_call');
 
+/// iOS MethodChannel for force ending CallKit (uses reliable saveEndCall)
+const _iosCallKitChannel = MethodChannel('com.launchgo.app/callkit');
+
+/// Force end all CallKit calls on iOS using the reliable native method.
+/// This uses saveEndCall() which bypasses the plugin's internal call list check.
+/// Call this after FlutterCallkitIncoming.endAllCalls() as a fallback.
+Future<void> forceEndCallKitIOS() async {
+  if (!Platform.isIOS) return;
+  
+  try {
+    // First try the plugin's method
+    await FlutterCallkitIncoming.endAllCalls();
+    
+    // Then call native fallback which uses saveEndCall()
+    await _iosCallKitChannel.invokeMethod('forceEndAllCalls');
+    debugPrint('[iOS] forceEndCallKitIOS: completed');
+  } catch (e) {
+    debugPrint('[iOS] forceEndCallKitIOS error: $e');
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -1067,15 +1088,32 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
         debugPrint('[VC] 📞 [iOS] Checking validity for: $cid');
 
-        // If call was accepted (activeCall exists), it's valid
+        // Extract call ID from cid (format: "default:callId")
+        final requestedCallId = cid.split(':').length > 1 ? cid.split(':')[1] : cid;
+
+        // If call was accepted (activeCall exists), check if it's THE SAME call
         if (_streamVideoService.hasActiveCall) {
-          debugPrint('[VC] 📞 [iOS] Active call exists -> valid');
-          return true;
+          final activeCallId = _streamVideoService.activeCall?.id;
+          if (activeCallId == requestedCallId) {
+            debugPrint('[VC] 📞 [iOS] Active call matches requested cid -> valid');
+            return true;
+          } else {
+            // Different call is active - the requested call is no longer valid
+            debugPrint('[VC] 📞 [iOS] Active call ($activeCallId) != requested ($requestedCallId) -> invalid');
+            return false;
+          }
         }
 
-        // If incoming call exists, check with server
+        // If incoming call exists, check if it matches and check with server
         if (_streamVideoService.incomingCallId != null) {
-          debugPrint('[VC] 📞 [iOS] Incoming call exists, checking server...');
+          final incomingId = _streamVideoService.incomingCallId;
+          if (incomingId != requestedCallId) {
+            // Different incoming call - requested call is stale
+            debugPrint('[VC] 📞 [iOS] Incoming call ($incomingId) != requested ($requestedCallId) -> invalid');
+            return false;
+          }
+          
+          debugPrint('[VC] 📞 [iOS] Incoming call matches, checking server...');
           try {
             final isValid = await _checkCallStillValid(cid);
             debugPrint('[VC] 📞 [iOS] Server says: $isValid');
