@@ -16,6 +16,7 @@ import 'preferences_service.dart';
 import 'chat/stream_chat_service.dart';
 import 'push_notification_service.dart';
 import 'weekly_notification_service.dart';
+import 'video_call/voip_pushkit_service.dart';
 
 /// Service for managing user authentication with Google Sign-In and backend JWT tokens
 class AuthService extends ChangeNotifier {
@@ -240,6 +241,10 @@ class AuthService extends ChangeNotifier {
     _isSigningOut = true;
     
     try {
+      // Disable iOS PushKit ASAP on logout to stop VoIP pushes while logged out.
+      // (StreamVideoService.disconnect removes devices server-side; this blocks local delivery too.)
+      await VoipPushKitService.disable();
+
       // Unregister device before logout
       try {
         if (_apiService != null) {

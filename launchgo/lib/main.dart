@@ -21,6 +21,7 @@ import 'package:launchgo/services/notification_navigation_service.dart';
 import 'package:launchgo/services/weekly_notification_service.dart';
 import 'package:launchgo/services/video_call/stream_video_service.dart';
 import 'package:launchgo/services/video_call/video_call_push_handler.dart';
+import 'package:launchgo/services/video_call/voip_pushkit_service.dart';
 import 'package:stream_video_flutter/stream_video_flutter.dart';
 import 'package:launchgo/widgets/splash_screen.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
@@ -347,6 +348,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
         // Initialize Stream Video for video calls
         if (_authService.userInfo!.callGetStreamToken != null) {
+          // Ensure PushKit is enabled while authenticated (iOS).
+          // Persisted on native side so it stays enabled across restarts until logout.
+          await VoipPushKitService.enable();
+
           await _streamVideoService.initialize(_authService.userInfo!);
           debugPrint(
             '[VC] 📞 [MyApp:authListener] Stream Video initialized for user: ${_authService.userInfo!.id}',

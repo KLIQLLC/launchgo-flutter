@@ -17,6 +17,45 @@ import CallKit
   
   // Keep a strong reference to PushKit registry
   private let voipRegistry = PKPushRegistry(queue: DispatchQueue.main)
+  private var pushKitChannel: FlutterMethodChannel?
+  private var currentVoipToken: String?
+  private let voipEnabledKey = "voip_push_enabled"
+  
+  private func logToCallDebugFile(_ message: String) {
+    let timestamp = ISO8601DateFormatter().string(from: Date())
+    let line = "[\(timestamp)] [VOIP_NATIVE] \(message)\n"
+    
+    do {
+      let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+      let fileURL = docs.appendingPathComponent("call_debug.log")
+      if FileManager.default.fileExists(atPath: fileURL.path) == false {
+        FileManager.default.createFile(atPath: fileURL.path, contents: nil)
+      }
+      let handle = try FileHandle(forWritingTo: fileURL)
+      try handle.seekToEnd()
+      if let data = line.data(using: .utf8) {
+        try handle.write(contentsOf: data)
+      }
+      try handle.close()
+    } catch {
+      print("[AppDelegate] ⚠️ Failed to write call_debug.log: \(error)")
+    }
+  }
+  
+  private func enableVoipPushRegistration() {
+    UserDefaults.standard.set(true, forKey: voipEnabledKey)
+    voipRegistry.delegate = self
+    voipRegistry.desiredPushTypes = [.voIP]
+    logToCallDebugFile("enableVoipPushRegistration: desiredPushTypes=.voIP")
+    print("[AppDelegate] 📞 PushKit enabled")
+  }
+  
+  private func disableVoipPushRegistration() {
+    UserDefaults.standard.set(false, forKey: voipEnabledKey)
+    voipRegistry.desiredPushTypes = []
+    logToCallDebugFile("disableVoipPushRegistration: desiredPushTypes=[]")
+    print("[AppDelegate] 📞 PushKit disabled")
+  }
   
   override func application(
     _ application: UIApplication,
@@ -66,11 +105,38 @@ import CallKit
           result(FlutterMethodNotImplemented)
         }
       }
+      
+      // Channel for Dart to control PushKit registration
+      pushKitChannel = FlutterMethodChannel(
+        name: "com.launchgo.app/pushkit",
+        binaryMessenger: controller.binaryMessenger
+      )
+      
+      pushKitChannel?.setMethodCallHandler { [weak self] (call, result) in
+        switch call.method {
+        case "enableVoip":
+          self?.enableVoipPushRegistration()
+          result(true)
+        case "disableVoip":
+          self?.disableVoipPushRegistration()
+          result(true)
+        case "getVoipToken":
+          result(self?.currentVoipToken)
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
     }
 
-    // Register for VoIP push notifications - we handle them ourselves
-    voipRegistry.delegate = self
-    voipRegistry.desiredPushTypes = [.voIP]
+    // Register for VoIP push notifications only if enabled (persisted).
+    // Default is disabled until Flutter enables it after login.
+    let enabled = UserDefaults.standard.bool(forKey: voipEnabledKey)
+    logToCallDebugFile("didFinishLaunching: voip_enabled=\(enabled)")
+    if enabled {
+      enableVoipPushRegistration()
+    } else {
+      disableVoipPushRegistration()
+    }
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
@@ -147,12 +213,16 @@ extension AppDelegate: PKPushRegistryDelegate {
   func pushRegistry(_ registry: PKPushRegistry, didUpdate pushCredentials: PKPushCredentials, for type: PKPushType) {
     let token = pushCredentials.token.map { String(format: "%02x", $0) }.joined()
     print("[AppDelegate] 📞 VoIP token updated: \(token.prefix(16))…")
+    currentVoipToken = token
+    logToCallDebugFile("didUpdateVoipToken: \(token.prefix(16))…")
     // Forward token to Stream SDK
     StreamVideoPKDelegateManager.shared.pushRegistry(registry, didUpdate: pushCredentials, for: type)
   }
 
   func pushRegistry(_ registry: PKPushRegistry, didInvalidatePushTokenFor type: PKPushType) {
     print("[AppDelegate] 📞 VoIP token invalidated")
+    currentVoipToken = nil
+    logToCallDebugFile("didInvalidatePushToken")
     StreamVideoPKDelegateManager.shared.pushRegistry(registry, didInvalidatePushTokenFor: type)
   }
 
@@ -163,6 +233,7 @@ extension AppDelegate: PKPushRegistryDelegate {
     completion: @escaping () -> Void
   ) {
     print("[AppDelegate] 📞 VoIP push received")
+    logToCallDebugFile("didReceiveIncomingPush: payloadKeys=\(payload.dictionaryPayload.keys)")
 
     // NOTE:
     // Do NOT call into Flutter here (app may be terminated / Flutter not running in TestFlight),
@@ -182,6 +253,7 @@ extension AppDelegate: PKPushRegistryDelegate {
       pushType = stream["type"] as? String
       callerName = stream["created_by_display_name"] as? String ?? "Incoming Call"
       print("[AppDelegate] 📞 Push type=\(pushType ?? "nil") call_cid=\(streamCallCid ?? "nil") caller=\(callerName)")
+      logToCallDebugFile("push: type=\(pushType ?? "nil") call_cid=\(streamCallCid ?? "nil") caller=\(callerName)")
     }
 
     // Handle call cancellation pushes
