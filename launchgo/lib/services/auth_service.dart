@@ -1,3 +1,4 @@
+// services/auth_service.dart
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -15,6 +16,7 @@ import 'preferences_service.dart';
 import 'chat/stream_chat_service.dart';
 import 'push_notification_service.dart';
 import 'weekly_notification_service.dart';
+import '../utils/call_debug_logger.dart';
 
 /// Service for managing user authentication with Google Sign-In and backend JWT tokens
 class AuthService extends ChangeNotifier {
@@ -25,6 +27,7 @@ class AuthService extends ChangeNotifier {
   bool _isInitialized = false;
   bool _isInitializing = false;
   bool _isSigningIn = false;
+  bool _isSigningOut = false;
   Completer<void>? _signInCompleter;
   ApiServiceRetrofit? _apiService;
   StreamChatService? _streamChatService;
@@ -36,6 +39,7 @@ class AuthService extends ChangeNotifier {
   String? get selectedStudentId => _selectedStudentId;
   bool get isInitialized => _isInitialized;
   bool get isSigningIn => _isSigningIn;
+  bool get isSigningOut => _isSigningOut;
   bool get isAuthenticated => _accessToken != null && !(_accessToken != null ? JwtDecoder.isExpired(_accessToken!) : true);
   bool get hasAccessToken => _accessToken != null;
   
@@ -234,6 +238,15 @@ class AuthService extends ChangeNotifier {
 
   /// Sign out
   Future<void> signOut({StreamChatService? streamChatService}) async {
+    CallDebugLogger.log('🔴 [AUTH] ========== signOut START ==========');
+    CallDebugLogger.log('🔴 [AUTH] _isSigningOut BEFORE: $_isSigningOut');
+    CallDebugLogger.log('🔴 [AUTH] _accessToken present: ${_accessToken != null}');
+    CallDebugLogger.log('🔴 [AUTH] _userInfo present: ${_userInfo != null}');
+    CallDebugLogger.log('🔴 [AUTH] isAuthenticated: $isAuthenticated');
+    
+    _isSigningOut = true;
+    CallDebugLogger.log('🔴 [AUTH] _isSigningOut SET TO TRUE');
+    
     try {
       // Unregister device before logout
       try {
@@ -268,6 +281,8 @@ class AuthService extends ChangeNotifier {
       _userInfo = null;
       _selectedStudentId = null;
       
+      CallDebugLogger.log('🔴 [AUTH] Cleared: _accessToken, _userInfo, _currentUser, _selectedStudentId');
+      
       // Clear secure storage and user preferences
       await SecureStorageService.clearAllAuthData();
       await PreferencesService.clearAllPreferences();
@@ -281,9 +296,15 @@ class AuthService extends ChangeNotifier {
         // Don't fail logout if notification cancellation fails
       }
       
+      CallDebugLogger.log('🔴 [AUTH] About to call notifyListeners()');
       notifyListeners();
+      CallDebugLogger.log('🔴 [AUTH] notifyListeners() completed');
     } catch (error) {
-      // Handle sign out error
+      CallDebugLogger.log('❌ [AUTH] signOut error: $error');
+    } finally {
+      _isSigningOut = false;
+      CallDebugLogger.log('🔴 [AUTH] _isSigningOut RESET TO FALSE');
+      CallDebugLogger.log('🔴 [AUTH] ========== signOut END ==========');
     }
   }
 

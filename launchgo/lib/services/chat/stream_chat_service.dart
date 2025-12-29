@@ -4,6 +4,7 @@ import 'package:stream_chat_flutter/stream_chat_flutter.dart';
 import 'package:app_badge_plus/app_badge_plus.dart';
 import '../push_notification_service.dart';
 import '../../config/environment.dart';
+import '../../utils/call_debug_logger.dart';
 
 class StreamChatService extends ChangeNotifier {
   static String get _apiKey => EnvironmentConfig.streamChatApiKey;
@@ -12,6 +13,9 @@ class StreamChatService extends ChangeNotifier {
   late final StreamChatClient _client;
   bool _isInitialized = false;
   bool _isUserConnected = false;
+  Future<void>? _connectInFlight;
+  String? _connectInFlightUserId;
+  bool _isRegisteringPush = false;
   
   StreamChatClient get client => _client;
   bool get isInitialized => _isInitialized;
@@ -54,13 +58,48 @@ class StreamChatService extends ChangeNotifier {
     required String userName,
     String? userImage,
     bool setOnline = true,  // Kept for backward compatibility but not used
+    String caller = 'unknown',  // Debug: who called this method
   }) async {
+    CallDebugLogger.log('🔵 [CHAT] ========== connectUser START ==========');
+    CallDebugLogger.log('🔵 [CHAT] caller: $caller');
+    CallDebugLogger.log('🔵 [CHAT] userId: $userId');
+    CallDebugLogger.log('🔵 [CHAT] _isUserConnected: $_isUserConnected');
+    CallDebugLogger.log('🔵 [CHAT] currentUser?.id: ${_client.state.currentUser?.id}');
+    CallDebugLogger.log('🔵 [CHAT] _connectInFlightUserId: $_connectInFlightUserId');
+    
+    // Serialize connect attempts (auth listener can fire many times during login)
+    if (_connectInFlight != null) {
+      CallDebugLogger.log(
+        '🟡 [CHAT] connectUser: connect already in progress for $_connectInFlightUserId; awaiting (caller: $caller)',
+      );
+      try {
+        await _connectInFlight;
+      } catch (_) {}
+      final nowConnected = _client.state.currentUser?.id == userId;
+      _isUserConnected = nowConnected;
+      notifyListeners();
+      CallDebugLogger.log(
+        '🟡 [CHAT] connectUser: returned after awaiting in-flight connect; nowConnected=$nowConnected (caller: $caller)',
+      );
+      CallDebugLogger.log('🔵 [CHAT] ========== connectUser END (awaited in-flight) ==========');
+      return;
+    }
+    
+    final connectCompleter = Completer<void>();
+    _connectInFlight = connectCompleter.future;
+    _connectInFlightUserId = userId;
+    
     try {
       // Check if already connected with the same user
       if (_client.state.currentUser?.id == userId) {
-        debugPrint('🟢 Stream Chat: User already connected');
+        CallDebugLogger.log('🟢 Stream Chat: User already connected (caller: $caller)');
+        // Keep state consistent even if another code path connected first.
+        _isUserConnected = true;
+        notifyListeners();
         // Still register FCM token in case it changed
         await _registerPushToken();
+        _setupBadgeListener();
+        CallDebugLogger.log('🔵 [CHAT] ========== connectUser END (already connected) ==========');
         return;
       }
       
@@ -81,7 +120,7 @@ class StreamChatService extends ChangeNotifier {
         token,
       );
       
-      debugPrint('🟢 Stream Chat: User connected successfully - $userId (automatically online)');
+      CallDebugLogger.log('🟢 Stream Chat: User connected successfully - $userId (automatically online) [caller: $caller]');
       
       // Register FCM token for push notifications
       await _registerPushToken();
@@ -91,74 +130,169 @@ class StreamChatService extends ChangeNotifier {
       
       _isUserConnected = true;
       notifyListeners();
+      CallDebugLogger.log('🔵 [CHAT] ========== connectUser END (success) ==========');
     } catch (e) {
-      debugPrint('❌ Stream Chat: Error connecting user - $e');
+      CallDebugLogger.log('❌ Stream Chat: Error connecting user (caller: $caller) - $e');
+      CallDebugLogger.log('🔵 [CHAT] ========== connectUser END (error) ==========');
       rethrow;
+    } finally {
+      if (!connectCompleter.isCompleted) {
+        connectCompleter.complete();
+      }
+      _connectInFlight = null;
+      _connectInFlightUserId = null;
     }
   }
   
   /// Register FCM token with Stream Chat for push notifications
   Future<void> _registerPushToken() async {
+    if (_isRegisteringPush) {
+      CallDebugLogger.log('🟡 [CHAT] _registerPushToken: already running, skipping');
+      return;
+    }
+    _isRegisteringPush = true;
+    CallDebugLogger.log('🟢 [CHAT] ========== _registerPushToken START ==========');
     try {
       final pushNotificationService = PushNotificationService.instance;
       
       // If notification service isn't initialized yet, wait for it
       if (!pushNotificationService.isInitialized) {
-        debugPrint('🔔 Stream Chat: Waiting for notification service to initialize...');
+        CallDebugLogger.log('🔔 Stream Chat: Waiting for notification service to initialize...');
         await pushNotificationService.initialize();
       }
       
-      if (pushNotificationService.fcmToken != null) {
-        debugPrint('🔔 Stream Chat: Registering FCM token: ${pushNotificationService.fcmToken!.substring(0, 20)}...');
-        await _client.addDevice(pushNotificationService.fcmToken!, PushProvider.firebase, 
-          pushProviderName: 'firebase');
-        debugPrint('✅ Stream Chat: FCM token registered successfully for push notifications');
+      final fcmToken = pushNotificationService.fcmToken;
+      CallDebugLogger.log('🟢 [CHAT] FCM token to register: ${fcmToken?.substring(0, 20) ?? "null"}...');
+      
+      if (fcmToken != null) {
+        // List devices before registration
+        try {
+          final devicesBefore = await _client.getDevices();
+          CallDebugLogger.log('🟢 [CHAT] Devices BEFORE registration: ${devicesBefore.devices.length}');
+          for (final device in devicesBefore.devices) {
+            CallDebugLogger.log('🟢 [CHAT]   - ${device.id.substring(0, 20)}... (${device.pushProvider})');
+          }
+        } catch (e) {
+          CallDebugLogger.log('🟢 [CHAT] Could not list devices before: $e');
+        }
         
-        // Verify registration by listing devices
-        final devicesResponse = await _client.getDevices();
-        debugPrint('📱 Stream Chat: Registered devices count: ${devicesResponse.devices.length}');
-        for (final device in devicesResponse.devices) {
-          debugPrint('📱 Device: ${device.id} - ${device.pushProvider}');
+        await _client.addDevice(fcmToken, PushProvider.firebase, pushProviderName: 'firebase');
+        CallDebugLogger.log('✅ [CHAT] FCM token REGISTERED with Stream Chat');
+        
+        // Verify registration by listing devices after
+        try {
+          final devicesAfter = await _client.getDevices();
+          CallDebugLogger.log('🟢 [CHAT] Devices AFTER registration: ${devicesAfter.devices.length}');
+          for (final device in devicesAfter.devices) {
+            CallDebugLogger.log('🟢 [CHAT]   - ${device.id.substring(0, 20)}... (${device.pushProvider})');
+          }
+        } catch (e) {
+          CallDebugLogger.log('🟢 [CHAT] Could not list devices after: $e');
         }
       } else {
-        debugPrint('⚠️ Stream Chat: No FCM token available for registration');
-        debugPrint('⚠️ NotificationService initialized: ${pushNotificationService.isInitialized}');
+        CallDebugLogger.log('⚠️ [CHAT] No FCM token available for registration');
+        CallDebugLogger.log('⚠️ [CHAT] NotificationService initialized: ${pushNotificationService.isInitialized}');
         
-        // Retry after a short delay
-        Future.delayed(const Duration(seconds: 2), () async {
-          if (pushNotificationService.fcmToken != null) {
-            await _client.addDevice(pushNotificationService.fcmToken!, PushProvider.firebase, 
-          pushProviderName: 'firebase');
-            debugPrint('✅ Stream Chat: FCM token registered successfully on retry');
-          } else {
-            debugPrint('❌ Stream Chat: FCM token still not available after retry');
-          }
+        // Retry after a short delay (token may arrive after login)
+        Future.delayed(const Duration(seconds: 2), () {
+          _registerPushToken();
         });
       }
+      CallDebugLogger.log('🟢 [CHAT] ========== _registerPushToken END ==========');
     } catch (e) {
-      debugPrint('❌ Stream Chat: Error registering FCM token - $e');
+      CallDebugLogger.log('❌ [CHAT] Error registering FCM token: $e');
+    } finally {
+      _isRegisteringPush = false;
     }
   }
 
-  Future<void> disconnectUser() async {
+  Future<void> disconnectUser({bool unregisterPush = true}) async {
+    CallDebugLogger.log('🔴 [CHAT] ========== disconnectUser START ==========');
+    CallDebugLogger.log('🔴 [CHAT] _isUserConnected: $_isUserConnected');
+    CallDebugLogger.log('🔴 [CHAT] currentUser?.id: ${_client.state.currentUser?.id}');
+    CallDebugLogger.log('🔴 [CHAT] unregisterPush: $unregisterPush');
+    
     try {
+      // If a connect is in-flight, wait for it to finish to avoid racing connect/disconnect.
+      if (_connectInFlight != null) {
+        CallDebugLogger.log(
+          '🟡 [CHAT] disconnectUser: waiting for in-flight connect ($_connectInFlightUserId) to finish',
+        );
+        try {
+          await _connectInFlight;
+        } catch (_) {}
+      }
+      
       // Check if client is connected before attempting to disconnect
       if (_client.state.currentUser != null) {
+        // CRITICAL: Unregister device from push notifications BEFORE disconnecting
+        if (unregisterPush) {
+          await _unregisterPushToken();
+        }
+        
         await _client.disconnectUser();
-        debugPrint('🟡 Stream Chat: User disconnected');
+        CallDebugLogger.log('🟡 Stream Chat: User disconnected');
       } else {
-        debugPrint('🟡 Stream Chat: No user to disconnect');
+        CallDebugLogger.log('🟡 Stream Chat: No user to disconnect');
       }
       _isUserConnected = false;
+      CallDebugLogger.log('🔴 [CHAT] _isUserConnected set to false');
       notifyListeners();
+      CallDebugLogger.log('🔴 [CHAT] ========== disconnectUser END (success) ==========');
     } catch (e) {
       // Handle WebSocket close code errors gracefully
       if (e.toString().contains('close code must be 1000 or in the range 3000-4999')) {
-        debugPrint('🟡 Stream Chat: WebSocket close code error (handled gracefully)');
+        CallDebugLogger.log('🟡 Stream Chat: WebSocket close code error (handled gracefully)');
       } else {
-        debugPrint('❌ Stream Chat: Error disconnecting user - $e');
+        CallDebugLogger.log('❌ Stream Chat: Error disconnecting user - $e');
       }
+      _isUserConnected = false;
       notifyListeners();
+      CallDebugLogger.log('🔴 [CHAT] ========== disconnectUser END (error handled) ==========');
+    }
+  }
+  
+  /// Unregister FCM token from Stream Chat to stop push notifications
+  Future<void> _unregisterPushToken() async {
+    CallDebugLogger.log('🔴 [CHAT] ========== _unregisterPushToken START ==========');
+    try {
+      final pushNotificationService = PushNotificationService.instance;
+      final fcmToken = pushNotificationService.fcmToken;
+      
+      CallDebugLogger.log('🔴 [CHAT] FCM token to remove: ${fcmToken?.substring(0, 20) ?? "null"}...');
+      
+      if (fcmToken != null) {
+        // List current devices before removal
+        try {
+          final devicesBefore = await _client.getDevices();
+          CallDebugLogger.log('🔴 [CHAT] Devices BEFORE removal: ${devicesBefore.devices.length}');
+          for (final device in devicesBefore.devices) {
+            CallDebugLogger.log('🔴 [CHAT]   - ${device.id.substring(0, 20)}... (${device.pushProvider})');
+          }
+        } catch (e) {
+          CallDebugLogger.log('🔴 [CHAT] Could not list devices: $e');
+        }
+        
+        // Remove the device
+        await _client.removeDevice(fcmToken);
+        CallDebugLogger.log('✅ [CHAT] FCM token REMOVED from Stream Chat');
+        
+        // List devices after removal to verify
+        try {
+          final devicesAfter = await _client.getDevices();
+          CallDebugLogger.log('🔴 [CHAT] Devices AFTER removal: ${devicesAfter.devices.length}');
+          for (final device in devicesAfter.devices) {
+            CallDebugLogger.log('🔴 [CHAT]   - ${device.id.substring(0, 20)}... (${device.pushProvider})');
+          }
+        } catch (e) {
+          CallDebugLogger.log('🔴 [CHAT] Could not list devices after: $e');
+        }
+      } else {
+        CallDebugLogger.log('⚠️ [CHAT] No FCM token to remove');
+      }
+      CallDebugLogger.log('🔴 [CHAT] ========== _unregisterPushToken END ==========');
+    } catch (e) {
+      CallDebugLogger.log('❌ [CHAT] Error unregistering push token: $e');
     }
   }
   
@@ -392,21 +526,32 @@ class StreamChatService extends ChangeNotifier {
     required String? token,
     required String? userName,
     String? userImage,
+    String caller = 'unknown',  // Debug: who called this method
   }) async {
+    CallDebugLogger.log('🔵 [CHAT] ========== autoConnectUser START ==========');
+    CallDebugLogger.log('🔵 [CHAT] caller: $caller');
+    CallDebugLogger.log('🔵 [CHAT] userId: $userId');
+    CallDebugLogger.log('🔵 [CHAT] token present: ${token != null}');
+    CallDebugLogger.log('🔵 [CHAT] userName: $userName');
+    CallDebugLogger.log('🔵 [CHAT] _isUserConnected: $_isUserConnected');
+    CallDebugLogger.log('🔵 [CHAT] currentUser?.id: ${_client.state.currentUser?.id}');
+    
     // Only connect if we have all required info and not already connected
     if (userId != null && 
         token != null && 
         userName != null && 
         !_isUserConnected &&
         _client.state.currentUser?.id != userId) {
+      CallDebugLogger.log('🔵 [CHAT] All conditions met, calling connectUser...');
       try {
         await connectUser(
           userId: userId,
           token: token,
           userName: userName,
           userImage: userImage,
+          caller: 'autoConnectUser($caller)',
         );
-        debugPrint('🟢 Stream Chat: Auto-connected user for unread badge (online presence enabled)');
+        CallDebugLogger.log('🟢 Stream Chat: Auto-connected user for unread badge (online presence enabled) [caller: $caller]');
         
         // Query and watch user's channels so they appear online to others
         try {
@@ -429,9 +574,19 @@ class StreamChatService extends ChangeNotifier {
         } catch (e) {
           debugPrint('⚠️ Stream Chat: Could not watch channels for presence: $e');
         }
+        CallDebugLogger.log('🔵 [CHAT] ========== autoConnectUser END (success) ==========');
       } catch (e) {
-        debugPrint('⚠️ Stream Chat: Auto-connect failed (will retry when chat opens): $e');
+        CallDebugLogger.log('⚠️ Stream Chat: Auto-connect failed (will retry when chat opens) [caller: $caller]: $e');
+        CallDebugLogger.log('🔵 [CHAT] ========== autoConnectUser END (error) ==========');
       }
+    } else {
+      CallDebugLogger.log('🔵 [CHAT] Conditions NOT met, skipping connect:');
+      CallDebugLogger.log('🔵 [CHAT]   userId != null: ${userId != null}');
+      CallDebugLogger.log('🔵 [CHAT]   token != null: ${token != null}');
+      CallDebugLogger.log('🔵 [CHAT]   userName != null: ${userName != null}');
+      CallDebugLogger.log('🔵 [CHAT]   !_isUserConnected: ${!_isUserConnected}');
+      CallDebugLogger.log('🔵 [CHAT]   currentUser?.id != userId: ${_client.state.currentUser?.id != userId}');
+      CallDebugLogger.log('🔵 [CHAT] ========== autoConnectUser END (skipped) ==========');
     }
   }
 

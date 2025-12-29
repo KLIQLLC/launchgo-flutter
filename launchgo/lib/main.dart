@@ -29,6 +29,7 @@ import 'package:launchgo/features/recaps/presentation/bloc/recap_bloc.dart';
 import 'package:launchgo/features/recaps/data/recap_repository.dart';
 import 'package:provider/provider.dart';
 import 'package:stream_chat_flutter/stream_chat_flutter.dart';
+import 'package:launchgo/utils/call_debug_logger.dart';
 
 /// MethodChannel for receiving video call intents from Android native code
 const _videoCallChannel = MethodChannel('com.launchgo/video_call');
@@ -327,15 +328,31 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // Auto-connect Stream Chat for unread badge when user is authenticated
     // Only for students - mentors connect when they select a student
     _authService.addListener(() async {
+      CallDebugLogger.log('🔔 [MAIN] authService.addListener triggered');
+      CallDebugLogger.log('🔔 [MAIN]   userInfo present: ${_authService.userInfo != null}');
+      CallDebugLogger.log('🔔 [MAIN]   isAuthenticated: ${_authService.isAuthenticated}');
+      CallDebugLogger.log('🔔 [MAIN]   isSigningOut: ${_authService.isSigningOut}');
+      CallDebugLogger.log('🔔 [MAIN]   chatToken present: ${_authService.userInfo?.chatGetStreamToken != null}');
+      CallDebugLogger.log('🔔 [MAIN]   isStudent: ${_authService.userInfo?.isStudent}');
+      
+      // CRITICAL: Skip if signing out
+      if (_authService.isSigningOut) {
+        CallDebugLogger.log('🔔 [MAIN] ⛔ SKIPPING - isSigningOut=true');
+        return;
+      }
+      
       if (_authService.userInfo != null &&
-          _authService.userInfo!.chatGetStreamToken != null) {
+          _authService.userInfo!.chatGetStreamToken != null &&
+          _authService.isAuthenticated) {
         // Only auto-connect students - mentors connect selectively
         if (_authService.userInfo!.isStudent) {
+          CallDebugLogger.log('🔔 [MAIN] ✅ Calling autoConnectUser from authListener');
           await _streamChatService.autoConnectUser(
             userId: _authService.userInfo!.id,
             token: _authService.userInfo!.chatGetStreamToken,
             userName: _authService.userInfo!.name,
             userImage: _authService.userInfo!.avatarUrl,
+            caller: 'authListener',
           );
         }
 
@@ -453,15 +470,26 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     });
 
     // Try to connect immediately if already authenticated (students only)
+    CallDebugLogger.log('🔔 [MAIN] Initial connect check:');
+    CallDebugLogger.log('🔔 [MAIN]   userInfo present: ${_authService.userInfo != null}');
+    CallDebugLogger.log('🔔 [MAIN]   isAuthenticated: ${_authService.isAuthenticated}');
+    CallDebugLogger.log('🔔 [MAIN]   isSigningOut: ${_authService.isSigningOut}');
+    
     if (_authService.userInfo != null &&
         _authService.userInfo!.chatGetStreamToken != null &&
-        _authService.userInfo!.isStudent) {
+        _authService.userInfo!.isStudent &&
+        _authService.isAuthenticated &&
+        !_authService.isSigningOut) {
+      CallDebugLogger.log('🔔 [MAIN] ✅ Calling autoConnectUser from initState (initial)');
       _streamChatService.autoConnectUser(
         userId: _authService.userInfo!.id,
         token: _authService.userInfo!.chatGetStreamToken,
         userName: _authService.userInfo!.name,
         userImage: _authService.userInfo!.avatarUrl,
+        caller: 'initState-initial',
       );
+    } else {
+      CallDebugLogger.log('🔔 [MAIN] ⛔ Initial connect skipped');
     }
 
     // Initialize Stream Video immediately if already authenticated
@@ -1185,28 +1213,39 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // Stream Chat automatically manages presence based on WebSocket connection
     // When app resumes, ensure connection is active for presence
     if (state == AppLifecycleState.resumed) {
+      CallDebugLogger.log('🔔 [MAIN] App resumed - checking autoConnect conditions');
+      CallDebugLogger.log('🔔 [MAIN]   userInfo present: ${_authService.userInfo != null}');
+      CallDebugLogger.log('🔔 [MAIN]   isAuthenticated: ${_authService.isAuthenticated}');
+      CallDebugLogger.log('🔔 [MAIN]   isSigningOut: ${_authService.isSigningOut}');
+      
       // If secure storage was temporarily unavailable during a lock-screen wakeup,
       // retry restoring auth now that the device is unlocked/foregrounded.
       if (!_authService.isAuthenticated) {
         Future.microtask(() => _authService.refreshFromStorageIfPossible());
       }
 
-      if (_authService.userInfo != null &&
-          _authService.userInfo!.chatGetStreamToken != null) {
+      // CRITICAL: Skip if signing out
+      if (_authService.isSigningOut) {
+        CallDebugLogger.log('🔔 [MAIN] ⛔ App resumed but isSigningOut=true, skipping autoConnect');
+      } else if (_authService.userInfo != null &&
+          _authService.userInfo!.chatGetStreamToken != null &&
+          _authService.isAuthenticated) {
         // Only auto-reconnect students - mentors will reconnect when they select students
         if (_authService.userInfo!.isStudent) {
+          CallDebugLogger.log('🔔 [MAIN] ✅ Calling autoConnectUser from appResumed');
           _streamChatService.autoConnectUser(
             userId: _authService.userInfo!.id,
             token: _authService.userInfo!.chatGetStreamToken,
             userName: _authService.userInfo!.name,
             userImage: _authService.userInfo!.avatarUrl,
+            caller: 'appResumed',
           );
-          debugPrint('🟢 App resumed - Student reconnected to Stream Chat');
+          CallDebugLogger.log('🟢 App resumed - Student reconnected to Stream Chat');
         } else {
-          debugPrint(
-            '🟡 App resumed - Mentor will connect when selecting student',
-          );
+          CallDebugLogger.log('🟡 App resumed - Mentor will connect when selecting student');
         }
+      } else {
+        CallDebugLogger.log('🔔 [MAIN] ⛔ App resumed but conditions not met for autoConnect');
       }
 
       // Only fetch notifications if user is authenticated
