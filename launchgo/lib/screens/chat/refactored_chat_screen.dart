@@ -37,9 +37,7 @@ class _RefactoredChatScreenState extends State<RefactoredChatScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
-      debugPrint('🟡 [CHAT] App going to background');
     } else if (state == AppLifecycleState.resumed) {
-      debugPrint('🟢 [CHAT] App resumed');
     }
   }
 
@@ -47,12 +45,10 @@ class _RefactoredChatScreenState extends State<RefactoredChatScreen>
     try {
       final streamChatService = context.read<StreamChatService>();
       _channelManager = ChatChannelManager(streamChatService);
-      debugPrint('✅ [CHAT] Channel manager initialized');
     } catch (e) {
       setState(() {
         _errorMessage = 'Failed to initialize chat: $e';
       });
-      debugPrint('❌ [CHAT] Failed to initialize channel manager: $e');
     }
   }
 
