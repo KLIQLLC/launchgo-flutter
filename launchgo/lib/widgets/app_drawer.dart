@@ -292,6 +292,32 @@ class _AppDrawerState extends State<AppDrawer> {
     final shouldLogout = await _showLogoutConfirmationDialog(context);
     
     if (shouldLogout == true && context.mounted) {
+      // Show blocking loader until logout completes
+      BuildContext? loaderDialogContext;
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        useRootNavigator: true,
+        builder: (ctx) {
+          loaderDialogContext = ctx;
+          return const PopScope(
+            canPop: false,
+            child: Center(
+              child: Card(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(strokeWidth: 3),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+
       // Get StreamChatService if available
       StreamChatService? streamChatService;
       try {
@@ -316,7 +342,15 @@ class _AppDrawerState extends State<AppDrawer> {
         }
       }
 
-      await authService.signOut(streamChatService: streamChatService);
+      try {
+        await authService.signOut(streamChatService: streamChatService);
+      } finally {
+        // Always dismiss loader if it's still shown
+        if (loaderDialogContext != null && loaderDialogContext!.mounted) {
+          Navigator.of(loaderDialogContext!, rootNavigator: true).pop();
+        }
+      }
+
       if (context.mounted) {
         context.go('/login');
       }
