@@ -13,10 +13,17 @@ import CallKit
   private var activeCallCid: String?
   private var methodChannel: FlutterMethodChannel?
   private var callKitChannel: FlutterMethodChannel?  // Channel for Dart to force end CallKit
+  private var pushKitChannel: FlutterMethodChannel?  // Channel for VoIP push control
   private let callObserver = CXCallObserver() // For observing CallKit state
   
   // Keep a strong reference to PushKit registry
   private let voipRegistry = PKPushRegistry(queue: DispatchQueue.main)
+  
+  // Track current VoIP token
+  private var currentVoipToken: String?
+  
+  // Track if VoIP is enabled (can be disabled on logout)
+  private var voipEnabled: Bool = true
   
   override func application(
     _ application: UIApplication,
@@ -62,6 +69,30 @@ import CallKit
         case "forceEndAllCalls":
           self?.forceEndAllCallKitCalls()
           result(nil)
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
+      
+      // Channel for VoIP push control (enable/disable/getToken)
+      pushKitChannel = FlutterMethodChannel(
+        name: "com.launchgo.app/pushkit",
+        binaryMessenger: controller.binaryMessenger
+      )
+      
+      pushKitChannel?.setMethodCallHandler { [weak self] (call, result) in
+        switch call.method {
+        case "enableVoip":
+          print("[AppDelegate] 📞 enableVoip called")
+          self?.voipEnabled = true
+          result(nil)
+        case "disableVoip":
+          print("[AppDelegate] 📞 disableVoip called")
+          self?.voipEnabled = false
+          result(nil)
+        case "getVoipToken":
+          print("[AppDelegate] 📞 getVoipToken called, token=\(self?.currentVoipToken?.prefix(16) ?? "nil")")
+          result(self?.currentVoipToken)
         default:
           result(FlutterMethodNotImplemented)
         }
@@ -147,6 +178,8 @@ extension AppDelegate: PKPushRegistryDelegate {
   func pushRegistry(_ registry: PKPushRegistry, didUpdate pushCredentials: PKPushCredentials, for type: PKPushType) {
     let token = pushCredentials.token.map { String(format: "%02x", $0) }.joined()
     print("[AppDelegate] 📞 VoIP token updated: \(token.prefix(16))…")
+    // Store token for Dart to retrieve
+    currentVoipToken = token
     // Forward token to Stream SDK
     StreamVideoPKDelegateManager.shared.pushRegistry(registry, didUpdate: pushCredentials, for: type)
   }
@@ -162,7 +195,14 @@ extension AppDelegate: PKPushRegistryDelegate {
     for type: PKPushType,
     completion: @escaping () -> Void
   ) {
-    print("[AppDelegate] 📞 VoIP push received")
+    print("[AppDelegate] 📞 VoIP push received, voipEnabled=\(voipEnabled)")
+
+    // If VoIP is disabled (user logged out), ignore the push but still call completion
+    if !voipEnabled {
+      print("[AppDelegate] 📞 VoIP disabled (logged out), ignoring push")
+      completion()
+      return
+    }
 
     // Extract Stream call info from payload
     var streamCallCid: String? = nil

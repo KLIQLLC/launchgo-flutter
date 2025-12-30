@@ -242,7 +242,6 @@ class AuthService extends ChangeNotifier {
     
     try {
       // Disable iOS PushKit ASAP on logout to stop VoIP pushes while logged out.
-      // (StreamVideoService.disconnect removes devices server-side; this blocks local delivery too.)
       await VoipPushKitService.disable();
 
       // Unregister device before logout
@@ -252,11 +251,9 @@ class AuthService extends ChangeNotifier {
         }
       } catch (e) {
         debugPrint('❌ [AUTH] Error unregistering device during logout: $e');
-        // Don't fail logout if device unregistration fails
       }
       
       // Always try to disconnect from Stream Chat during logout
-      // Try with provided service first, then try to get it from static instance
       StreamChatService? chatService = streamChatService ?? StreamChatService.instance;
       
       if (chatService != null) {
@@ -280,10 +277,8 @@ class AuthService extends ChangeNotifier {
       // Cancel weekly notifications
       try {
         await WeeklyNotificationService.instance.cancelWeeklyRecapNotification();
-        debugPrint('✅ [AUTH] Weekly notifications cancelled during logout');
       } catch (e) {
         debugPrint('❌ [AUTH] Error cancelling weekly notifications: $e');
-        // Don't fail logout if notification cancellation fails
       }
       
       notifyListeners();
