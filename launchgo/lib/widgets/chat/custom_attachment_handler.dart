@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:stream_chat_flutter/stream_chat_flutter.dart';
@@ -46,11 +47,9 @@ class CustomAttachmentHandler {
   }
 
   // Permission handling methods
-  static Future<bool> _requestCameraPermission() async {
-    final cameraStatus = await Permission.camera.request();
-    return cameraStatus.isGranted;
-  }
-
+  // Note: For photos and camera, we let image_picker handle permissions natively
+  // as it provides better iOS integration and automatically shows the system dialog
+  
   static Future<bool> _requestPhotosPermission() async {
     if (Platform.isAndroid) {
       // Try storage permission first (works for most Android versions)
@@ -67,8 +66,25 @@ class CustomAttachmentHandler {
     }
 
     // iOS: Request photos permission
+    // Check current status first
+    final currentStatus = await Permission.photos.status;
+    debugPrint('📸 Photos permission current status: $currentStatus');
+    
+    // If already granted, return true
+    if (currentStatus.isGranted || currentStatus.isLimited) {
+      return true;
+    }
+    
+    // If permanently denied, can't request again
+    if (currentStatus.isPermanentlyDenied) {
+      debugPrint('📸 Photos permission permanently denied');
+      return false;
+    }
+    
+    // Request permission
     final photosStatus = await Permission.photos.request();
-    return photosStatus.isGranted;
+    debugPrint('📸 Photos permission after request: $photosStatus');
+    return photosStatus.isGranted || photosStatus.isLimited;
   }
 
   static Future<bool> _requestMicrophonePermission() async {
@@ -186,16 +202,8 @@ class _AttachmentBottomSheet extends StatelessWidget {
   Future<void> _handlePhotoLibrary(BuildContext context) async {
     Navigator.pop(context);
     
-    // Request photos permission
-    final hasPermission = await CustomAttachmentHandler._requestPhotosPermission();
-    
-    if (!hasPermission) {
-      if (parentContext.mounted) {
-        CustomAttachmentHandler._showPermissionDeniedDialog(parentContext, 'Photos');
-      }
-      return;
-    }
-    
+    // Let image_picker handle the permission natively - it will show the iOS dialog
+    debugPrint('📸 Opening photo library (image_picker will request permission if needed)');
     if (parentContext.mounted) {
       await _AttachmentPicker.pickImage(
         context: parentContext,
@@ -208,16 +216,8 @@ class _AttachmentBottomSheet extends StatelessWidget {
   Future<void> _handleCamera(BuildContext context) async {
     Navigator.pop(context);
     
-    // Request camera permission
-    final hasPermission = await CustomAttachmentHandler._requestCameraPermission();
-    
-    if (!hasPermission) {
-      if (parentContext.mounted) {
-        CustomAttachmentHandler._showPermissionDeniedDialog(parentContext, 'Camera');
-      }
-      return;
-    }
-    
+    // Let image_picker handle the permission natively - it will show the iOS dialog
+    debugPrint('📸 Opening camera (image_picker will request permission if needed)');
     if (parentContext.mounted) {
       await _AttachmentPicker.pickImage(
         context: parentContext,
@@ -306,6 +306,8 @@ class _AttachmentPicker {
     required StreamMessageInputController messageInputController,
   }) async {
     try {
+      debugPrint('📸 Attempting to pick image from ${source == ImageSource.gallery ? "gallery" : "camera"}');
+      
       final XFile? image = await _imagePicker.pickImage(
         source: source,
         maxWidth: CustomAttachmentHandler._maxImageWidth.toDouble(),
@@ -313,20 +315,29 @@ class _AttachmentPicker {
         imageQuality: CustomAttachmentHandler._imageQuality,
       );
       
+      debugPrint('📸 Image picked: ${image?.path ?? "null (user cancelled)"}');
+      
       if (image != null) {
         // Process the image even if context is not mounted - the controller is still valid
         await _processImageFileWithoutContext(image, messageInputController);
       }
     } catch (e) {
+      debugPrint('❌ Error picking image: $e');
       if (context.mounted) {
         String errorMessage = 'Failed to pick image';
-        if (e.toString().contains('photo_access_denied') || 
-            e.toString().contains('camera_access_denied') ||
-            e.toString().contains('Permission denied')) {
-          final settingsPath = Platform.isIOS 
-              ? 'Settings > Privacy & Security > Camera/Photos > launchgo'
-              : 'Settings > Apps > launchgo > Permissions';
-          errorMessage = 'Camera/Photos permission denied. Please enable in $settingsPath';
+        
+        // Check for permission-related errors
+        final errorString = e.toString().toLowerCase();
+        if (errorString.contains('photo_access_denied') || 
+            errorString.contains('camera_access_denied') ||
+            errorString.contains('permission') ||
+            errorString.contains('denied') ||
+            errorString.contains('authorized')) {
+          
+          // Permission was denied - show dialog to open settings
+          final permissionType = source == ImageSource.gallery ? 'Photos' : 'Camera';
+          CustomAttachmentHandler._showPermissionDeniedDialog(context, permissionType);
+          return;
         } else {
           errorMessage = 'Failed to pick image: ${e.toString()}';
         }
