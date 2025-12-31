@@ -57,9 +57,6 @@ class PushNotificationService extends ChangeNotifier {
   NotificationsApiService? _notificationsService;
   GoRouter? _router;
   
-  // Add auth service for semester switching
-  AuthService? _authService;
-  
   // Callback for when FCM token becomes available
   VoidCallback? _onTokenAvailableCallback;
   
@@ -93,7 +90,6 @@ class PushNotificationService extends ChangeNotifier {
   
   /// Set auth service for semester switching
   void setAuthService(AuthService authService) {
-    _authService = authService;
     // Initialize the notification navigation service
     if (_router != null) {
       NotificationNavigationService.instance.initialize(_router!, authService);
@@ -191,9 +187,7 @@ class PushNotificationService extends ChangeNotifier {
       if (settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional) {
         
-        // Wait for APNS token on iOS before getting FCM token
-        debugPrint('🔔 Waiting for APNS token...');
-        await _waitForApnsToken();
+        // iOS requires APNs configured in Firebase; we do not use the APNs token directly here.
         
         // Get FCM token
         _fcmToken = await _messaging.getToken();
@@ -267,15 +261,7 @@ class PushNotificationService extends ChangeNotifier {
     }
   }
   
-  /// Wait for APNS token to be available on iOS
-  Future<void> _waitForApnsToken() async {
-    try {
-      final apnsToken = await _messaging.getAPNSToken();
-      debugPrint('APNS token: $apnsToken');
-    } catch (e) {
-      debugPrint('Error getting APNS token: $e');
-    }
-  }
+  // (removed) _waitForApnsToken(): we don't need to block on APNs token in app code
 
   
   /// Handle foreground messages

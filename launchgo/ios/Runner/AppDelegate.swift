@@ -5,15 +5,19 @@ import stream_video_push_notification
 import flutter_callkit_incoming
 import PushKit
 import CallKit
+import Security
+import AVFAudio
 
 @main
-@objc class AppDelegate: FlutterAppDelegate {
+@objc class AppDelegate: FlutterAppDelegate, CallkitIncomingAppDelegate {
   
   private var callValidityTimer: Timer?
   private var activeCallCid: String?
   private var methodChannel: FlutterMethodChannel?
   private var callKitChannel: FlutterMethodChannel?  // Channel for Dart to force end CallKit
   private var pushKitChannel: FlutterMethodChannel?  // Channel for VoIP push control
+  private var apnsChannel: FlutterMethodChannel?     // Channel for APNs token (non-VoIP) for chat pushes
+  private var streamVideoAuthChannel: FlutterMethodChannel? // Channel for storing Stream Video auth for native reject
   private let callObserver = CXCallObserver() // For observing CallKit state
   
   // Keep a strong reference to PushKit registry
@@ -21,6 +25,18 @@ import CallKit
   
   // Track current VoIP token
   private var currentVoipToken: String?
+  
+  // Track current APNs token (non-VoIP)
+  private var currentApnsToken: String?
+  
+  // Keychain keys for native Stream Video reject flow
+  private let keychainService = "com.launchgo.streamvideo"
+  private let keychainAccountToken = "user_token"
+  private let keychainAccountApiKey = "api_key"
+  
+  // Native polling to stop CallKit if cancel push is missed (cold start)
+  private var nativeCallPollTimer: Timer?
+  private var nativePollCallCid: String?
   
   // Track if VoIP is enabled (can be disabled on logout)
   private var voipEnabled: Bool = true
@@ -97,6 +113,56 @@ import CallKit
           result(FlutterMethodNotImplemented)
         }
       }
+      
+      // Channel for APNs token (non-VoIP) used for chat pushes (PushProvider.apn)
+      apnsChannel = FlutterMethodChannel(
+        name: "com.launchgo.app/apns",
+        binaryMessenger: controller.binaryMessenger
+      )
+      
+      apnsChannel?.setMethodCallHandler { [weak self] (call, result) in
+        switch call.method {
+        case "getApnsToken":
+          let tokenPrefix = self?.currentApnsToken?.prefix(16) ?? "nil"
+          print("[AppDelegate] 🔔 getApnsToken called, token=\(tokenPrefix)")
+          result(self?.currentApnsToken)
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
+      
+      // Channel to store Stream Video auth in Keychain so native iOS can reject calls when Flutter is not running.
+      streamVideoAuthChannel = FlutterMethodChannel(
+        name: "com.launchgo.app/stream_video_auth",
+        binaryMessenger: controller.binaryMessenger
+      )
+      
+      streamVideoAuthChannel?.setMethodCallHandler { [weak self] (call, result) in
+        guard let self else {
+          result(FlutterError(code: "NO_SELF", message: "AppDelegate deallocated", details: nil))
+          return
+        }
+        switch call.method {
+        case "set":
+          if let args = call.arguments as? [String: Any],
+             let apiKey = args["apiKey"] as? String,
+             let token = args["token"] as? String {
+            self.keychainSet(account: self.keychainAccountApiKey, value: apiKey)
+            self.keychainSet(account: self.keychainAccountToken, value: token)
+            print("[AppDelegate] 🔐 StreamVideo auth stored (apiKey=\(apiKey), token=\(token.prefix(16))…)")
+            result(true)
+          } else {
+            result(FlutterError(code: "INVALID_ARGS", message: "Missing apiKey/token", details: nil))
+          }
+        case "clear":
+          self.keychainDelete(account: self.keychainAccountApiKey)
+          self.keychainDelete(account: self.keychainAccountToken)
+          print("[AppDelegate] 🔐 StreamVideo auth cleared")
+          result(true)
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
     }
 
     // Register for VoIP push notifications - we handle them ourselves
@@ -104,6 +170,222 @@ import CallKit
     voipRegistry.desiredPushTypes = [.voIP]
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+  
+  // MARK: - APNs (non-VoIP) token
+  override func application(
+    _ application: UIApplication,
+    didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Foundation.Data
+  ) {
+    let token = deviceToken.map { String(format: "%02x", $0) }.joined()
+    currentApnsToken = token
+    print("[AppDelegate] 🔔 APNs token updated: \(token.prefix(16))…")
+    
+    // Best-effort notify Flutter if it is listening (optional)
+    apnsChannel?.invokeMethod("apnsTokenUpdated", arguments: ["token": token])
+    
+    super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
+  }
+  
+  // MARK: - CallkitIncomingAppDelegate (native callbacks for CallKit actions)
+  
+  func onAccept(_ call: flutter_callkit_incoming.Call, _ action: CXAnswerCallAction) {
+    // Flutter handles accept (and joining). Just fulfill.
+    print("[AppDelegate] 📞 CallKit onAccept uuid=\(call.uuid.uuidString)")
+    action.fulfill()
+  }
+  
+  func onDecline(_ call: flutter_callkit_incoming.Call, _ action: CXEndCallAction) {
+    print("[AppDelegate] 📞 CallKit onDecline uuid=\(call.uuid.uuidString)")
+    // If VoIP is disabled (logged out), just end UI.
+    if !voipEnabled {
+      action.fulfill()
+      return
+    }
+    
+    // Reject call on Stream so caller stops ringing even if Flutter is not running.
+    nativeRejectStreamVideoCall(from: call, reason: "decline")
+    action.fulfill()
+  }
+  
+  func onEnd(_ call: flutter_callkit_incoming.Call, _ action: CXEndCallAction) {
+    // Hangup after accept; let Flutter/SDK handle. Just fulfill.
+    print("[AppDelegate] 📞 CallKit onEnd uuid=\(call.uuid.uuidString)")
+    action.fulfill()
+  }
+  
+  func onTimeOut(_ call: flutter_callkit_incoming.Call) {
+    print("[AppDelegate] 📞 CallKit onTimeOut uuid=\(call.uuid.uuidString)")
+    if !voipEnabled { return }
+    nativeRejectStreamVideoCall(from: call, reason: "timeout")
+  }
+  
+  func didActivateAudioSession(_ audioSession: AVAudioSession) {}
+  func didDeactivateAudioSession(_ audioSession: AVAudioSession) {}
+  
+  // MARK: - Native reject call (Stream Video)
+  
+  private func nativeRejectStreamVideoCall(from call: flutter_callkit_incoming.Call, reason: String) {
+    // Extract call_cid from CallKit extra payload
+    let extra = call.data.extra as? [String: Any]
+    let callCid = extra?["call_cid"] as? String ?? extra?["stream_call_cid"] as? String
+    guard let callCid, callCid.contains(":") else {
+      print("[AppDelegate] 📞 Reject: missing call_cid in extra=\(String(describing: extra))")
+      return
+    }
+    let parts = callCid.split(separator: ":", maxSplits: 1).map(String.init)
+    if parts.count != 2 { return }
+    let callType = parts[0]
+    let callId = parts[1]
+    
+    guard let apiKey = keychainGet(account: keychainAccountApiKey),
+          let token = keychainGet(account: keychainAccountToken) else {
+      print("[AppDelegate] 📞 Reject: missing StreamVideo auth in Keychain")
+      return
+    }
+    
+    // Fire-and-forget request in a short background task
+    var bg: UIBackgroundTaskIdentifier = .invalid
+    bg = UIApplication.shared.beginBackgroundTask(withName: "reject_call") {
+      UIApplication.shared.endBackgroundTask(bg)
+      bg = .invalid
+    }
+    
+    let urlStr = "https://video.stream-io-api.com/video/call/\(callType)/\(callId)/reject?api_key=\(apiKey)"
+    guard let url = URL(string: urlStr) else { return }
+    
+    var req = URLRequest(url: url)
+    req.httpMethod = "POST"
+    req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    req.setValue("jwt", forHTTPHeaderField: "Stream-Auth-Type")
+    req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    let body: [String: Any] = ["reason": reason]
+    req.httpBody = try? JSONSerialization.data(withJSONObject: body, options: []) as Foundation.Data
+    
+    print("[AppDelegate] 📞 Reject: POST \(urlStr) reason=\(reason)")
+    URLSession.shared.dataTask(with: req) { _, response, error in
+      if let error {
+        print("[AppDelegate] 📞 Reject error: \(error)")
+      } else if let http = response as? HTTPURLResponse {
+        print("[AppDelegate] 📞 Reject response: \(http.statusCode)")
+      }
+      if bg != .invalid {
+        UIApplication.shared.endBackgroundTask(bg)
+      }
+    }.resume()
+  }
+  
+  private func startNativeCallPoll(callCid: String) {
+    // Poll call state from Stream Video API and end CallKit if call ended/rejected.
+    nativeCallPollTimer?.invalidate()
+    nativePollCallCid = callCid
+    
+    // Poll every 2s, max ~90s
+    var ticks = 0
+    nativeCallPollTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+      guard let self else { return }
+      ticks += 1
+      if ticks > 45 { // 90 seconds
+        self.stopNativeCallPoll()
+        return
+      }
+      self.pollCallOnce()
+    }
+    RunLoop.current.add(nativeCallPollTimer!, forMode: .common)
+    pollCallOnce()
+  }
+  
+  private func stopNativeCallPoll() {
+    nativeCallPollTimer?.invalidate()
+    nativeCallPollTimer = nil
+    nativePollCallCid = nil
+  }
+  
+  private func pollCallOnce() {
+    guard voipEnabled else { return }
+    guard let callCid = nativePollCallCid else { return }
+    guard callCid.contains(":") else { return }
+    let parts = callCid.split(separator: ":", maxSplits: 1).map(String.init)
+    if parts.count != 2 { return }
+    let callType = parts[0]
+    let callId = parts[1]
+    
+    guard let apiKey = keychainGet(account: keychainAccountApiKey),
+          let token = keychainGet(account: keychainAccountToken) else {
+      // no auth -> can't poll
+      return
+    }
+    
+    let urlStr = "https://video.stream-io-api.com/video/call/\(callType)/\(callId)?api_key=\(apiKey)"
+    guard let url = URL(string: urlStr) else { return }
+    
+    var req = URLRequest(url: url)
+    req.httpMethod = "GET"
+    req.setValue("jwt", forHTTPHeaderField: "Stream-Auth-Type")
+    req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    
+    URLSession.shared.dataTask(with: req) { [weak self] data, response, error in
+      guard let self else { return }
+      if error != nil { return }
+      guard let http = response as? HTTPURLResponse else { return }
+      guard http.statusCode >= 200 && http.statusCode < 300 else { return }
+      guard let data else { return }
+      
+      // Heuristic parse: if call.ended_at is non-null OR the response contains call.rejected/ended indicators, stop ringing.
+      if let json = (try? JSONSerialization.jsonObject(with: data, options: [])) as? [String: Any],
+         let call = json["call"] as? [String: Any] {
+        let endedAt = call["ended_at"]
+        if endedAt != nil && !(endedAt is NSNull) {
+          DispatchQueue.main.async {
+            print("[AppDelegate] 📞 Poll: call ended_at present -> ending CallKit")
+            self.forceEndAllCallKitCalls()
+            self.stopNativeCallPoll()
+          }
+          return
+        }
+      }
+    }.resume()
+  }
+  
+  // MARK: - Keychain helpers
+  
+  private func keychainSet(account: String, value: String) {
+    let data = value.data(using: .utf8) ?? Foundation.Data()
+    let query: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: keychainService,
+      kSecAttrAccount as String: account
+    ]
+    let attrs: [String: Any] = [kSecValueData as String: data]
+    let status = SecItemUpdate(query as CFDictionary, attrs as CFDictionary)
+    if status == errSecItemNotFound {
+      var addQuery = query
+      addQuery[kSecValueData as String] = data
+      SecItemAdd(addQuery as CFDictionary, nil)
+    }
+  }
+  
+  private func keychainGet(account: String) -> String? {
+    let query: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: keychainService,
+      kSecAttrAccount as String: account,
+      kSecReturnData as String: true,
+      kSecMatchLimit as String: kSecMatchLimitOne
+    ]
+    var item: CFTypeRef?
+    let status = SecItemCopyMatching(query as CFDictionary, &item)
+    guard status == errSecSuccess, let data = item as? Foundation.Data else { return nil }
+    return String(data: data, encoding: .utf8)
+  }
+  
+  private func keychainDelete(account: String) {
+    let query: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: keychainService,
+      kSecAttrAccount as String: account
+    ]
+    SecItemDelete(query as CFDictionary)
   }
   
   // MARK: - Call Validity Timer
@@ -219,9 +501,11 @@ extension AppDelegate: PKPushRegistryDelegate {
       print("[AppDelegate] 📞 Push type=\(pushType ?? "nil") call_cid=\(streamCallCid ?? "nil") caller=\(callerName)")
     }
 
-    // Handle call cancellation pushes
-    if pushType == "call.miss" || pushType == "call.ended" || pushType == "call.rejected" {
-      print("[AppDelegate] 📞 Call cancel push - ending CallKit")
+    // Handle call cancellation pushes.
+    // Stream can send different call.* types depending on SDK/server version.
+    // If we receive ANY call.* push that is NOT call.ring, it means the ringing UI should end.
+    if let pt = pushType, pt.hasPrefix("call.") && pt != "call.ring" {
+      print("[AppDelegate] 📞 Call non-ring push (\(pt)) - ending CallKit")
       forceEndAllCallKitCalls()
       completion()
       return
@@ -287,6 +571,10 @@ extension AppDelegate: PKPushRegistryDelegate {
     )
 
     print("[AppDelegate] 📞 CallKit shown uuid=\(uuid.uuidString)")
+
+    // Cold-start safety: start polling Stream Video call state so we can stop ringing
+    // even if the cancel push is missed by APNs/PushKit.
+    startNativeCallPoll(callCid: callCid)
 
     completion()
   }

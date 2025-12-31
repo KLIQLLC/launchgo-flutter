@@ -36,6 +36,9 @@ class StreamVideoService extends ChangeNotifier {
 
   /// iOS method channel for call validity timer
   static const _iosTimerChannel = MethodChannel('com.launchgo.app/call_validity');
+  
+  /// iOS method channel for native reject flow (store/clear Stream Video auth for CallKit decline while app is terminated)
+  static const _iosStreamVideoAuthChannel = MethodChannel('com.launchgo.app/stream_video_auth');
 
   StreamVideo? get client => _client;
   Call? get activeCall => _activeCall;
@@ -139,10 +142,22 @@ class StreamVideoService extends ChangeNotifier {
             name: 'voip_apns',
           ),
           androidPushProvider: const StreamVideoPushProvider.firebase(
-            name: 'firebase',
+            name: 'video_firebase',
           ),
         ),
       );
+      
+      // iOS: Store Stream Video auth for native CallKit decline -> reject call API when Flutter isn't running.
+      if (Platform.isIOS) {
+        try {
+          await _iosStreamVideoAuthChannel.invokeMethod('set', {
+            'apiKey': apiKey,
+            'token': token,
+          });
+        } catch (_) {
+          // Best effort; do not fail init
+        }
+      }
 
       // Save credentials for native Android background access (call rejection)
       if (Platform.isAndroid) {
@@ -157,7 +172,11 @@ class StreamVideoService extends ChangeNotifier {
 
       // Connect to establish WebSocket
       debugPrint('[VC] 📞 [StreamVideoService:initialize] Connecting to Stream Video WebSocket...');
-      await _client!.connect();
+      final shouldRegisterPushDevice = !Platform.isIOS;
+      await CallDebugLogger.log(
+        '[VIDEO_PUSH] StreamVideo.connect(registerPushDevice=$shouldRegisterPushDevice platform=${Platform.operatingSystem})',
+      );
+      await _client!.connect(registerPushDevice: shouldRegisterPushDevice);
       debugPrint('[VC] 📞 [StreamVideoService:initialize] WebSocket connected successfully');
 
       // Set up listeners based on user role
@@ -263,9 +282,7 @@ class StreamVideoService extends ChangeNotifier {
 
           // iOS: End CallKit when call is cancelled
           if (Platform.isIOS && _incomingCallId != null) {
-            final activeCalls = await FlutterCallkitIncoming.activeCalls();
             await FlutterCallkitIncoming.endAllCalls();
-            final afterCalls = await FlutterCallkitIncoming.activeCalls();
           }
 
           _incomingCallId = null;
@@ -409,7 +426,8 @@ class StreamVideoService extends ChangeNotifier {
     
     try {
       if (Platform.isIOS) {
-        final before = await FlutterCallkitIncoming.activeCalls();
+        // Intentionally ignore activeCalls() result (kept for debugging).
+        await FlutterCallkitIncoming.activeCalls();
       }
       
       await FlutterCallkitIncoming.endAllCalls();
@@ -424,7 +442,7 @@ class StreamVideoService extends ChangeNotifier {
             await nativeChannel.invokeMethod('forceEndAllCalls');
             
             // Re-check
-            final afterNative = await FlutterCallkitIncoming.activeCalls();
+            await FlutterCallkitIncoming.activeCalls();
           } catch (e) {
           }
         }
@@ -523,7 +541,6 @@ class StreamVideoService extends ChangeNotifier {
     // End CallKit when clearing active call
     if (Platform.isIOS) {
       try {
-        final before = await FlutterCallkitIncoming.activeCalls();
         await FlutterCallkitIncoming.endAllCalls();
         final after = await FlutterCallkitIncoming.activeCalls();
         
@@ -534,7 +551,7 @@ class StreamVideoService extends ChangeNotifier {
             await nativeChannel.invokeMethod('forceEndAllCalls');
             
             // Re-check
-            final afterNative = await FlutterCallkitIncoming.activeCalls();
+            await FlutterCallkitIncoming.activeCalls();
           } catch (e) {
           }
         }
@@ -672,6 +689,13 @@ class StreamVideoService extends ChangeNotifier {
 
     await _client?.disconnect();
     _client = null;
+
+    // iOS: Clear native auth so a logged-out device cannot reject/act on calls.
+    if (Platform.isIOS) {
+      try {
+        await _iosStreamVideoAuthChannel.invokeMethod('clear');
+      } catch (_) {}
+    }
 
     _activeCall = null;
     _incomingCallId = null;

@@ -22,6 +22,7 @@ import 'package:launchgo/services/weekly_notification_service.dart';
 import 'package:launchgo/services/video_call/stream_video_service.dart';
 import 'package:launchgo/services/video_call/video_call_push_handler.dart';
 import 'package:launchgo/services/video_call/voip_pushkit_service.dart';
+import 'package:launchgo/utils/call_debug_logger.dart';
 import 'package:stream_video_flutter/stream_video_flutter.dart';
 import 'package:launchgo/widgets/splash_screen.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
@@ -969,6 +970,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
       if (event.event == callkit.Event.actionCallAccept) {
         debugPrint('[VC] 📞 [iOS] ========== CALL ACCEPT EVENT ==========');
+        await CallDebugLogger.log('[IOS_ACCEPT] CallKit actionCallAccept received');
 
         // Extract call ID from event body
         String? callId;
@@ -989,6 +991,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         }
 
         debugPrint('[VC] 📞 [iOS] Extracted call ID: $callId');
+        await CallDebugLogger.log('[IOS_ACCEPT] Extracted callId=$callId');
 
         if (callId != null) {
           // Check if we already navigated to this call
@@ -996,56 +999,128 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             debugPrint(
               '[VC] 📞 [iOS] Already navigated to this call, skipping',
             );
+            await CallDebugLogger.log('[IOS_ACCEPT] Already navigated to callId=$callId; skipping');
             return;
           }
 
-          debugPrint(
-            '[VC] 📞 [iOS] Waiting for auth and video service to be ready...',
+          debugPrint('[VC] 📞 [iOS] Ensuring auth + StreamVideo are ready...');
+          await CallDebugLogger.log(
+            '[IOS_ACCEPT] Ensure ready: userInfo=${_authService.userInfo?.id} isStudent=${_authService.userInfo?.isStudent} videoInitialized=${_streamVideoService.isInitialized}',
           );
+          final acceptStart = DateTime.now();
 
-          // Wait for auth and video service with retries
-          for (int i = 0; i < 50; i++) {
-            // Wait up to 5 seconds
-            if (_authService.userInfo != null &&
-                _authService.userInfo!.isStudent &&
-                _streamVideoService.isInitialized) {
-              debugPrint('[VC] 📞 [iOS] Services ready after ${i * 100}ms');
+          // Ensure auth exists and this is a student device.
+          if (_authService.userInfo == null || !_authService.userInfo!.isStudent) {
+            debugPrint('[VC] ⚠️ [iOS] Cannot accept: user not ready or not a student');
+            await CallDebugLogger.log('[IOS_ACCEPT] ABORT: user not ready or not student');
+            return;
+          }
+
+          // Cold start case: initialize Stream Video if needed (don't just wait).
+          if (!_streamVideoService.isInitialized) {
+            try {
+              debugPrint('[VC] 📞 [iOS] StreamVideo not initialized, initializing now...');
+              await CallDebugLogger.log('[IOS_ACCEPT] StreamVideo not initialized -> initializing');
+              await _streamVideoService.initialize(_authService.userInfo!);
+              debugPrint('[VC] 📞 [iOS] StreamVideo initialized: ${_streamVideoService.isInitialized}');
+              await CallDebugLogger.log('[IOS_ACCEPT] StreamVideo initialized=${_streamVideoService.isInitialized}');
+            } catch (e) {
+              debugPrint('[VC] ❌ [iOS] Failed to initialize StreamVideo: $e');
+              await CallDebugLogger.log('[IOS_ACCEPT] ERROR initializing StreamVideo: $e');
+            }
+          }
+
+          // Wait up to 30s total for service to become ready.
+          for (int i = 0; i < 300; i++) {
+            if (_streamVideoService.isInitialized && _streamVideoService.client != null) {
+              final waited = DateTime.now().difference(acceptStart).inMilliseconds;
+              debugPrint('[VC] 📞 [iOS] Services ready after ${waited}ms');
+              await CallDebugLogger.log('[IOS_ACCEPT] Services ready after ${waited}ms');
               break;
             }
             await Future.delayed(const Duration(milliseconds: 100));
           }
 
-          if (_authService.userInfo == null ||
-              !_streamVideoService.isInitialized) {
-            debugPrint('[VC] ⚠️ [iOS] Services not ready after timeout');
+          if (!_streamVideoService.isInitialized || _streamVideoService.client == null) {
+            debugPrint('[VC] ⚠️ [iOS] Services not ready after 30s; call may be marked missed by server');
+            await CallDebugLogger.log('[IOS_ACCEPT] ABORT: StreamVideo not ready after 30s');
             return;
           }
 
           // CRITICAL FIX: Explicitly accept the call via Stream SDK
-          // This ensures the mentor is notified that the student answered
+          // This ensures the mentor is notified that the student answered.
+          //
+          // IMPORTANT: Call.accept() only succeeds when call.status is Incoming.
+          // On cold start, makeCall().getOrCreate() often yields Idle, so accept is rejected.
+          //
+          // We cannot use consumeAndAcceptActiveCall() here because it depends on the SDK-managed
+          // CallKit activeCalls list (uuid/callCid), which can be null in our custom CallKit flow.
+          // Instead, we consume using the CallKit event payload (uuid + call_cid) and then accept.
           try {
             final client = _streamVideoService.client;
-            if (client != null) {
-              final call = client.makeCall(
-                callType: StreamCallType.defaultType(),
-                id: callId,
-              );
-              await call.getOrCreate();
-              await call.accept();
-              _streamVideoService.setActiveCall(call);
-              
-              _lastNavigatedCallId = callId;
-              _appRouter.router.pushNamed(
-                'student-video-chat',
-                pathParameters: {'callId': callId},
-                queryParameters: {'callerName': 'Mentor', 'autoAccept': 'true'},
-              );
+            if (client == null) {
+              debugPrint('[VC] ⚠️ [iOS] Cannot accept: StreamVideo client is null');
+              await CallDebugLogger.log('[IOS_ACCEPT] ABORT: StreamVideo client is null');
+              return;
             }
+
+            // Extract CallKit UUID + call_cid from the event payload
+            String? uuid;
+            String? callCid;
+            if (body is Map) {
+              uuid = body['id'] as String? ?? body['uuid'] as String?;
+              final extra = body['extra'];
+              if (extra is Map) {
+                callCid = extra['call_cid'] as String? ?? extra['stream_call_cid'] as String?;
+              }
+            }
+
+            await CallDebugLogger.log('[IOS_ACCEPT] payload uuid=$uuid callCid=$callCid');
+
+            if (uuid == null || uuid.isEmpty || callCid == null || callCid.isEmpty) {
+              await CallDebugLogger.log('[IOS_ACCEPT] ABORT: missing uuid or callCid in CallKit event payload');
+              debugPrint('[VC] ⚠️ [iOS] Missing uuid/callCid in CallKit event payload');
+              return;
+            }
+
+            debugPrint('[VC] 📞 [iOS] consumeIncomingCall(uuid=$uuid, cid=$callCid)...');
+            await CallDebugLogger.log('[IOS_ACCEPT] Calling StreamVideo.consumeIncomingCall(uuid, cid)');
+
+            final consumeResult = await client.consumeIncomingCall(uuid: uuid, cid: callCid);
+            Call? acceptedCall;
+            consumeResult.fold(
+              success: (result) {
+                acceptedCall = result.data;
+              },
+              failure: (error) async {
+                await CallDebugLogger.log('[IOS_ACCEPT] consumeIncomingCall FAILED: $error');
+              },
+            );
+
+            if (acceptedCall == null) {
+              await CallDebugLogger.log('[IOS_ACCEPT] ABORT: consumeIncomingCall returned no call');
+              return;
+            }
+
+            await CallDebugLogger.log('[IOS_ACCEPT] consumeIncomingCall OK: callId=${acceptedCall!.id} callCid=${acceptedCall!.callCid}');
+
+            final acceptResult = await acceptedCall!.accept();
+            await CallDebugLogger.log('[IOS_ACCEPT] accept() result=$acceptResult');
+
+            _streamVideoService.setActiveCall(acceptedCall!);
+            _lastNavigatedCallId = acceptedCall!.id;
+            _appRouter.router.pushNamed(
+              'student-video-chat',
+              pathParameters: {'callId': acceptedCall!.id},
+              queryParameters: {'callerName': 'Mentor', 'autoAccept': 'true'},
+            );
           } catch (e) {
-            debugPrint('[VC] ❌ [iOS] Error accepting call: $e');
+            debugPrint('[VC] ❌ [iOS] Error accepting via consumeIncomingCall: $e');
+            await CallDebugLogger.log('[IOS_ACCEPT] ERROR consumeIncomingCall/accept: $e');
           }
         } else {
           debugPrint('[VC] ⚠️ [iOS] Could not extract call ID from event');
+          await CallDebugLogger.log('[IOS_ACCEPT] ABORT: could not extract callId from CallKit event');
         }
 
         debugPrint('[VC] 📞 [iOS] ========== END CALL ACCEPT EVENT ==========');

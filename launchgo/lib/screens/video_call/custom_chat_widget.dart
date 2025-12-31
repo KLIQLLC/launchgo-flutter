@@ -10,6 +10,7 @@ import '../../services/auth_service.dart';
 import '../../services/video_call/stream_video_service.dart';
 import '../../widgets/chat/custom_attachment_handler.dart';
 import 'dart:async';
+import '../../utils/call_debug_logger.dart';
 
 class CustomChatWidget extends StatefulWidget {
   final StreamChatClient client;
@@ -531,9 +532,20 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
       );
 
       debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Calling getOrCreate with ringing: true');
+      await CallDebugLogger.log(
+        '[CALL_CREATE] getOrCreate: callId=$uniqueCallId memberId=${selectedStudent.id} ringing=true notify=false',
+      );
       final result = await call.getOrCreate(
         memberIds: [selectedStudent.id],
-        ringing: true,  // Triggers push notification to student
+        ringing: true, // Triggers VoIP push (CallKit)
+        notify: false, // Do NOT send regular "calling you" push during ringing
+        // Keep missed-call push, but make it match our CallKit ring duration (60s)
+        // so "missed" doesn't fire early.
+        ring: const StreamRingSettings(
+          autoCancelTimeout: Duration(seconds: 60),
+          autoRejectTimeout: Duration(seconds: 60),
+          missedCallTimeout: Duration(seconds: 60),
+        ),
       );
 
       result.fold(
