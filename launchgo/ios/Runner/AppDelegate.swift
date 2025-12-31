@@ -11,11 +11,6 @@ import AVFAudio
 @main
 @objc class AppDelegate: FlutterAppDelegate, CallkitIncomingAppDelegate {
   
-  private func dbg(_ message: String) {
-#if DEBUG
-    print(message)
-#endif
-  }
   
   private var callValidityTimer: Timer?
   private var activeCallCid: String?
@@ -105,15 +100,15 @@ import AVFAudio
       pushKitChannel?.setMethodCallHandler { [weak self] (call, result) in
         switch call.method {
         case "enableVoip":
-          dbg("[AppDelegate] 📞 enableVoip called")
+          
           self?.voipEnabled = true
           result(nil)
         case "disableVoip":
-          dbg("[AppDelegate] 📞 disableVoip called")
+          
           self?.voipEnabled = false
           result(nil)
         case "getVoipToken":
-          dbg("[AppDelegate] 📞 getVoipToken called, token=\(self?.currentVoipToken?.prefix(16) ?? "nil")")
+          
           result(self?.currentVoipToken)
         default:
           result(FlutterMethodNotImplemented)
@@ -130,7 +125,7 @@ import AVFAudio
         switch call.method {
         case "getApnsToken":
           let tokenPrefix = self?.currentApnsToken?.prefix(16) ?? "nil"
-          dbg("[AppDelegate] 🔔 getApnsToken called, token=\(tokenPrefix)")
+          
           result(self?.currentApnsToken)
         default:
           result(FlutterMethodNotImplemented)
@@ -155,7 +150,7 @@ import AVFAudio
              let token = args["token"] as? String {
             self.keychainSet(account: self.keychainAccountApiKey, value: apiKey)
             self.keychainSet(account: self.keychainAccountToken, value: token)
-            dbg("[AppDelegate] 🔐 StreamVideo auth stored (apiKey=\(apiKey), token=\(token.prefix(16))…)")
+            
             result(true)
           } else {
             result(FlutterError(code: "INVALID_ARGS", message: "Missing apiKey/token", details: nil))
@@ -163,7 +158,7 @@ import AVFAudio
         case "clear":
           self.keychainDelete(account: self.keychainAccountApiKey)
           self.keychainDelete(account: self.keychainAccountToken)
-          dbg("[AppDelegate] 🔐 StreamVideo auth cleared")
+          
           result(true)
         default:
           result(FlutterMethodNotImplemented)
@@ -185,7 +180,7 @@ import AVFAudio
   ) {
     let token = deviceToken.map { String(format: "%02x", $0) }.joined()
     currentApnsToken = token
-    dbg("[AppDelegate] 🔔 APNs token updated: \(token.prefix(16))…")
+    
     
     // Best-effort notify Flutter if it is listening (optional)
     apnsChannel?.invokeMethod("apnsTokenUpdated", arguments: ["token": token])
@@ -197,13 +192,13 @@ import AVFAudio
   
   func onAccept(_ call: flutter_callkit_incoming.Call, _ action: CXAnswerCallAction) {
     // Flutter handles accept (and joining). Just fulfill.
-    dbg("[AppDelegate] 📞 CallKit onAccept uuid=\(call.uuid.uuidString)")
+    
     stopNativeCallPoll()
     action.fulfill()
   }
   
   func onDecline(_ call: flutter_callkit_incoming.Call, _ action: CXEndCallAction) {
-    dbg("[AppDelegate] 📞 CallKit onDecline uuid=\(call.uuid.uuidString)")
+    
     stopNativeCallPoll()
     // If VoIP is disabled (logged out), just end UI.
     if !voipEnabled {
@@ -218,13 +213,13 @@ import AVFAudio
   
   func onEnd(_ call: flutter_callkit_incoming.Call, _ action: CXEndCallAction) {
     // Hangup after accept; let Flutter/SDK handle. Just fulfill.
-    dbg("[AppDelegate] 📞 CallKit onEnd uuid=\(call.uuid.uuidString)")
+    
     stopNativeCallPoll()
     action.fulfill()
   }
   
   func onTimeOut(_ call: flutter_callkit_incoming.Call) {
-    dbg("[AppDelegate] 📞 CallKit onTimeOut uuid=\(call.uuid.uuidString)")
+    
     stopNativeCallPoll()
     if !voipEnabled { return }
     nativeRejectStreamVideoCall(from: call, reason: "timeout")
@@ -240,7 +235,7 @@ import AVFAudio
     let extra = call.data.extra as? [String: Any]
     let callCid = extra?["call_cid"] as? String ?? extra?["stream_call_cid"] as? String
     guard let callCid, callCid.contains(":") else {
-      dbg("[AppDelegate] 📞 Reject: missing call_cid in extra=\(String(describing: extra))")
+      
       return
     }
     let parts = callCid.split(separator: ":", maxSplits: 1).map(String.init)
@@ -250,7 +245,7 @@ import AVFAudio
     
     guard let apiKey = keychainGet(account: keychainAccountApiKey),
           let token = keychainGet(account: keychainAccountToken) else {
-      dbg("[AppDelegate] 📞 Reject: missing StreamVideo auth in Keychain")
+      
       return
     }
     
@@ -272,12 +267,12 @@ import AVFAudio
     let body: [String: Any] = ["reason": reason]
     req.httpBody = try? JSONSerialization.data(withJSONObject: body, options: []) as Foundation.Data
     
-    dbg("[AppDelegate] 📞 Reject: POST \(urlStr) reason=\(reason)")
+    
     URLSession.shared.dataTask(with: req) { _, response, error in
       if let error {
-        self.dbg("[AppDelegate] 📞 Reject error: \(error)")
+        
       } else if let http = response as? HTTPURLResponse {
-        self.dbg("[AppDelegate] 📞 Reject response: \(http.statusCode)")
+        
       }
       if bg != .invalid {
         UIApplication.shared.endBackgroundTask(bg)
@@ -341,7 +336,7 @@ import AVFAudio
       // If call is gone (404) treat as ended and stop ringing.
       if http.statusCode == 404 {
         DispatchQueue.main.async {
-          self.dbg("[AppDelegate] 📞 Poll: call not found (404) -> ending CallKit")
+          
           self.forceEndAllCallKitCalls()
           self.stopNativeCallPoll()
         }
@@ -356,7 +351,7 @@ import AVFAudio
         let endedAt = call["ended_at"]
         if endedAt != nil && !(endedAt is NSNull) {
           DispatchQueue.main.async {
-            self.dbg("[AppDelegate] 📞 Poll: call ended_at present -> ending CallKit")
+            
             self.forceEndAllCallKitCalls()
             self.stopNativeCallPoll()
           }
@@ -478,7 +473,7 @@ import AVFAudio
 extension AppDelegate: PKPushRegistryDelegate {
   func pushRegistry(_ registry: PKPushRegistry, didUpdate pushCredentials: PKPushCredentials, for type: PKPushType) {
     let token = pushCredentials.token.map { String(format: "%02x", $0) }.joined()
-    dbg("[AppDelegate] 📞 VoIP token updated: \(token.prefix(16))…")
+    
     // Store token for Dart to retrieve
     currentVoipToken = token
     // Forward token to Stream SDK
@@ -486,7 +481,7 @@ extension AppDelegate: PKPushRegistryDelegate {
   }
 
   func pushRegistry(_ registry: PKPushRegistry, didInvalidatePushTokenFor type: PKPushType) {
-    dbg("[AppDelegate] 📞 VoIP token invalidated")
+    
     StreamVideoPKDelegateManager.shared.pushRegistry(registry, didInvalidatePushTokenFor: type)
   }
 
@@ -496,11 +491,11 @@ extension AppDelegate: PKPushRegistryDelegate {
     for type: PKPushType,
     completion: @escaping () -> Void
   ) {
-    dbg("[AppDelegate] 📞 VoIP push received, voipEnabled=\(voipEnabled)")
+    
 
     // If VoIP is disabled (user logged out), ignore the push but still call completion
     if !voipEnabled {
-      dbg("[AppDelegate] 📞 VoIP disabled (logged out), ignoring push")
+      
       completion()
       return
     }
@@ -517,14 +512,14 @@ extension AppDelegate: PKPushRegistryDelegate {
       streamCallCid = stream["call_cid"] as? String
       pushType = stream["type"] as? String
       callerName = stream["created_by_display_name"] as? String ?? "Incoming Call"
-      dbg("[AppDelegate] 📞 Push type=\(pushType ?? "nil") call_cid=\(streamCallCid ?? "nil") caller=\(callerName)")
+      
     }
 
     // Handle call cancellation pushes.
     // Stream can send different call.* types depending on SDK/server version.
     // If we receive ANY call.* push that is NOT call.ring, it means the ringing UI should end.
     if let pt = pushType, pt.hasPrefix("call.") && pt != "call.ring" {
-      dbg("[AppDelegate] 📞 Call non-ring push (\(pt)) - ending CallKit")
+      
       forceEndAllCallKitCalls()
       completion()
       return
@@ -532,7 +527,7 @@ extension AppDelegate: PKPushRegistryDelegate {
 
     // Only show CallKit for call.ring pushes
     guard pushType == "call.ring", let callCid = streamCallCid else {
-      dbg("[AppDelegate] 📞 Not a call.ring or no call_cid, ignoring")
+      
       completion()
       return
     }
@@ -541,10 +536,10 @@ extension AppDelegate: PKPushRegistryDelegate {
     let callId = callCid.components(separatedBy: ":").last ?? callCid
 
     // End any previous CallKit calls before showing new one (prevents stacking)
-    dbg("[AppDelegate] 📞 Clearing previous CallKit calls before showing new one")
+    
     forceEndAllCallKitCalls()
 
-    dbg("[AppDelegate] 📞 Showing CallKit for callId=\(callId)")
+    
 
     // Create a unique UUID for CallKit
     let uuid = UUID()
@@ -589,7 +584,7 @@ extension AppDelegate: PKPushRegistryDelegate {
       fromPushKit: true
     )
 
-    dbg("[AppDelegate] 📞 CallKit shown uuid=\(uuid.uuidString)")
+    
 
     // Cold-start safety: start polling Stream Video call state so we can stop ringing
     // even if the cancel push is missed by APNs/PushKit.
