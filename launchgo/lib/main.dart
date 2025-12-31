@@ -970,7 +970,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
       if (event.event == callkit.Event.actionCallAccept) {
         debugPrint('[VC] 📞 [iOS] ========== CALL ACCEPT EVENT ==========');
-        await CallDebugLogger.log('[IOS_ACCEPT] CallKit actionCallAccept received');
 
         // Extract call ID from event body
         String? callId;
@@ -991,7 +990,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         }
 
         debugPrint('[VC] 📞 [iOS] Extracted call ID: $callId');
-        await CallDebugLogger.log('[IOS_ACCEPT] Extracted callId=$callId');
 
         if (callId != null) {
           // Check if we already navigated to this call
@@ -999,14 +997,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             debugPrint(
               '[VC] 📞 [iOS] Already navigated to this call, skipping',
             );
-            await CallDebugLogger.log('[IOS_ACCEPT] Already navigated to callId=$callId; skipping');
             return;
           }
 
           debugPrint('[VC] 📞 [iOS] Ensuring auth + StreamVideo are ready...');
-          await CallDebugLogger.log(
-            '[IOS_ACCEPT] Ensure ready: userInfo=${_authService.userInfo?.id} isStudent=${_authService.userInfo?.isStudent} videoInitialized=${_streamVideoService.isInitialized}',
-          );
           final acceptStart = DateTime.now();
 
           // Ensure auth exists and this is a student device.
@@ -1020,10 +1014,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           if (!_streamVideoService.isInitialized) {
             try {
               debugPrint('[VC] 📞 [iOS] StreamVideo not initialized, initializing now...');
-              await CallDebugLogger.log('[IOS_ACCEPT] StreamVideo not initialized -> initializing');
               await _streamVideoService.initialize(_authService.userInfo!);
               debugPrint('[VC] 📞 [iOS] StreamVideo initialized: ${_streamVideoService.isInitialized}');
-              await CallDebugLogger.log('[IOS_ACCEPT] StreamVideo initialized=${_streamVideoService.isInitialized}');
             } catch (e) {
               debugPrint('[VC] ❌ [iOS] Failed to initialize StreamVideo: $e');
               await CallDebugLogger.log('[IOS_ACCEPT] ERROR initializing StreamVideo: $e');
@@ -1035,7 +1027,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             if (_streamVideoService.isInitialized && _streamVideoService.client != null) {
               final waited = DateTime.now().difference(acceptStart).inMilliseconds;
               debugPrint('[VC] 📞 [iOS] Services ready after ${waited}ms');
-              await CallDebugLogger.log('[IOS_ACCEPT] Services ready after ${waited}ms');
               break;
             }
             await Future.delayed(const Duration(milliseconds: 100));
@@ -1075,8 +1066,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               }
             }
 
-            await CallDebugLogger.log('[IOS_ACCEPT] payload uuid=$uuid callCid=$callCid');
-
             if (uuid == null || uuid.isEmpty || callCid == null || callCid.isEmpty) {
               await CallDebugLogger.log('[IOS_ACCEPT] ABORT: missing uuid or callCid in CallKit event payload');
               debugPrint('[VC] ⚠️ [iOS] Missing uuid/callCid in CallKit event payload');
@@ -1084,8 +1073,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             }
 
             debugPrint('[VC] 📞 [iOS] consumeIncomingCall(uuid=$uuid, cid=$callCid)...');
-            await CallDebugLogger.log('[IOS_ACCEPT] Calling StreamVideo.consumeIncomingCall(uuid, cid)');
-
             final consumeResult = await client.consumeIncomingCall(uuid: uuid, cid: callCid);
             Call? acceptedCall;
             consumeResult.fold(
@@ -1102,10 +1089,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               return;
             }
 
-            await CallDebugLogger.log('[IOS_ACCEPT] consumeIncomingCall OK: callId=${acceptedCall!.id} callCid=${acceptedCall!.callCid}');
-
             final acceptResult = await acceptedCall!.accept();
-            await CallDebugLogger.log('[IOS_ACCEPT] accept() result=$acceptResult');
+            // Log only if accept fails (reduce noise)
+            if (acceptResult.isFailure) {
+              await CallDebugLogger.log('[IOS_ACCEPT] accept() FAILED: $acceptResult');
+            }
 
             _streamVideoService.setActiveCall(acceptedCall!);
             _lastNavigatedCallId = acceptedCall!.id;

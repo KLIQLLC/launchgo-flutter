@@ -18,6 +18,8 @@ class StreamChatService extends ChangeNotifier {
   bool _isUserConnected = false;
   Future<void>? _connectInFlight;
   bool _isRegisteringPush = false;
+  String? _lastRegisteredApnsToken;
+  String? _lastRegisteredFcmToken;
   
   // iOS APNs token (non-VoIP) channel
   static const MethodChannel _apnsChannel = MethodChannel('com.launchgo.app/apns');
@@ -140,24 +142,23 @@ class StreamChatService extends ChangeNotifier {
         await pushNotificationService.initialize();
       }
 
-      await CallDebugLogger.log('[CHAT_PUSH] registerPushToken start platform=${Platform.operatingSystem}');
-
       if (Platform.isIOS) {
         // iOS: register APNs (non-VoIP) token for chat pushes.
         // Also remove the Firebase device so Video can't send call.ring via FCM (shared registry in Push v2).
         final apnsToken = await _apnsChannel.invokeMethod<String>('getApnsToken');
-        await CallDebugLogger.log('[CHAT_PUSH] iOS apnsToken=${apnsToken == null ? 'null' : '${apnsToken.substring(0, apnsToken.length > 16 ? 16 : apnsToken.length)}…'}');
         if (apnsToken != null && apnsToken.isNotEmpty) {
-          await CallDebugLogger.log('[CHAT_PUSH] iOS addDevice(apn, chat_apns) starting');
+          // Idempotency: avoid re-registering the same token repeatedly (can timeout and spam logs).
+          if (_lastRegisteredApnsToken == apnsToken) {
+            return;
+          }
           await _client.addDevice(
             apnsToken,
             PushProvider.apn,
             pushProviderName: 'chat_apns',
           );
-          await CallDebugLogger.log('[CHAT_PUSH] iOS addDevice(apn, chat_apns) done');
+          _lastRegisteredApnsToken = apnsToken;
         } else {
           // Retry after a short delay (APNs token may arrive later)
-          await CallDebugLogger.log('[CHAT_PUSH] iOS apnsToken missing -> retry scheduled');
           Future.delayed(const Duration(seconds: 2), () {
             _registerPushToken();
           });
@@ -165,19 +166,20 @@ class StreamChatService extends ChangeNotifier {
       } else {
         // Android: register FCM under chat_firebase
         final fcmToken = pushNotificationService.fcmToken;
-        await CallDebugLogger.log('[CHAT_PUSH] Android fcmToken=${fcmToken == null ? 'null' : '${fcmToken.substring(0, fcmToken.length > 16 ? 16 : fcmToken.length)}…'}');
         if (fcmToken != null && fcmToken.isNotEmpty) {
+          // Idempotency: avoid re-registering the same token repeatedly.
+          if (_lastRegisteredFcmToken == fcmToken) {
+            return;
+          }
           // Push Notifications v2 is shared between Chat + Video. Use a dedicated provider name for chat.
-          await CallDebugLogger.log('[CHAT_PUSH] Android addDevice(firebase, chat_firebase) starting');
           await _client.addDevice(
             fcmToken,
             PushProvider.firebase,
             pushProviderName: 'chat_firebase',
           );
-          await CallDebugLogger.log('[CHAT_PUSH] Android addDevice(firebase, chat_firebase) done');
+          _lastRegisteredFcmToken = fcmToken;
         } else {
           // Retry after a short delay (token may arrive after login)
-          await CallDebugLogger.log('[CHAT_PUSH] Android fcmToken missing -> retry scheduled');
           Future.delayed(const Duration(seconds: 2), () {
             _registerPushToken();
           });
@@ -185,6 +187,7 @@ class StreamChatService extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('❌ Stream Chat: Error registering FCM token: $e');
+      // Keep only error in persisted logs (less spam)
       await CallDebugLogger.log('[CHAT_PUSH] ERROR registerPushToken: $e');
     } finally {
       _isRegisteringPush = false;
@@ -232,32 +235,27 @@ class StreamChatService extends ChangeNotifier {
   Future<void> _unregisterPushToken() async {
     try {
       final pushNotificationService = PushNotificationService.instance;
-      await CallDebugLogger.log('[CHAT_PUSH] unregisterPushToken start platform=${Platform.operatingSystem}');
       
       if (Platform.isIOS) {
         final apnsToken = await _apnsChannel.invokeMethod<String>('getApnsToken');
         if (apnsToken != null && apnsToken.isNotEmpty) {
-          await CallDebugLogger.log('[CHAT_PUSH] iOS removeDevice(apnToken) starting');
           await _client.removeDevice(apnsToken);
-          await CallDebugLogger.log('[CHAT_PUSH] iOS removeDevice(apnToken) done');
+          _lastRegisteredApnsToken = null;
         }
         
         // Also remove the Firebase device if present (best effort)
         final fcmToken = pushNotificationService.fcmToken;
         if (fcmToken != null && fcmToken.isNotEmpty) {
           try {
-            await CallDebugLogger.log('[CHAT_PUSH] iOS removeDevice(firebaseToken) starting');
             await _client.removeDevice(fcmToken);
-            await CallDebugLogger.log('[CHAT_PUSH] iOS removeDevice(firebaseToken) done');
           } catch (_) {}
         }
       } else {
         final fcmToken = pushNotificationService.fcmToken;
         if (fcmToken != null && fcmToken.isNotEmpty) {
           // Remove the device
-          await CallDebugLogger.log('[CHAT_PUSH] Android removeDevice(firebaseToken) starting');
           await _client.removeDevice(fcmToken);
-          await CallDebugLogger.log('[CHAT_PUSH] Android removeDevice(firebaseToken) done');
+          _lastRegisteredFcmToken = null;
         }
       }
     } catch (e) {
