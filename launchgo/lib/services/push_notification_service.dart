@@ -1,7 +1,9 @@
 // services/push_notification_service.dart
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:path_provider/path_provider.dart';
@@ -53,6 +55,9 @@ class PushNotificationService extends ChangeNotifier {
   
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   String? _fcmToken;
+  Future<bool>? _permissionsInFlight;
+  StreamSubscription<String>? _tokenRefreshSub;
+  String? _lastNotifiedToken;
   bool _isInitialized = false;
   NotificationsApiService? _notificationsService;
   GoRouter? _router;
@@ -162,51 +167,84 @@ class PushNotificationService extends ChangeNotifier {
   
 
   /// Request notification permissions and setup FCM token
-  Future<bool> requestPermissionsAndSetupToken() async {
-    debugPrint('🔔 Requesting notification permissions...');
-    
+  Future<bool> requestPermissionsAndSetupToken({String caller = 'unknown'}) async {
+    // Single-flight: many places call this during startup/login; only one should actually
+    // hit iOS permission APIs and token wiring.
+    final inFlight = _permissionsInFlight;
+    if (inFlight != null) {
+      return inFlight;
+    }
+
+    final future = _requestPermissionsAndSetupTokenInternal(caller: caller);
+    _permissionsInFlight = future;
+    try {
+      return await future;
+    } finally {
+      if (identical(_permissionsInFlight, future)) {
+        _permissionsInFlight = null;
+      }
+    }
+  }
+
+  Future<bool> _requestPermissionsAndSetupTokenInternal({required String caller}) async {
+    debugPrint('🔔 Requesting notification permissions... caller=$caller');
+
     try {
       // Initialize notification display service (Android only)
       if (Platform.isAndroid) {
         await AndroidNotificationDisplayService.instance.initialize();
       }
-      
-      // Request notification permissions
-      NotificationSettings settings = await _messaging.requestPermission(
-        alert: true,
-        announcement: false,
-        badge: true,
-        carPlay: false,
-        criticalAlert: false,
-        provisional: false,
-        sound: true,
-      );
-      
-      debugPrint('🔔 Notification permission status: ${settings.authorizationStatus}');
-      
-      if (settings.authorizationStatus == AuthorizationStatus.authorized ||
-          settings.authorizationStatus == AuthorizationStatus.provisional) {
+
+      // Avoid re-requesting permission if we already have it.
+      final before = await _messaging.getNotificationSettings();
+      var status = before.authorizationStatus;
+      debugPrint('🔔 Notification permission status (before request): $status');
+
+      if (status == AuthorizationStatus.notDetermined) {
+        // Request notification permissions
+        final settings = await _messaging.requestPermission(
+          alert: true,
+          announcement: false,
+          badge: true,
+          carPlay: false,
+          criticalAlert: false,
+          provisional: false,
+          sound: true,
+        );
+        status = settings.authorizationStatus;
+        debugPrint('🔔 Notification permission status (after request): $status');
+      }
+
+      if (status == AuthorizationStatus.authorized ||
+          status == AuthorizationStatus.provisional) {
         
         // iOS requires APNs configured in Firebase; we do not use the APNs token directly here.
         
         // Get FCM token
-        _fcmToken = await _messaging.getToken();
+        final token = await _messaging.getToken();
+        _fcmToken = token;
         debugPrint('🔔 FCM Token retrieved: $_fcmToken');
         
         // Call callback if set (for backend registration)
-        if (_onTokenAvailableCallback != null) {
+        if (_onTokenAvailableCallback != null &&
+            _fcmToken != null &&
+            _fcmToken!.isNotEmpty &&
+            _lastNotifiedToken != _fcmToken) {
           debugPrint('🔔 Calling token available callback...');
+          _lastNotifiedToken = _fcmToken;
           Future.microtask(() => _onTokenAvailableCallback!());
         }
         
-        // Listen to token refresh
-        _messaging.onTokenRefresh.listen((token) {
+        // Listen to token refresh (only once)
+        _tokenRefreshSub ??= _messaging.onTokenRefresh.listen((token) async {
           _fcmToken = token;
           debugPrint('🔔 FCM Token refreshed: $token');
           notifyListeners();
-          
-          // Call callback for token refresh too
-          if (_onTokenAvailableCallback != null) {
+
+          if (_onTokenAvailableCallback != null &&
+              token.isNotEmpty &&
+              _lastNotifiedToken != token) {
+            _lastNotifiedToken = token;
             Future.microtask(() => _onTokenAvailableCallback!());
           }
         });
@@ -218,7 +256,12 @@ class PushNotificationService extends ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        debugPrint('❌ Notification permission denied: ${settings.authorizationStatus}');
+        // NotDetermined can happen if multiple callers race while the system dialog is up.
+        if (status == AuthorizationStatus.notDetermined) {
+          debugPrint('⚠️ Notification permission still not determined (dialog may be pending)');
+        } else {
+          debugPrint('❌ Notification permission denied: $status');
+        }
         return false;
       }
     } catch (e) {

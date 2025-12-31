@@ -427,28 +427,15 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           });
         }
 
-        // Request FCM permissions and setup token for push notifications
+        // For returning users (auto-login), also check push permission status.
+        // If it's still notDetermined, the user will be prompted again.
+        // PushNotificationService is single-flight so this won't duplicate requests.
         if (_authService.isAuthenticated) {
           Future.microtask(() async {
-            // Check if user is still authenticated (might have signed out)
-            if (!_authService.isAuthenticated ||
-                _authService.userInfo == null) {
-              debugPrint(
-                '⚠️ User signed out during async operation, skipping setup',
-              );
-              return;
-            }
-
-            // Request FCM permissions and setup token
-            final success = await PushNotificationService.instance
-                .requestPermissionsAndSetupToken();
-            if (success) {
-              debugPrint('✅ FCM token setup successful');
-              // Manually trigger Stream Chat FCM registration
-              await _streamChatService.registerPushTokenManually();
-            } else {
-              debugPrint('❌ FCM token setup failed');
-            }
+            // Check and request push permissions if not yet determined
+            await PushNotificationService.instance.requestPermissionsAndSetupToken(
+              caller: 'MyApp.authListener.returningUser',
+            );
 
             // Load notifications
             _notificationsService.fetchNotifications();
@@ -484,6 +471,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       Future.microtask(() async {
         // Double-check user is still authenticated
         if (_authService.userInfo != null) {
+          // For returning users on app startup: check push permission status.
+          // If notDetermined, prompt user. Single-flight mechanism prevents duplicates.
+          await PushNotificationService.instance.requestPermissionsAndSetupToken(
+            caller: 'MyApp.initState.alreadyAuthenticated',
+          );
+
           await _streamVideoService.initialize(_authService.userInfo!);
           debugPrint('[VC] 📞 [MyApp:initState] Stream Video initialized on startup');
 
@@ -529,20 +522,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       });
     }
 
-    // Setup FCM token if already authenticated
-    if (_authService.isAuthenticated) {
-      Future.microtask(() async {
-        final success = await PushNotificationService.instance
-            .requestPermissionsAndSetupToken();
-        if (success) {
-          debugPrint('✅ FCM token setup successful (initial)');
-          await _streamChatService.registerPushTokenManually();
-        } else {
-          debugPrint('❌ FCM token setup failed (initial)');
-        }
-        _notificationsService.fetchNotifications();
-      });
-    }
+    // NOTE: FCM / notification permissions are requested centrally (AuthService).
 
     // Show splash screen for 2 seconds
     Future.delayed(const Duration(seconds: 2), () {

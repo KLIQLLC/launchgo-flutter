@@ -46,9 +46,12 @@ class WeeklyNotificationService {
         // iOS initialization
         const DarwinInitializationSettings initializationSettingsDarwin = 
             DarwinInitializationSettings(
-              requestAlertPermission: true,
-              requestBadgePermission: true,
-              requestSoundPermission: true,
+              // IMPORTANT: don't request iOS notification permission from here.
+              // We request permissions centrally via PushNotificationService to avoid
+              // multiple parallel permission requests.
+              requestAlertPermission: false,
+              requestBadgePermission: false,
+              requestSoundPermission: false,
             );
         
         const InitializationSettings initializationSettings = InitializationSettings(

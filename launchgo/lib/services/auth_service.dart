@@ -789,7 +789,8 @@ class AuthService extends ChangeNotifier {
     debugPrint('🔔 [AUTH] Requesting push notification permissions after login...');
     Future.microtask(() async {
       try {
-        final permissionGranted = await PushNotificationService.instance.requestPermissionsAndSetupToken();
+        final permissionGranted = await PushNotificationService.instance
+            .requestPermissionsAndSetupToken(caller: 'AuthService._requestPushNotificationPermissions');
         if (permissionGranted) {
           debugPrint('✅ [AUTH] Push notification permissions granted');
         } else {

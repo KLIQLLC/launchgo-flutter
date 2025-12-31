@@ -116,9 +116,10 @@ class StreamVideoService extends ChangeNotifier {
       }
       debugPrint('[VC] 📞 [StreamVideoService:initialize] Token is valid');
 
-      // Reset singleton state only if we're reinitializing
-      if (_client != null || _isInitialized) {
-        debugPrint('[VC] 📞 [StreamVideoService:initialize] Existing client/state found, resetting singleton...');
+      // Reset StreamVideo singleton if it was already initialized elsewhere.
+      // This can happen if initialization raced or if previous state leaked across hot restarts / lifecycle.
+      if (StreamVideo.isInitialized()) {
+        debugPrint('[VC] 📞 [StreamVideoService:initialize] StreamVideo singleton already initialized -> resetting');
         await StreamVideo.reset();
         debugPrint('[VC] 📞 [StreamVideoService:initialize] StreamVideo singleton reset complete');
       }
