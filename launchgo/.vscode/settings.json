@@ -3,5 +3,6 @@
   "[dart]": {
     "editor.formatOnSave": false,
     "editor.formatOnType": false
-  }
+  },
+  "debug.enableStatusBarColor": false
 }
