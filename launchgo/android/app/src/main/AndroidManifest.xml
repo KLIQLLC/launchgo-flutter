@@ -132,6 +132,12 @@
     
     <!-- Media permissions for Android 13+ (API 33+) -->
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
+
+    <!-- Explicitly remove READ_MEDIA_IMAGES and READ_MEDIA_VIDEO permissions -->
+    <!-- Google Play policy: Apps using one-time photo access must use Photo Picker instead -->
+    <!-- image_picker plugin uses Photo Picker on Android 13+ which doesn't need these permissions -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" tools:node="remove"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" tools:node="remove"/>
     
     <!-- Internet permission for file uploads -->
     <uses-permission android:name="android.permission.INTERNET"/>

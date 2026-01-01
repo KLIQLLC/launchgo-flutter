@@ -72,9 +72,9 @@ dependencies:
   ## Utilities
   intl: ^0.20.2
   url_launcher: ^6.2.4
-  file_picker: ^10.3.7
+  file_picker: ^10.3.8
   share_plus: ^12.0.1
-  image_picker: ^1.2.0
+  image_picker: ^1.2.1
   permission_handler: ^12.0.1
   geolocator: ^14.0.1
   path_provider: ^2.1.0

@@ -52,17 +52,11 @@ class CustomAttachmentHandler {
   
   static Future<bool> _requestPhotosPermission() async {
     if (Platform.isAndroid) {
-      // Try storage permission first (works for most Android versions)
-      try {
-        final storageStatus = await Permission.storage.request();
-        if (storageStatus.isGranted) return true;
-        
-        // For Android 13+, try photos permission
-        final photosStatus = await Permission.photos.request();
-        return photosStatus.isGranted;
-      } catch (e) {
-        return false;
-      }
+      // On Android 13+, image_picker uses the Photo Picker which doesn't require permissions.
+      // On older Android versions, image_picker handles permissions internally.
+      // We don't need to request READ_MEDIA_IMAGES/READ_MEDIA_VIDEO permissions
+      // as this violates Google Play's Photo and Video Permissions policy.
+      return true;
     }
 
     // iOS: Request photos permission
