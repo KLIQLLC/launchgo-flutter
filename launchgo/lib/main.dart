@@ -334,24 +334,40 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         return;
       }
       
-      if (_authService.userInfo != null &&
-          _authService.userInfo!.chatGetStreamToken != null &&
+      final authUser = _authService.userInfo;
+      final authUserId = authUser?.id;
+      if (authUser != null &&
+          authUser.chatGetStreamToken != null &&
           _authService.isAuthenticated) {
         // Only auto-connect students - mentors connect selectively
-        if (_authService.userInfo!.isStudent) {
+        if (authUser.isStudent) {
           await _streamChatService.autoConnectUser(
-            userId: _authService.userInfo!.id,
-            token: _authService.userInfo!.chatGetStreamToken,
-            userName: _authService.userInfo!.name,
-            userImage: _authService.userInfo!.avatarUrl,
+            userId: authUser.id,
+            token: authUser.chatGetStreamToken,
+            userName: authUser.name,
+            userImage: authUser.avatarUrl,
           );
         }
 
+        // If auth changed while we were awaiting chat connect, don't continue.
+        if (_authService.isSigningOut ||
+            !_authService.isAuthenticated ||
+            _authService.userInfo?.id != authUserId) {
+          return;
+        }
+
         // Initialize Stream Video for video calls
-        if (_authService.userInfo!.callGetStreamToken != null) {
+        if (_authService.userInfo?.callGetStreamToken != null) {
           // Ensure PushKit is enabled while authenticated (iOS).
           // Persisted on native side so it stays enabled across restarts until logout.
           await VoipPushKitService.enable();
+
+          // If auth changed while we were awaiting PushKit enable, don't continue.
+          if (_authService.isSigningOut ||
+              !_authService.isAuthenticated ||
+              _authService.userInfo?.id != authUserId) {
+            return;
+          }
 
           await _streamVideoService.initialize(_authService.userInfo!);
           debugPrint(
@@ -468,14 +484,26 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // Initialize Stream Video immediately if already authenticated
     if (_authService.userInfo != null &&
         _authService.userInfo!.callGetStreamToken != null) {
+      final startupUserId = _authService.userInfo!.id;
       Future.microtask(() async {
         // Double-check user is still authenticated
-        if (_authService.userInfo != null) {
+        if (_authService.userInfo != null &&
+            _authService.isAuthenticated &&
+            !_authService.isSigningOut &&
+            _authService.userInfo!.id == startupUserId) {
           // For returning users on app startup: check push permission status.
           // If notDetermined, prompt user. Single-flight mechanism prevents duplicates.
           await PushNotificationService.instance.requestPermissionsAndSetupToken(
             caller: 'MyApp.initState.alreadyAuthenticated',
           );
+
+          // Auth might have changed while awaiting the permission flow.
+          if (_authService.userInfo == null ||
+              !_authService.isAuthenticated ||
+              _authService.isSigningOut ||
+              _authService.userInfo!.id != startupUserId) {
+            return;
+          }
 
           await _streamVideoService.initialize(_authService.userInfo!);
           debugPrint('[VC] 📞 [MyApp:initState] Stream Video initialized on startup');
@@ -537,6 +565,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void _handleAuthChanged() {
     final user = _authService.userInfo;
     if (user == null) return;
+    if (_authService.isSigningOut || !_authService.isAuthenticated) return;
+    final userId = user.id;
 
     // Ensure Stream Video initializes as soon as we have userInfo (needed for CallKit accept flows).
     if (user.callGetStreamToken != null &&
@@ -545,7 +575,17 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       _videoInitInProgress = true;
       Future.microtask(() async {
         try {
-          await _streamVideoService.initialize(user);
+          // Guard against stale queued microtasks: logout/auth changes can happen before this runs.
+          if (!mounted ||
+              _authService.isSigningOut ||
+              !_authService.isAuthenticated ||
+              _authService.userInfo?.id != userId) {
+            debugPrint(
+              '[VC] 📞 [MyApp:_handleAuthChanged] Skipping Stream Video init (auth changed or signing out)',
+            );
+            return;
+          }
+          await _streamVideoService.initialize(_authService.userInfo!);
           debugPrint('[VC] 📞 [MyApp:_handleAuthChanged] Stream Video initialized after auth');
         } catch (e) {
           debugPrint('[VC] ⚠️ [MyApp:_handleAuthChanged] Stream Video init failed: $e');

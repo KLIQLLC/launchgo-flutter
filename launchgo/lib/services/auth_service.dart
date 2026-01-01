@@ -242,7 +242,9 @@ class AuthService extends ChangeNotifier {
     
     try {
       // Disable iOS PushKit ASAP on logout to stop VoIP pushes while logged out.
+      debugPrint('📞 [AUTH] signOut: disabling PushKit (VoIP) ...');
       await VoipPushKitService.disable();
+      debugPrint('📞 [AUTH] signOut: PushKit disabled');
 
       // Unregister device before logout
       try {

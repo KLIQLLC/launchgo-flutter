@@ -13,6 +13,7 @@ import '../../config/environment.dart';
 import '../../models/user_model.dart';
 import '../preferences_service.dart';
 import 'video_call_native_bridge.dart';
+import 'voip_pushkit_service.dart';
 
 /// Callback type for when a call is accepted via CallKit/push (call already joined)
 typedef OnCallAcceptedCallback = void Function(Call call);
@@ -173,7 +174,9 @@ class StreamVideoService extends ChangeNotifier {
 
       // Connect to establish WebSocket
       debugPrint('[VC] 📞 [StreamVideoService:initialize] Connecting to Stream Video WebSocket...');
-      final shouldRegisterPushDevice = !Platform.isIOS;
+      // We want the device to be registered for pushes while logged in on ALL platforms.
+      // Logout is responsible for removing devices and disabling PushKit on iOS.
+      final shouldRegisterPushDevice = true;
       await CallDebugLogger.log(
         '[VIDEO_PUSH] StreamVideo.connect(registerPushDevice=$shouldRegisterPushDevice platform=${Platform.operatingSystem})',
       );
@@ -643,6 +646,7 @@ class StreamVideoService extends ChangeNotifier {
   /// Disconnect and cleanup
   Future<void> disconnect() async {
     debugPrint('[VC] 📞 [StreamVideoService:disconnect] Disconnecting service');
+    debugPrint('[VC] 📞 [StreamVideoService:disconnect] BEGIN (expect no devices left after this)');
 
     // Cancel any in-flight initialization so callers don't wait forever.
     _isInitializing = false;
@@ -665,6 +669,24 @@ class StreamVideoService extends ChangeNotifier {
     if (_client != null) {
       try {
         debugPrint('[VC] 📞 [StreamVideoService:disconnect] Unregistering devices from Stream Video...');
+        
+        // iOS: Explicitly remove VoIP token first (most reliable approach)
+        if (Platform.isIOS) {
+          try {
+            final voipToken = await VoipPushKitService.getVoipToken();
+            if (voipToken != null && voipToken.isNotEmpty) {
+              debugPrint('[VC] 📞 [StreamVideoService:disconnect] Explicitly removing iOS VoIP token: ${voipToken.substring(0, 16)}...');
+              await _client!.removeDevice(pushToken: voipToken);
+              debugPrint('[VC] ✅ [StreamVideoService:disconnect] iOS VoIP token removed');
+            } else {
+              debugPrint('[VC] 📞 [StreamVideoService:disconnect] No iOS VoIP token available to remove');
+            }
+          } catch (e) {
+            debugPrint('[VC] ⚠️ [StreamVideoService:disconnect] Error removing iOS VoIP token: $e');
+          }
+        }
+        
+        // Then query and remove all other devices (catch-all for any others)
         final devicesResult = await _client!.getDevices();
         
         if (devicesResult.isSuccess) {
@@ -705,6 +727,7 @@ class StreamVideoService extends ChangeNotifier {
 
     notifyListeners();
     debugPrint('[VC] 📞 [StreamVideoService:disconnect] Service disconnected');
+    debugPrint('[VC] 📞 [StreamVideoService:disconnect] END');
   }
 
   @override

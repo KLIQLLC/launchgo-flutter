@@ -100,12 +100,26 @@ import AVFAudio
       pushKitChannel?.setMethodCallHandler { [weak self] (call, result) in
         switch call.method {
         case "enableVoip":
-          
-          self?.voipEnabled = true
+          guard let self else {
+            result(nil)
+            return
+          }
+          self.voipEnabled = true
+          // Re-enable PushKit token updates.
+          self.voipRegistry.desiredPushTypes = [.voIP]
+          print("[VC] 📞 [AppDelegate] PushKit ENABLED (voipEnabled=true, desiredPushTypes=[voIP])")
           result(nil)
         case "disableVoip":
-          
-          self?.voipEnabled = false
+          guard let self else {
+            result(nil)
+            return
+          }
+          self.voipEnabled = false
+          // Stop PushKit token updates so we can't re-register devices after logout.
+          self.voipRegistry.desiredPushTypes = []
+          // Best-effort: tell Stream SDK token is invalidated.
+          StreamVideoPKDelegateManager.shared.pushRegistry(self.voipRegistry, didInvalidatePushTokenFor: .voIP)
+          print("[VC] 📞 [AppDelegate] PushKit DISABLED (voipEnabled=false, desiredPushTypes=[])")
           result(nil)
         case "getVoipToken":
           
@@ -476,13 +490,25 @@ extension AppDelegate: PKPushRegistryDelegate {
     
     // Store token for Dart to retrieve
     currentVoipToken = token
-    // Forward token to Stream SDK
+    let prefix = String(token.prefix(16))
+    print("[VC] 📞 [AppDelegate] PushKit didUpdate token=\(prefix)... voipEnabled=\(voipEnabled)")
+    
+    // CRITICAL: If user is logged out, do NOT forward token to Stream SDK,
+    // otherwise it can (re)register voip_apns device after logout.
+    if !voipEnabled {
+      print("[VC] 📞 [AppDelegate] PushKit token update ignored (voipEnabled=false)")
+      return
+    }
+    
+    // Forward token to Stream SDK (this registers/updates voip_apns device)
     StreamVideoPKDelegateManager.shared.pushRegistry(registry, didUpdate: pushCredentials, for: type)
+    print("[VC] 📞 [AppDelegate] PushKit token forwarded to StreamVideoPKDelegateManager")
   }
 
   func pushRegistry(_ registry: PKPushRegistry, didInvalidatePushTokenFor type: PKPushType) {
     
     StreamVideoPKDelegateManager.shared.pushRegistry(registry, didInvalidatePushTokenFor: type)
+    print("[VC] 📞 [AppDelegate] PushKit didInvalidatePushTokenFor type=\(type.rawValue)")
   }
 
   func pushRegistry(

@@ -7,6 +7,7 @@ import 'package:launchgo/utils/call_debug_logger.dart';
 import 'package:stream_chat_flutter/stream_chat_flutter.dart';
 import 'package:app_badge_plus/app_badge_plus.dart';
 import '../push_notification_service.dart';
+import '../video_call/voip_pushkit_service.dart';
 import '../../config/environment.dart';
 
 class StreamChatService extends ChangeNotifier {
@@ -108,7 +109,7 @@ class StreamChatService extends ChangeNotifier {
         ),
         token,
       );
-      
+
       // Register FCM token for push notifications
       await _registerPushToken();
       
@@ -237,10 +238,22 @@ class StreamChatService extends ChangeNotifier {
       final pushNotificationService = PushNotificationService.instance;
       
       if (Platform.isIOS) {
+        // Remove APNs (non-VoIP) token
         final apnsToken = await _apnsChannel.invokeMethod<String>('getApnsToken');
         if (apnsToken != null && apnsToken.isNotEmpty) {
           await _client.removeDevice(apnsToken);
           _lastRegisteredApnsToken = null;
+        }
+        
+        // Remove VoIP APNs token (registered by Stream Video SDK but shows up in Chat devices)
+        final voipToken = await VoipPushKitService.getVoipToken();
+        if (voipToken != null && voipToken.isNotEmpty) {
+          try {
+            await _client.removeDevice(voipToken);
+            debugPrint('✅ Stream Chat: Removed VoIP token from Chat devices');
+          } catch (e) {
+            debugPrint('⚠️ Stream Chat: Error removing VoIP token: $e');
+          }
         }
         
         // Also remove the Firebase device if present (best effort)
