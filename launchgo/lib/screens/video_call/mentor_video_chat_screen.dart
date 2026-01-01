@@ -34,6 +34,7 @@ class _MentorVideoChatScreenState
   /// Whether the call was rejected/cancelled
   bool _isCallRejected = false;
   bool _sentFinalCallLog = false;
+  StreamSubscription<CoordinatorEvent>? _coordinatorEventsSubscription;
 
   void _sendCallLog(String event) {
     if (!mounted) return;
@@ -69,15 +70,85 @@ class _MentorVideoChatScreenState
     );
     // Mentor always starts in "accepted" state - they initiated the call
     hasAcceptedCall = true;
+
+    // IMPORTANT: start listening to coordinator events ASAP so we don't miss a fast reject
+    // (e.g., student declines immediately from CallKit while mentor is still initializing/joining).
+    _setupCoordinatorEventsListener();
+  }
+
+  void _setupCoordinatorEventsListener() {
+    _coordinatorEventsSubscription?.cancel();
+
+    final client = videoService.client;
+    if (client == null) {
+      debugPrint(
+        '[VC] ⚠️ [MentorVideoChatScreen:_setupCoordinatorEventsListener] Video client is null (will rely on call state + timeout)',
+      );
+      return;
+    }
+
+    _coordinatorEventsSubscription = client.events.listen((event) {
+      if (!mounted) return;
+
+      String? eventCallId;
+      if (event is CoordinatorCallRejectedEvent) {
+        eventCallId = event.callCid.id;
+      } else if (event is CoordinatorCallEndedEvent) {
+        eventCallId = event.callCid.id;
+      } else if (event is CoordinatorCallSessionParticipantLeftEvent) {
+        eventCallId = event.callCid.id;
+      }
+
+      // Only handle events for THIS call.
+      if (eventCallId == null || eventCallId != widget.callId) return;
+
+      if (event is CoordinatorCallRejectedEvent) {
+        _handleRemoteRejectedOrEnded('rejected');
+      } else if (event is CoordinatorCallEndedEvent) {
+        _handleRemoteRejectedOrEnded('ended');
+      } else if (event is CoordinatorCallSessionParticipantLeftEvent) {
+        // If the other participant leaves before connecting, treat it as ended/rejected for caller UX.
+        if (!_isStudentConnected) {
+          _handleRemoteRejectedOrEnded('participant_left');
+        }
+      }
+    });
   }
 
   @override
   void dispose() {
     _callTimeoutTimer?.cancel();
+    _coordinatorEventsSubscription?.cancel();
     super.dispose();
   }
 
-  /// Start timeout timer - if student doesn't answer within 30 seconds, end call
+  void _handleRemoteRejectedOrEnded(String reason) {
+    if (!mounted) return;
+    if (isEnding) return;
+
+    debugPrint(
+      '[VC] 📞 [MentorVideoChatScreen:_handleRemoteRejectedOrEnded] Remote event: $reason',
+    );
+
+    _callTimeoutTimer?.cancel();
+
+    // If the student never joined and we get a rejected/ended event, treat it as declined.
+    if (!_isStudentConnected && !_isCallRejected) {
+      setState(() {
+        _isCallRejected = true;
+      });
+
+      if (!_sentFinalCallLog) {
+        _sentFinalCallLog = true;
+        _sendCallLog('declined');
+      }
+    }
+
+    // Ensure we actually stop the outgoing "calling" state (leave + clear active call + end CallKit if any).
+    unawaited(endCall());
+  }
+
+  /// Start timeout timer - if student doesn't answer within 60 seconds, end call
   void _startCallTimeoutTimer() {
     debugPrint(
       '[VC] 📞 [MentorVideoChatScreen:_startCallTimeoutTimer] Starting ${_callTimeoutDuration.inSeconds}s timeout timer',
@@ -192,6 +263,9 @@ class _MentorVideoChatScreenState
       // Setup state listener (includes reject detection)
       setupCallStateListener();
 
+      // Ensure coordinator listener is active (client might have been null in initState).
+      _setupCoordinatorEventsListener();
+
       // Start timeout timer - will cancel call if student doesn't answer in 30 seconds
       _startCallTimeoutTimer();
 
@@ -270,17 +344,9 @@ class _MentorVideoChatScreenState
           _callTimeoutTimer?.cancel();
         }
 
-        // Dismiss screen after delay
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted && !isEnding) {
-            debugPrint(
-              '[VC] 📞 [MentorVideoChatScreen:callStateListener] Navigating back after disconnect',
-            );
-            isEnding = true;
-            videoService.clearActiveCall();
-            navigateBack();
-          }
-        });
+        // IMPORTANT: actually end/leave the call to stop outgoing "calling" state immediately.
+        // Simply navigating back can leave the call running and keep the UI/sound in a "calling" state.
+        unawaited(endCall());
       }
 
       // Monitor participant count for 1-on-1 calls
