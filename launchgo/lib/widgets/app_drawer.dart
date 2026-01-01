@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:launchgo/config/environment.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/chat/stream_chat_service.dart';
 import 'package:launchgo/services/video_call/stream_video_service.dart';
@@ -185,20 +186,21 @@ class _AppDrawerState extends State<AppDrawer> {
                 ],
                 
                 const SizedBox(height: 8),
-                // Settings with indent (always visible for log access)
-                Padding(
-                  padding: const EdgeInsets.only(left: _itemIndentPadding),
-                  child: _buildDrawerItem(
-                    context: context,
-                    title: 'Settings',
-                    isSelected: currentRoute == '/settings',
-                    svgPath: 'assets/icons/ic_settings.svg',
-                    onTap: () {
-                      Navigator.pop(context); // Close drawer
-                      context.push('/settings');
-                    },
+                // Settings with indent (only visible in stage, hidden in prod)
+                if (!EnvironmentConfig.isProd)
+                  Padding(
+                    padding: const EdgeInsets.only(left: _itemIndentPadding),
+                    child: _buildDrawerItem(
+                      context: context,
+                      title: 'Settings',
+                      isSelected: currentRoute == '/settings',
+                      svgPath: 'assets/icons/ic_settings.svg',
+                      onTap: () {
+                        Navigator.pop(context); // Close drawer
+                        context.push('/settings');
+                      },
+                    ),
                   ),
-                ),
                 // Logout Button with indent
                 Padding(
                   padding: const EdgeInsets.only(left: _itemIndentPadding),
