@@ -369,16 +369,23 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             return;
           }
 
-          await _streamVideoService.initialize(_authService.userInfo!);
-          debugPrint(
-            '[VC] 📞 [MyApp:authListener] Stream Video initialized for user: ${_authService.userInfo!.id}',
-          );
+          try {
+            await _streamVideoService.initialize(_authService.userInfo!);
+            debugPrint(
+              '[VC] 📞 [MyApp:authListener] Stream Video initialized for user: ${_authService.userInfo!.id}',
+            );
+          } catch (e, st) {
+            debugPrint(
+              '[VC] ❌ [MyApp:authListener] Stream Video init failed: $e\n$st',
+            );
+            return;
+          }
 
           // Consume active call from terminated state (for students)
           // This handles calls accepted via CallKit while app was terminated
-          if (_authService.userInfo!.isStudent) {
+          if (_authService.userInfo!.isStudent && Platform.isAndroid) {
             debugPrint(
-              '[VC] 📞 [MyApp:authListener] Checking for active call from terminated state',
+              '[VC] 📞 [MyApp:authListener] Checking for active call from terminated state (Android only)',
             );
 
             // Use post frame callback to ensure UI is ready
@@ -505,14 +512,19 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             return;
           }
 
-          await _streamVideoService.initialize(_authService.userInfo!);
-          debugPrint('[VC] 📞 [MyApp:initState] Stream Video initialized on startup');
+          try {
+            await _streamVideoService.initialize(_authService.userInfo!);
+            debugPrint('[VC] 📞 [MyApp:initState] Stream Video initialized on startup');
+          } catch (e, st) {
+            debugPrint('[VC] ❌ [MyApp:initState] Stream Video init failed: $e\n$st');
+            return;
+          }
 
           // Consume active call from terminated state (Android)
           // Based on official pattern from GetStream tutorial
-          if (_authService.userInfo!.isStudent) {
+          if (_authService.userInfo!.isStudent && Platform.isAndroid) {
             debugPrint(
-              '[VC] 📞 [MyApp:initState] Attempting to consume active call from terminated state',
+              '[VC] 📞 [MyApp:initState] Attempting to consume active call from terminated state (Android only)',
             );
             WidgetsBinding.instance.addPostFrameCallback((_) {
               _streamVideoService.consumeAndAcceptActiveCall((
