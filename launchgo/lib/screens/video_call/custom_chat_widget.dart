@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'package:stream_chat_flutter/stream_chat_flutter.dart';
 import 'package:stream_video_flutter/stream_video_flutter.dart';
+import 'package:stream_video/src/utils/result.dart' as sv_result;
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../services/auth_service.dart';
@@ -567,8 +568,7 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
         return;
       }
 
-      result.fold(
-        success: (success) {
+      if (result is sv_result.Success) {
           debugPrint('[VC] 📞 [CustomChatWidget:_initiateVideoCall] Call created successfully');
 
           // Send call started message (system message, time added on render from createdAt)
@@ -604,19 +604,28 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
               },
             );
           }
-        },
-        failure: (failure) {
-          debugPrint('[VC] ❌ [CustomChatWidget:_initiateVideoCall] Failed to create call: ${failure.error.message}');
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Failed to create call: ${failure.error.message}'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        },
-      );
+      } else if (result is sv_result.Failure) {
+        final message = result.error.message;
+        debugPrint('[VC] ❌ [CustomChatWidget:_initiateVideoCall] Failed to create call: $message');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to create call: $message'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } else {
+        debugPrint('[VC] ⚠️ [CustomChatWidget:_initiateVideoCall] Unexpected getOrCreate result type: ${result.runtimeType}');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to start call. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     } catch (e) {
       debugPrint('[VC] ❌ [CustomChatWidget:_initiateVideoCall] Error creating call: $e');
       if (context.mounted) {
