@@ -535,18 +535,37 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
       await CallDebugLogger.log(
         '[CALL_CREATE] getOrCreate: callId=$uniqueCallId memberId=${selectedStudent.id} ringing=true notify=false',
       );
-      final result = await call.getOrCreate(
-        memberIds: [selectedStudent.id],
-        ringing: true, // Triggers VoIP push (CallKit)
-        notify: false, // Do NOT send regular "calling you" push during ringing
-        // Keep missed-call push, but make it match our CallKit ring duration (60s)
-        // so "missed" doesn't fire early.
-        ring: const StreamRingSettings(
-          autoCancelTimeout: Duration(seconds: 60),
-          autoRejectTimeout: Duration(seconds: 60),
-          missedCallTimeout: Duration(seconds: 60),
-        ),
-      );
+
+      late final dynamic result;
+      try {
+        result = await call.getOrCreate(
+          memberIds: [selectedStudent.id],
+          ringing: true, // Triggers VoIP push (CallKit)
+          notify: false, // Do NOT send regular "calling you" push during ringing
+          // Keep missed-call push, but make it match our CallKit ring duration (60s)
+          // so "missed" doesn't fire early.
+          ring: const StreamRingSettings(
+            autoCancelTimeout: Duration(seconds: 60),
+            autoRejectTimeout: Duration(seconds: 60),
+            missedCallTimeout: Duration(seconds: 60),
+          ),
+        );
+      } catch (e, st) {
+        debugPrint('[VC] ❌ [CustomChatWidget:_initiateVideoCall] getOrCreate threw: $e\n$st');
+        await CallDebugLogger.log(
+          '[CALL_CREATE][ERROR] getOrCreate threw: $e\n$st',
+        );
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to start call. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
 
       result.fold(
         success: (success) {
