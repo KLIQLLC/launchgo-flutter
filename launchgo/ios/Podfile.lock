@@ -479,7 +479,7 @@ SPEC CHECKSUMS:
   stream_video_flutter: d72405271cc5a1ceb679988fee5466b464ead908
   stream_video_push_notification: 731428e1aba83a524cecd8b9541bd778c0d3cb98
   stream_video_screen_sharing: 89cf7990a0f32caa780eb58c773138377f5f13b4
-  stream_webrtc_flutter: 5be2f332cebb1816a26f8e77410b8927932d1e9b
+  stream_webrtc_flutter: c7588ef595df484f6c58354367e3ba1588e40aa6
   SwiftyGif: 706c60cf65fa2bc5ee0313beece843c8eb8194d4
   thermal: a9261044101ae8f532fa29cab4e8270b51b3f55c
   url_launcher_ios: bb13df5870e8c4234ca12609d04010a21be43dfa
