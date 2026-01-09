@@ -19,6 +19,7 @@ import AVFAudio
   private var pushKitChannel: FlutterMethodChannel?  // Channel for VoIP push control
   private var apnsChannel: FlutterMethodChannel?     // Channel for APNs token (non-VoIP) for chat pushes
   private var streamVideoAuthChannel: FlutterMethodChannel? // Channel for storing Stream Video auth for native reject
+  private var videoToggleChannel: FlutterMethodChannel? // Channel to notify Flutter when user taps Video button
   private let callObserver = CXCallObserver() // For observing CallKit state
   
   // Keep a strong reference to PushKit registry
@@ -178,6 +179,12 @@ import AVFAudio
           result(FlutterMethodNotImplemented)
         }
       }
+      
+      // Channel to notify Flutter when user taps Video button in CallKit
+      videoToggleChannel = FlutterMethodChannel(
+        name: "com.launchgo.app/video_toggle",
+        binaryMessenger: controller.binaryMessenger
+      )
     }
 
     // Register for VoIP push notifications - we handle them ourselves
@@ -571,12 +578,14 @@ extension AppDelegate: PKPushRegistryDelegate {
     let uuid = UUID()
 
     // Build CallKitParams for flutter_callkit_incoming
+    // type: 0 = audio call (hasVideo: false) - user can tap Video button to upgrade
+    // This keeps the call in CallKit audio mode until user explicitly requests video
     let callKitParams: [String: Any] = [
       "id": uuid.uuidString,
       "nameCaller": callerName,
       "appName": "LaunchGo",
-      "handle": "Video Call",
-      "type": 1, // 1 = video call
+      "handle": "Audio Call",
+      "type": 0, // 0 = audio call - stays in CallKit UI until user taps Video
       "textAccept": "Accept",
       "textDecline": "Decline",
       "duration": 60000, // 60 seconds ring
@@ -588,10 +597,10 @@ extension AppDelegate: PKPushRegistryDelegate {
       "ios": [
         "iconName": "CallKitIcon",
         "handleType": "generic",
-        "supportsVideo": true,
+        "supportsVideo": true, // Show Video button in CallKit UI
         "maximumCallGroups": 1,
         "maximumCallsPerCallGroup": 1,
-        "audioSessionMode": "videoChat",
+        "audioSessionMode": "voiceChat", // Audio mode for now, video later
         "audioSessionActive": true,
         "audioSessionPreferredSampleRate": 44100.0,
         "audioSessionPreferredIOBufferDuration": 0.005,

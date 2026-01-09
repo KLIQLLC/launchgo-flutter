@@ -38,6 +38,10 @@ const _videoCallChannel = MethodChannel('com.launchgo/video_call');
 /// iOS MethodChannel for force ending CallKit (uses reliable saveEndCall)
 const _iosCallKitChannel = MethodChannel('com.launchgo.app/callkit');
 
+/// iOS MethodChannel for receiving video toggle events from native CallKit
+/// When user taps Video button in CallKit UI, native code notifies Flutter via this channel
+const _iosVideoToggleChannel = MethodChannel('com.launchgo.app/video_toggle');
+
 /// Force end all CallKit calls on iOS using the reliable native method.
 /// This uses saveEndCall() which bypasses the plugin's internal call list check.
 /// Call this after FlutterCallkitIncoming.endAllCalls() as a fallback.
@@ -157,6 +161,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   _lastNavigatedCallId; // Track last call we navigated to (video call screen)
   String?
   _lastIncomingCallId; // Track last incoming call to prevent duplicate screens
+  
+  /// iOS audio-only call accepted via CallKit on lock screen
+  /// When user taps Video button, we navigate to video chat with this call
+  String? _pendingAudioCallId;
+  Call? _pendingAudioCall;
 
   /// iOS method channel for call validity timer
   static const _iosTimerChannel = MethodChannel(
@@ -231,6 +240,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     if (Platform.isIOS) {
       _setupiOSCallKitEventListener();
       _setupIOSCallValidityHandler();
+      _setupIOSVideoToggleHandler();
     }
 
     // Set up ringing events callback for navigation when call is accepted
@@ -238,12 +248,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // The call is ALREADY JOINED when this callback fires
     _streamVideoService.setOnCallAcceptedCallback((call) {
       debugPrint(
-        '[VC] 📞 [MyApp:onCallAcceptedCallback] Call accepted via CallKit/push - navigating',
+        '[VC] 📞 [MyApp:onCallAcceptedCallback] Call accepted via CallKit/push',
       );
       debugPrint('[VC] 📞 [MyApp:onCallAcceptedCallback] Call ID: ${call.id}');
-      debugPrint(
-        '[VC] 📞 [MyApp:onCallAcceptedCallback] App state: foreground',
-      );
 
       // Prevent duplicate navigation
       if (_lastNavigatedCallId == call.id) {
@@ -253,6 +260,24 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         return;
       }
 
+      // iOS: Check if we're in the background/lock screen audio-only mode
+      // If so, store as pending call and don't navigate yet
+      // Navigation will happen when user taps Video button or app comes to foreground
+      if (Platform.isIOS) {
+        // Check app lifecycle state - if not resumed, we're likely on lock screen
+        final lifecycleState = WidgetsBinding.instance.lifecycleState;
+        debugPrint('[VC] 📞 [MyApp:onCallAcceptedCallback] iOS lifecycle state: $lifecycleState');
+        
+        if (lifecycleState != AppLifecycleState.resumed) {
+          debugPrint('[VC] 📞 [MyApp:onCallAcceptedCallback] iOS: App not in foreground, storing as pending audio call');
+          _pendingAudioCallId = call.id;
+          _pendingAudioCall = call;
+          // Don't navigate - wait for Video button tap or app resume
+          return;
+        }
+      }
+
+      debugPrint('[VC] 📞 [MyApp:onCallAcceptedCallback] Navigating to video chat');
       _lastNavigatedCallId = call.id;
       _appRouter.router.pushNamed(
         'student-video-chat',
@@ -1128,12 +1153,19 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             }
 
             _streamVideoService.setActiveCall(acceptedCall!);
-            _lastNavigatedCallId = acceptedCall!.id;
-            _appRouter.router.pushNamed(
-              'student-video-chat',
-              pathParameters: {'callId': acceptedCall!.id},
-              queryParameters: {'callerName': 'Mentor', 'autoAccept': 'true'},
-            );
+            
+            // IMPORTANT: On iOS lock screen, we DON'T navigate to video chat immediately.
+            // The call is accepted as audio-only via CallKit.
+            // User must tap the Video button in CallKit UI to open the app and enable video.
+            // Store the pending call so we can navigate when video toggle is received.
+            _pendingAudioCallId = acceptedCall!.id;
+            _pendingAudioCall = acceptedCall;
+            debugPrint('[VC] 📞 [iOS] Call accepted as audio-only. Waiting for video toggle to navigate.');
+            debugPrint('[VC] 📞 [iOS] Pending audio call: $_pendingAudioCallId');
+            
+            // Note: Navigation will happen when:
+            // 1. User taps Video button -> native sends video_toggle event -> we navigate
+            // 2. App comes to foreground with pending call -> we navigate
           } catch (e) {
             debugPrint('[VC] ❌ [iOS] Error accepting via consumeIncomingCall: $e');
             await CallDebugLogger.log('[IOS_ACCEPT] ERROR consumeIncomingCall/accept: $e');
@@ -1248,6 +1280,68 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     debugPrint('[VC] 📞 [iOS] Call validity handler configured');
   }
 
+  /// Set up iOS video toggle handler
+  /// When user taps Video button in CallKit UI, native code notifies Flutter to open app
+  void _setupIOSVideoToggleHandler() {
+    debugPrint('[VC] 📞 [iOS] Setting up video toggle handler');
+
+    _iosVideoToggleChannel.setMethodCallHandler((call) async {
+      if (call.method == 'videoToggled') {
+        debugPrint('[VC] 📞 [iOS] ========== VIDEO TOGGLE EVENT ==========');
+        final args = call.arguments as Map<dynamic, dynamic>?;
+        final callId = args?['call_id'] as String?;
+        final callCid = args?['call_cid'] as String?;
+        
+        debugPrint('[VC] 📞 [iOS] Video toggled for call: $callId, cid: $callCid');
+        
+        // Navigate to video chat with the pending audio call
+        if (_pendingAudioCall != null && _pendingAudioCallId != null) {
+          debugPrint('[VC] 📞 [iOS] Navigating to video chat with pending call: $_pendingAudioCallId');
+          
+          // Prevent duplicate navigation
+          if (_lastNavigatedCallId == _pendingAudioCallId) {
+            debugPrint('[VC] 📞 [iOS] Already navigated to this call, skipping');
+            return true;
+          }
+          
+          _lastNavigatedCallId = _pendingAudioCallId;
+          _appRouter.router.pushNamed(
+            'student-video-chat',
+            pathParameters: {'callId': _pendingAudioCallId!},
+            queryParameters: {'callerName': 'Mentor', 'autoAccept': 'true'},
+          );
+          
+          // Clear pending call after navigation
+          _pendingAudioCallId = null;
+          _pendingAudioCall = null;
+        } else if (callId != null) {
+          // Fallback: use callId from the event
+          debugPrint('[VC] 📞 [iOS] No pending call, using callId from event: $callId');
+          
+          if (_lastNavigatedCallId == callId) {
+            debugPrint('[VC] 📞 [iOS] Already navigated to this call, skipping');
+            return true;
+          }
+          
+          _lastNavigatedCallId = callId;
+          _appRouter.router.pushNamed(
+            'student-video-chat',
+            pathParameters: {'callId': callId},
+            queryParameters: {'callerName': 'Mentor', 'autoAccept': 'true'},
+          );
+        } else {
+          debugPrint('[VC] ⚠️ [iOS] No pending call and no callId in event');
+        }
+        
+        debugPrint('[VC] 📞 [iOS] ========== END VIDEO TOGGLE EVENT ==========');
+        return true;
+      }
+      return null;
+    });
+
+    debugPrint('[VC] 📞 [iOS] Video toggle handler configured');
+  }
+
   /// Check if call is still valid by querying Stream server
   Future<bool> _checkCallStillValid(String callCid) async {
     if (!_streamVideoService.isInitialized ||
@@ -1297,6 +1391,26 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       // retry restoring auth now that the device is unlocked/foregrounded.
       if (!_authService.isAuthenticated) {
         Future.microtask(() => _authService.refreshFromStorageIfPossible());
+      }
+      
+      // iOS: Check if there's a pending audio call that was accepted on lock screen
+      // When app comes to foreground (e.g., user taps Video button), navigate to video chat
+      if (Platform.isIOS && _pendingAudioCall != null && _pendingAudioCallId != null) {
+        debugPrint('[VC] 📞 [iOS] App resumed with pending audio call: $_pendingAudioCallId');
+        
+        if (_lastNavigatedCallId != _pendingAudioCallId) {
+          debugPrint('[VC] 📞 [iOS] Navigating to video chat from app resume');
+          _lastNavigatedCallId = _pendingAudioCallId;
+          _appRouter.router.pushNamed(
+            'student-video-chat',
+            pathParameters: {'callId': _pendingAudioCallId!},
+            queryParameters: {'callerName': 'Mentor', 'autoAccept': 'true'},
+          );
+        }
+        
+        // Clear pending call after navigation
+        _pendingAudioCallId = null;
+        _pendingAudioCall = null;
       }
 
       // CRITICAL: Skip if signing out

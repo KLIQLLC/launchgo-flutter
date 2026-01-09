@@ -666,7 +666,7 @@ Future<void> _showAndroidIncomingCallNotification(Map<String, dynamic> data) asy
     id: callId,  // Use actual call_id, not random UUID
     nameCaller: callerName,
     appName: 'launchgo',
-    type: 0, // 0 = video call, 1 = audio call
+    type: 0, // 0 = audio call (hasVideo=false), 1 = video call (hasVideo=true)
     textAccept: 'Accept',
     textDecline: 'Decline',
     duration: 30000, // Ring for 30 seconds
