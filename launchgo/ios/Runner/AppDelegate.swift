@@ -541,11 +541,18 @@ extension AppDelegate: PKPushRegistryDelegate {
     let streamPayload = payload.dictionaryPayload["stream"] as? [String: Any]
                         ?? payload.dictionaryPayload["stream_video"] as? [String: Any]
 
+    // Determine call type from push payload (same logic as Stream SDK)
+    // If video == "false", it's audio-only (type: 0). Otherwise video (type: 1)
+    var callType: Int = 1 // Default to video
+    
     if let stream = streamPayload {
       streamCallCid = stream["call_cid"] as? String
       pushType = stream["type"] as? String
       callerName = stream["created_by_display_name"] as? String ?? "Incoming Call"
       
+      // Check video field - same logic as StreamVideoPKDelegateManager
+      let videoIncluded = stream["video"] as? String
+      callType = (videoIncluded == "false") ? 0 : 1
     }
 
     // Handle call cancellation pushes.
@@ -578,14 +585,13 @@ extension AppDelegate: PKPushRegistryDelegate {
     let uuid = UUID()
 
     // Build CallKitParams for flutter_callkit_incoming
-    // type: 0 = audio call (hasVideo: false) - user can tap Video button to upgrade
-    // This keeps the call in CallKit audio mode until user explicitly requests video
+    // type comes from push payload: 0 = audio, 1 = video (default)
     let callKitParams: [String: Any] = [
       "id": uuid.uuidString,
       "nameCaller": callerName,
       "appName": "LaunchGo",
-      "handle": "Audio Call",
-      "type": 0, // 0 = audio call - stays in CallKit UI until user taps Video
+      "handle": callType == 1 ? "Video Call" : "Audio Call",
+      "type": callType,
       "textAccept": "Accept",
       "textDecline": "Decline",
       "duration": 60000, // 60 seconds ring
@@ -597,10 +603,10 @@ extension AppDelegate: PKPushRegistryDelegate {
       "ios": [
         "iconName": "CallKitIcon",
         "handleType": "generic",
-        "supportsVideo": true, // Show Video button in CallKit UI
+        "supportsVideo": true,
         "maximumCallGroups": 1,
         "maximumCallsPerCallGroup": 1,
-        "audioSessionMode": "voiceChat", // Audio mode for now, video later
+        "audioSessionMode": callType == 1 ? "videoChat" : "voiceChat",
         "audioSessionActive": true,
         "audioSessionPreferredSampleRate": 44100.0,
         "audioSessionPreferredIOBufferDuration": 0.005,

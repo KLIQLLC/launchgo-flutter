@@ -1152,15 +1152,28 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               await CallDebugLogger.log('[IOS_ACCEPT] accept() FAILED: $acceptResult');
             }
 
+            // CRITICAL: Join the call to establish WebRTC connection (audio/video).
+            // Without join(), there's no media - mentor can't hear student.
+            // We join in background here, then when user opens app we just show the UI.
+            debugPrint('[VC] 📞 [iOS] Joining call (WebRTC) in background...');
+            final joinResult = await acceptedCall!.join();
+            if (joinResult.isFailure) {
+              debugPrint('[VC] ❌ [iOS] Join failed: $joinResult');
+              await CallDebugLogger.log('[IOS_ACCEPT] join() FAILED: $joinResult');
+            } else {
+              debugPrint('[VC] ✅ [iOS] Joined successfully - audio/video connected');
+              await CallDebugLogger.log('[IOS_ACCEPT] join() OK');
+            }
+
             _streamVideoService.setActiveCall(acceptedCall!);
             
             // IMPORTANT: On iOS lock screen, we DON'T navigate to video chat immediately.
-            // The call is accepted as audio-only via CallKit.
-            // User must tap the Video button in CallKit UI to open the app and enable video.
+            // The call is accepted and joined (audio/video works), but UI stays in CallKit.
+            // User can tap Video button or unlock phone to see the Flutter video UI.
             // Store the pending call so we can navigate when video toggle is received.
             _pendingAudioCallId = acceptedCall!.id;
             _pendingAudioCall = acceptedCall;
-            debugPrint('[VC] 📞 [iOS] Call accepted as audio-only. Waiting for video toggle to navigate.');
+            debugPrint('[VC] 📞 [iOS] Call accepted and joined. Waiting for video toggle to navigate.');
             debugPrint('[VC] 📞 [iOS] Pending audio call: $_pendingAudioCallId');
             
             // Note: Navigation will happen when:
