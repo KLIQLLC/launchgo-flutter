@@ -1,4 +1,5 @@
 // main.dart
+import 'dart:async';
 import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
@@ -22,6 +23,7 @@ import 'package:launchgo/services/weekly_notification_service.dart';
 import 'package:launchgo/services/video_call/stream_video_service.dart';
 import 'package:launchgo/services/video_call/video_call_push_handler.dart';
 import 'package:launchgo/services/video_call/voip_pushkit_service.dart';
+import 'package:launchgo/services/secure_storage_service.dart';
 import 'package:launchgo/utils/call_debug_logger.dart';
 import 'package:stream_video_flutter/stream_video_flutter.dart';
 import 'package:launchgo/widgets/splash_screen.dart';
@@ -983,7 +985,20 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         debugPrint('[VC] 📞 Call TIMEOUT event - ending all calls');
         await FlutterCallkitIncoming.endAllCalls();
       } else if (event.event == callkit.Event.actionCallEnded) {
-        debugPrint('[VC] 📞 Call ENDED event');
+        debugPrint('[VC] 📞 Call ENDED event - leaving Stream call');
+        // When user hangs up via CallKit (e.g., taps red button on lock screen),
+        // we must leave/end the Stream call so the other party knows.
+        if (_streamVideoService.hasActiveCall) {
+          try {
+            await _streamVideoService.activeCall?.leave();
+            debugPrint('[VC] 📞 Call left successfully');
+          } catch (e) {
+            debugPrint('[VC] ⚠️ Error leaving call: $e');
+          }
+          _streamVideoService.clearActiveCall();
+        }
+        _pendingAudioCallId = null;
+        _pendingAudioCall = null;
       } else if (event.event == callkit.Event.actionCallIncoming) {
         debugPrint('[VC] 📞 Call INCOMING event');
       } else if (event.event == callkit.Event.actionCallStart) {
@@ -1060,10 +1075,15 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           debugPrint('[VC] 📞 [iOS] Ensuring auth + StreamVideo are ready...');
           final acceptStart = DateTime.now();
 
-          // Ensure auth exists and this is a student device.
-          if (_authService.userInfo == null || !_authService.userInfo!.isStudent) {
-            debugPrint('[VC] ⚠️ [iOS] Cannot accept: user not ready or not a student');
-            await CallDebugLogger.log('[IOS_ACCEPT] ABORT: user not ready or not student');
+          // DO NOT poll/wait for full userInfo here.
+          // On iOS lock screen wakes, secure storage/userInfo API may be unavailable.
+          // Instead, bootstrap StreamVideo either from in-memory userInfo OR cached StreamVideo bootstrap user.
+          final user = _authService.userInfo ??
+              await SecureStorageService.getStreamVideoBootstrapUser();
+
+          if (user == null || !user.isStudent) {
+            debugPrint('[VC] ⚠️ [iOS] Cannot accept: no bootstrap user or not a student');
+            await CallDebugLogger.log('[IOS_ACCEPT] ABORT: no bootstrap user or not student');
             return;
           }
 
@@ -1071,7 +1091,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           if (!_streamVideoService.isInitialized) {
             try {
               debugPrint('[VC] 📞 [iOS] StreamVideo not initialized, initializing now...');
-              await _streamVideoService.initialize(_authService.userInfo!);
+              await _streamVideoService.initialize(user);
               debugPrint('[VC] 📞 [iOS] StreamVideo initialized: ${_streamVideoService.isInitialized}');
             } catch (e) {
               debugPrint('[VC] ❌ [iOS] Failed to initialize StreamVideo: $e');
@@ -1152,28 +1172,38 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               await CallDebugLogger.log('[IOS_ACCEPT] accept() FAILED: $acceptResult');
             }
 
-            // CRITICAL: Join the call to establish WebRTC connection (audio/video).
-            // Without join(), there's no media - mentor can't hear student.
-            // We join in background here, then when user opens app we just show the UI.
-            debugPrint('[VC] 📞 [iOS] Joining call (WebRTC) in background...');
-            final joinResult = await acceptedCall!.join();
-            if (joinResult.isFailure) {
-              debugPrint('[VC] ❌ [iOS] Join failed: $joinResult');
-              await CallDebugLogger.log('[IOS_ACCEPT] join() FAILED: $joinResult');
-            } else {
-              debugPrint('[VC] ✅ [iOS] Joined successfully - audio/video connected');
-              await CallDebugLogger.log('[IOS_ACCEPT] join() OK');
-            }
+            // CRITICAL: Join the call (same as Stream SDK's _onCallAccept does).
+            // Use unawaited so it doesn't block - join happens in background while CallKit shows.
+            // This establishes the WebRTC connection so mentor can hear/see student.
+            unawaited(acceptedCall!.join().then((result) {
+              if (result.isSuccess) {
+                debugPrint('[VC] ✅ [iOS] Background join succeeded');
+              } else {
+                debugPrint('[VC] ❌ [iOS] Background join failed: $result');
+                CallDebugLogger.log('[IOS_ACCEPT] join() FAILED: $result');
+              }
+            }));
+
+            // Listen for remote hangup while we are still on CallKit (before app UI opens).
+            acceptedCall!.state.listen((state) {
+              debugPrint('[VC] 📞 [iOS:BG] Call state changed: ${state.status}');
+              if (state.status is CallStatusDisconnected) {
+                debugPrint('[VC] 📞 [iOS:BG] Call ended by other party - ending CallKit');
+                FlutterCallkitIncoming.endAllCalls();
+                _pendingAudioCallId = null;
+                _pendingAudioCall = null;
+                _streamVideoService.clearActiveCall();
+              }
+            });
 
             _streamVideoService.setActiveCall(acceptedCall!);
             
             // IMPORTANT: On iOS lock screen, we DON'T navigate to video chat immediately.
-            // The call is accepted and joined (audio/video works), but UI stays in CallKit.
-            // User can tap Video button or unlock phone to see the Flutter video UI.
-            // Store the pending call so we can navigate when video toggle is received.
+            // The call is accepted and joining in background, UI stays in CallKit.
+            // Store the pending call so we can navigate when app comes to foreground.
             _pendingAudioCallId = acceptedCall!.id;
             _pendingAudioCall = acceptedCall;
-            debugPrint('[VC] 📞 [iOS] Call accepted and joined. Waiting for video toggle to navigate.');
+            debugPrint('[VC] 📞 [iOS] Call accepted, join initiated. Waiting for app foreground to navigate.');
             debugPrint('[VC] 📞 [iOS] Pending audio call: $_pendingAudioCallId');
             
             // Note: Navigation will happen when:
@@ -1214,6 +1244,56 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           }
           await _streamVideoService.rejectIncomingCall(callId);
         }
+      } else if (event.event == callkit.Event.actionCallEnded) {
+        debugPrint('[VC] 📞 [iOS] Call ENDED event - leaving Stream call');
+
+        // When user hangs up via CallKit (lock screen / system UI),
+        // we must leave the Stream call so the other party is notified.
+        try {
+          // Prefer leaving the active call if we have it.
+          if (_streamVideoService.hasActiveCall) {
+            await _streamVideoService.activeCall?.leave();
+            debugPrint('[VC] 📞 [iOS] Active call left successfully');
+          } else {
+            // Best-effort: attempt to leave by callId from payload.
+            String? callId;
+            final body = event.body;
+            if (body is Map) {
+              final extra = body['extra'];
+              if (extra is Map) {
+                callId = extra['call_id'] as String?;
+                callId ??= (extra['call_cid'] as String?)?.split(':').last;
+              }
+              callId ??= body['call_id'] as String? ?? body['id'] as String?;
+            }
+
+            final client = _streamVideoService.client;
+            if (client != null && callId != null && callId.isNotEmpty) {
+              final call = client.makeCall(
+                callType: StreamCallType.defaultType(),
+                id: callId,
+              );
+              await call.getOrCreate();
+              await call.leave();
+              debugPrint('[VC] 📞 [iOS] Call left successfully (by callId)');
+            } else {
+              debugPrint(
+                '[VC] ⚠️ [iOS] No activeCall and cannot leave by callId (client=$client callId=$callId)',
+              );
+            }
+          }
+        } catch (e) {
+          debugPrint('[VC] ⚠️ [iOS] Error leaving call on CallKit end: $e');
+        } finally {
+          _streamVideoService.clearActiveCall();
+          _pendingAudioCallId = null;
+          _pendingAudioCall = null;
+        }
+      } else if (event.event == callkit.Event.actionCallTimeout) {
+        debugPrint('[VC] 📞 [iOS] Call TIMEOUT event - ending CallKit + clearing state');
+        await FlutterCallkitIncoming.endAllCalls();
+        _pendingAudioCallId = null;
+        _pendingAudioCall = null;
       }
 
       debugPrint(

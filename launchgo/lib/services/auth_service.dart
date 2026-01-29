@@ -82,6 +82,9 @@ class AuthService extends ChangeNotifier {
       // Migrate old tokens to environment-specific storage
       await SecureStorageService.migrateOldTokens();
 
+      // iOS: ensure Keychain items are readable during CallKit/PushKit wakes on lock screen.
+      await SecureStorageService.migrateIOSKeychainAccessibilityIfNeeded();
+
       // Load stored access token for current environment (may be temporarily unavailable on iOS while locked)
       _accessToken = await SecureStorageService.getAccessToken();
 
@@ -476,6 +479,11 @@ class AuthService extends ChangeNotifier {
         debugPrint('✅ User info data received: ${userInfoData['id']} - ${userInfoData['name']}');
         _userInfo = UserModel.fromJson(userInfoData);
         debugPrint('✅ User info parsed: ${_userInfo?.id} - ${_userInfo?.name} (${_userInfo?.role})');
+
+        // Cache Stream Video bootstrap user so CallKit accept can initialize/join even on cold start.
+        if (_userInfo != null) {
+          await SecureStorageService.saveStreamVideoBootstrapUser(_userInfo!);
+        }
         
         
         // Restore saved student selection for mentors

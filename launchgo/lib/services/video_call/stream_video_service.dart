@@ -12,6 +12,7 @@ import 'package:stream_video_push_notification/stream_video_push_notification.da
 import '../../config/environment.dart';
 import '../../models/user_model.dart';
 import '../preferences_service.dart';
+import '../secure_storage_service.dart';
 import 'video_call_native_bridge.dart';
 import 'voip_pushkit_service.dart';
 
@@ -148,6 +149,12 @@ class StreamVideoService extends ChangeNotifier {
           ),
         ),
       );
+
+      // Cache Stream Video bootstrap user so CallKit accept can initialize/join without waiting for userInfo API.
+      // Best-effort only; never fail init.
+      try {
+        await SecureStorageService.saveStreamVideoBootstrapUser(user);
+      } catch (_) {}
       
       // iOS: Store Stream Video auth for native CallKit decline -> reject call API when Flutter isn't running.
       if (Platform.isIOS) {

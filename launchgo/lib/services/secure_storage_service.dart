@@ -1,10 +1,27 @@
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:launchgo/config/environment.dart';
+import 'package:launchgo/models/user_model.dart';
 
 /// Service for secure storage of authentication tokens with environment-specific keys
 class SecureStorageService {
-  static const _storage = FlutterSecureStorage();
+  /// iOS CallKit/PushKit can wake the app while the device is locked.
+  /// The default Keychain accessibility ("when unlocked") makes reads fail in that state,
+  /// which breaks accepting/joining calls in the background.
+  ///
+  /// Using "after first unlock" keeps values readable while locked *after the device was unlocked once*
+  /// since boot — the common expected behavior for VoIP apps.
+  static final FlutterSecureStorage _storage = FlutterSecureStorage(
+    iOptions: const IOSOptions(
+      accessibility: KeychainAccessibility.first_unlock,
+    ),
+  );
+
+  // Legacy storage (default options). Used only to migrate existing items.
+  static final FlutterSecureStorage _legacyStorage = FlutterSecureStorage();
   
   /// Get environment-specific storage key
   static String _getEnvironmentKey(String baseKey) {
@@ -16,6 +33,118 @@ class SecureStorageService {
   static String get _accessTokenKey => _getEnvironmentKey('access_token');
   static String get _refreshTokenKey => _getEnvironmentKey('refresh_token');
   static String get _tokenExpiryKey => _getEnvironmentKey('token_expiry');
+
+  // Cached Stream Video bootstrap (so CallKit accept can initialize StreamVideo without waiting for full userInfo API).
+  static String get _streamVideoBootstrapKey => _getEnvironmentKey('stream_video_bootstrap_v1');
+
+  /// Best-effort migration: if tokens were previously written with the legacy (locked-only) accessibility,
+  /// rewrite them with "after first unlock" accessibility so they are readable on lock screen wakes.
+  static Future<void> migrateIOSKeychainAccessibilityIfNeeded() async {
+    // iOS-only behavior, but guard for safety.
+    if (defaultTargetPlatform != TargetPlatform.iOS) return;
+
+    try {
+      // If we can already read the access token using the new storage, assume migration is done.
+      final alreadyReadable = await _storage.read(key: _accessTokenKey);
+      if (alreadyReadable != null && alreadyReadable.isNotEmpty) return;
+
+      final oldAccess = await _legacyStorage.read(key: _accessTokenKey);
+      final oldRefresh = await _legacyStorage.read(key: _refreshTokenKey);
+      final oldExpiry = await _legacyStorage.read(key: _tokenExpiryKey);
+      final oldBootstrap = await _legacyStorage.read(key: _streamVideoBootstrapKey);
+
+      if (oldAccess == null &&
+          oldRefresh == null &&
+          oldExpiry == null &&
+          oldBootstrap == null) {
+        return;
+      }
+
+      // Rewrite under the new storage (delete first to ensure attributes update).
+      await _storage.delete(key: _accessTokenKey);
+      await _storage.delete(key: _refreshTokenKey);
+      await _storage.delete(key: _tokenExpiryKey);
+      await _storage.delete(key: _streamVideoBootstrapKey);
+
+      if (oldAccess != null) {
+        await _storage.write(key: _accessTokenKey, value: oldAccess);
+      }
+      if (oldRefresh != null) {
+        await _storage.write(key: _refreshTokenKey, value: oldRefresh);
+      }
+      if (oldExpiry != null) {
+        await _storage.write(key: _tokenExpiryKey, value: oldExpiry);
+      }
+      if (oldBootstrap != null) {
+        await _storage.write(key: _streamVideoBootstrapKey, value: oldBootstrap);
+      }
+    } catch (_) {
+      // Best effort: never break app startup due to migration.
+    }
+  }
+
+  /// Cache a minimal "bootstrap user" for Stream Video initialization during CallKit accepts.
+  ///
+  /// This intentionally stores only what `StreamVideoService.initialize()` needs:
+  /// id/name/email/role/callGetStreamToken/avatarUrl.
+  static Future<void> saveStreamVideoBootstrapUser(UserModel user) async {
+    final token = user.callGetStreamToken;
+    if (token == null || token.isEmpty) return;
+
+    final payload = <String, dynamic>{
+      'id': user.id,
+      'name': user.name,
+      'email': user.email,
+      'role': user.role.name,
+      'avatarUrl': user.avatarUrl,
+      'callGetStreamToken': token,
+    };
+    await _storage.write(
+      key: _streamVideoBootstrapKey,
+      value: jsonEncode(payload),
+    );
+  }
+
+  /// Load cached bootstrap user for Stream Video initialization.
+  static Future<UserModel?> getStreamVideoBootstrapUser() async {
+    try {
+      final raw = await _storage.read(key: _streamVideoBootstrapKey);
+      if (raw == null || raw.isEmpty) return null;
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return null;
+
+      final map = Map<String, dynamic>.from(decoded);
+      final id = (map['id'] as String?) ?? '';
+      final name = (map['name'] as String?) ?? '';
+      final email = (map['email'] as String?) ?? '';
+      final roleStr = (map['role'] as String?) ?? 'unknown';
+      final avatarUrl = map['avatarUrl'] as String?;
+      final callToken = map['callGetStreamToken'] as String?;
+
+      if (id.isEmpty || name.isEmpty || callToken == null || callToken.isEmpty) {
+        return null;
+      }
+
+      final role = switch (roleStr) {
+        'student' => UserRole.student,
+        'mentor' => UserRole.mentor,
+        'caseManager' => UserRole.caseManager,
+        _ => UserRole.unknown,
+      };
+
+      return UserModel(
+        id: id,
+        name: name,
+        email: email,
+        role: role,
+        status: UserStatus.unknown,
+        avatarUrl: avatarUrl,
+        callGetStreamToken: callToken,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
   
   /// Save access token
   static Future<void> saveAccessToken(String token) async {
