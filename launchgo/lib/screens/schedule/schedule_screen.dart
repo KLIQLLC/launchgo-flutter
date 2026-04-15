@@ -1,3 +1,4 @@
+// screens/schedule/schedule_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:launchgo/models/deadline_model.dart';
@@ -926,7 +927,7 @@ class _UpcomingDeadlinesView extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(left: 4, bottom: 8),
                   child: Text(
-                    assignment.course?.code ?? 'Unknown Course',
+                    assignment.course?.code ?? 'Unknown Task',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 16,

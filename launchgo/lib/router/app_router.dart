@@ -1,3 +1,4 @@
+// router/app_router.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -339,7 +340,7 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
         case '/schedule':
           return 'Schedule';
         case '/courses':
-          return 'Courses';
+          return 'Tasks';
         case '/documents':
           return 'Documents';
         case '/recaps':
@@ -376,7 +377,7 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
             size: const Size(24, 24),
             color: _selectedTabColor,
           ),
-          label: 'Courses',
+          label: 'Tasks',
         ),
         BottomNavigationBarItem(
           icon: CustomIcon(

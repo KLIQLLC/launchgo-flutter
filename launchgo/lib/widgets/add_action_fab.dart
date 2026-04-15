@@ -23,7 +23,7 @@ class AddActionFab extends StatelessWidget {
   }) {
     return AddActionFab(
       onPressed: onPressed,
-      tooltip: 'Add Course',
+      tooltip: 'Add Task',
       backgroundColor: Colors.blue,
       foregroundColor: Colors.white,
     );

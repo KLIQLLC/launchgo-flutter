@@ -1,3 +1,4 @@
+// screens/courses/course_form_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/theme_service.dart';
@@ -93,7 +94,7 @@ class _CourseFormScreenState extends State<CourseFormScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to save course: $e'),
+            content: Text('Failed to save task: $e'),
             backgroundColor: AppColors.error,
           ),
         );
@@ -118,7 +119,7 @@ class _CourseFormScreenState extends State<CourseFormScreen> {
         elevation: 0,
         centerTitle: true,
         title: Text(
-          widget.course != null ? 'Edit Course' : 'Add New Course',
+          widget.course != null ? 'Edit Task' : 'Add New Task',
           style: TextStyle(
             color: themeService.textColor,
             fontSize: 20,
@@ -141,14 +142,14 @@ class _CourseFormScreenState extends State<CourseFormScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Course Name
-                    _buildLabel('Course Name*', themeService),
+                    _buildLabel('Task Name*', themeService),
                     _buildTextField(
                       controller: _nameController,
                       hintText: 'Intro to Computer Science',
                       themeService: themeService,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
-                          return 'Course name is required';
+                          return 'Task name is required';
                         }
                         return null;
                       },
@@ -156,14 +157,14 @@ class _CourseFormScreenState extends State<CourseFormScreen> {
                     const SizedBox(height: 16),
 
                     // Course Code
-                    _buildLabel('Course Code*', themeService),
+                    _buildLabel('Task Code*', themeService),
                     _buildTextField(
                       controller: _codeController,
                       hintText: 'CS101',
                       themeService: themeService,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
-                          return 'Course code is required';
+                          return 'Task code is required';
                         }
                         return null;
                       },
@@ -171,7 +172,7 @@ class _CourseFormScreenState extends State<CourseFormScreen> {
                     const SizedBox(height: 16),
 
                     // Course Credits
-                    _buildLabel('Course Credits', themeService),
+                    _buildLabel('Task Credits', themeService),
                     _buildTextField(
                       controller: _creditsController,
                       hintText: '3',
@@ -231,10 +232,10 @@ class _CourseFormScreenState extends State<CourseFormScreen> {
                     const SizedBox(height: 16),
 
                     // Course Description
-                    _buildLabel('Course Description', themeService),
+                    _buildLabel('Task Description', themeService),
                     _buildTextField(
                       controller: _descriptionController,
-                      hintText: 'This course is an introduction to computer science.',
+                      hintText: 'This task is an introduction to computer science.',
                       themeService: themeService,
                       maxLines: 4,
                     ),
@@ -258,7 +259,7 @@ class _CourseFormScreenState extends State<CourseFormScreen> {
               child: SafeArea(
                 top: false,
                 child: FormSubmitButton(
-                  text: widget.course != null ? 'Update Course' : 'Add Course',
+                  text: widget.course != null ? 'Update Task' : 'Add Task',
                   onPressed: _saveCourse,
                   isLoading: _isLoading,
                 ),

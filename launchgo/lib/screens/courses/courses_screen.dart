@@ -1,3 +1,4 @@
+// screens/courses/courses_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
@@ -117,7 +118,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Delete Course'),
+          title: const Text('Delete Task'),
           content: Text('Are you sure you want to delete "$courseName"?'),
           actions: [
             TextButton(
@@ -154,7 +155,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
       backgroundColor: themeService.backgroundColor,
       floatingActionButton: authService.permissions.canCreateDocuments 
         ? ExtendedFAB(
-            label: 'Add Course',
+            label: 'Add Task',
             onPressed: _navigateToAddCourse,
           )
         : null,
@@ -195,7 +196,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              'No Courses Yet',
+              'No Tasks Yet',
               style: TextStyle(
                 color: themeService.textColor,
                 fontSize: 18,
@@ -204,7 +205,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Your enrolled courses will appear here\nonce they are available',
+              'Your enrolled tasks will appear here\nonce they are available',
               style: TextStyle(
                 color: themeService.textSecondaryColor,
                 fontSize: 14,
@@ -239,7 +240,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
               canTap: authService.permissions.canEditDocuments,
               onTap: () => _navigateToEditCourse(course),
               onSwipeToDelete: () async {
-                final confirmed = await _confirmDelete(context, course['name'] ?? 'this course');
+                final confirmed = await _confirmDelete(context, course['name'] ?? 'this task');
                 if (confirmed && course['id'] != null) {
                   return await _deleteCourse(course['id']);
                 }

@@ -242,7 +242,7 @@ class ApiServiceRetrofit {
     try {
       final userId = _getEffectiveUserId();
       if (userId == null) {
-        debugPrint('User ID is null, cannot get course');
+        debugPrint('User ID is null, cannot get task');
         return null;
       }
       
