@@ -1,3 +1,4 @@
+// models/event_model.dart
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 import '../utils/recurrence_utils.dart';
@@ -138,7 +139,7 @@ class Event extends Equatable {
       case 'class':
         return const Color(0xFF5CD65C); // Green
       case 'assignment':
-        return const Color(0xFFEB4748); // Red
+        return const Color(0xFFFF8C69); // 
       case 'homework':
         return const Color(0xFF7576F0); // Blue
       case 'study':
