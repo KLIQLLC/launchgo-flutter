@@ -1,6 +1,11 @@
+// services/push_notification_service.dart
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
+import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:path_provider/path_provider.dart';
 import 'api_service_retrofit.dart';
 import 'notifications_api_service.dart';
@@ -10,6 +15,36 @@ import 'package:go_router/go_router.dart';
 import 'notification_navigation_service.dart';
 import 'android_notification_display_service.dart';
 import 'notification_parser.dart';
+import 'video_call/video_call_push_handler.dart';
+import 'video_call/video_call_native_bridge.dart';
+
+/// Check if Stream Chat message is call-related (system message about call)
+/// Stream sends regular FCM pushes for call log messages, but we don't want to show them
+/// because VoIP push already handles the call UI
+bool _isCallRelatedStreamMessage(Map<String, dynamic> data) {
+  // Check message body/title for call-related text
+  final body = (data['body'] as String? ?? '').toLowerCase();
+  final title = (data['title'] as String? ?? '').toLowerCase();
+  
+  final isCallText = body.contains('call started') ||
+      body.contains('call ended') ||
+      body.contains('call missed') ||
+      body.contains('call declined') ||
+      title.contains('call started') ||
+      title.contains('call ended') ||
+      title.contains('call missed') ||
+      title.contains('call declined');
+
+  // Also check stream.* fields if available
+  final streamType = data['stream.type'] as String?;
+  final streamChannelType = data['stream.channel_type'] as String?;
+  
+  // Stream may put call-related info in stream fields
+  final isStreamCallRelated = streamType != null && streamType.contains('call') ||
+      streamChannelType != null && streamChannelType.contains('call');
+
+  return isCallText || isStreamCallRelated;
+}
 
 /// Service for handling FCM token lifecycle and device registration
 class PushNotificationService extends ChangeNotifier {
@@ -20,12 +55,12 @@ class PushNotificationService extends ChangeNotifier {
   
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   String? _fcmToken;
+  Future<bool>? _permissionsInFlight;
+  StreamSubscription<String>? _tokenRefreshSub;
+  String? _lastNotifiedToken;
   bool _isInitialized = false;
   NotificationsApiService? _notificationsService;
   GoRouter? _router;
-  
-  // Add auth service for semester switching
-  AuthService? _authService;
   
   // Callback for when FCM token becomes available
   VoidCallback? _onTokenAvailableCallback;
@@ -60,7 +95,6 @@ class PushNotificationService extends ChangeNotifier {
   
   /// Set auth service for semester switching
   void setAuthService(AuthService authService) {
-    _authService = authService;
     // Initialize the notification navigation service
     if (_router != null) {
       NotificationNavigationService.instance.initialize(_router!, authService);
@@ -133,53 +167,84 @@ class PushNotificationService extends ChangeNotifier {
   
 
   /// Request notification permissions and setup FCM token
-  Future<bool> requestPermissionsAndSetupToken() async {
-    debugPrint('🔔 Requesting notification permissions...');
-    
+  Future<bool> requestPermissionsAndSetupToken({String caller = 'unknown'}) async {
+    // Single-flight: many places call this during startup/login; only one should actually
+    // hit iOS permission APIs and token wiring.
+    final inFlight = _permissionsInFlight;
+    if (inFlight != null) {
+      return inFlight;
+    }
+
+    final future = _requestPermissionsAndSetupTokenInternal(caller: caller);
+    _permissionsInFlight = future;
+    try {
+      return await future;
+    } finally {
+      if (identical(_permissionsInFlight, future)) {
+        _permissionsInFlight = null;
+      }
+    }
+  }
+
+  Future<bool> _requestPermissionsAndSetupTokenInternal({required String caller}) async {
+    debugPrint('🔔 Requesting notification permissions... caller=$caller');
+
     try {
       // Initialize notification display service (Android only)
       if (Platform.isAndroid) {
         await AndroidNotificationDisplayService.instance.initialize();
       }
-      
-      // Request notification permissions
-      NotificationSettings settings = await _messaging.requestPermission(
-        alert: true,
-        announcement: false,
-        badge: true,
-        carPlay: false,
-        criticalAlert: false,
-        provisional: false,
-        sound: true,
-      );
-      
-      debugPrint('🔔 Notification permission status: ${settings.authorizationStatus}');
-      
-      if (settings.authorizationStatus == AuthorizationStatus.authorized ||
-          settings.authorizationStatus == AuthorizationStatus.provisional) {
+
+      // Avoid re-requesting permission if we already have it.
+      final before = await _messaging.getNotificationSettings();
+      var status = before.authorizationStatus;
+      debugPrint('🔔 Notification permission status (before request): $status');
+
+      if (status == AuthorizationStatus.notDetermined) {
+        // Request notification permissions
+        final settings = await _messaging.requestPermission(
+          alert: true,
+          announcement: false,
+          badge: true,
+          carPlay: false,
+          criticalAlert: false,
+          provisional: false,
+          sound: true,
+        );
+        status = settings.authorizationStatus;
+        debugPrint('🔔 Notification permission status (after request): $status');
+      }
+
+      if (status == AuthorizationStatus.authorized ||
+          status == AuthorizationStatus.provisional) {
         
-        // Wait for APNS token on iOS before getting FCM token
-        debugPrint('🔔 Waiting for APNS token...');
-        await _waitForApnsToken();
+        // iOS requires APNs configured in Firebase; we do not use the APNs token directly here.
         
         // Get FCM token
-        _fcmToken = await _messaging.getToken();
+        final token = await _messaging.getToken();
+        _fcmToken = token;
         debugPrint('🔔 FCM Token retrieved: $_fcmToken');
         
         // Call callback if set (for backend registration)
-        if (_onTokenAvailableCallback != null) {
+        if (_onTokenAvailableCallback != null &&
+            _fcmToken != null &&
+            _fcmToken!.isNotEmpty &&
+            _lastNotifiedToken != _fcmToken) {
           debugPrint('🔔 Calling token available callback...');
+          _lastNotifiedToken = _fcmToken;
           Future.microtask(() => _onTokenAvailableCallback!());
         }
         
-        // Listen to token refresh
-        _messaging.onTokenRefresh.listen((token) {
+        // Listen to token refresh (only once)
+        _tokenRefreshSub ??= _messaging.onTokenRefresh.listen((token) async {
           _fcmToken = token;
           debugPrint('🔔 FCM Token refreshed: $token');
           notifyListeners();
-          
-          // Call callback for token refresh too
-          if (_onTokenAvailableCallback != null) {
+
+          if (_onTokenAvailableCallback != null &&
+              token.isNotEmpty &&
+              _lastNotifiedToken != token) {
+            _lastNotifiedToken = token;
             Future.microtask(() => _onTokenAvailableCallback!());
           }
         });
@@ -191,7 +256,12 @@ class PushNotificationService extends ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        debugPrint('❌ Notification permission denied: ${settings.authorizationStatus}');
+        // NotDetermined can happen if multiple callers race while the system dialog is up.
+        if (status == AuthorizationStatus.notDetermined) {
+          debugPrint('⚠️ Notification permission still not determined (dialog may be pending)');
+        } else {
+          debugPrint('❌ Notification permission denied: $status');
+        }
         return false;
       }
     } catch (e) {
@@ -234,42 +304,60 @@ class PushNotificationService extends ChangeNotifier {
     }
   }
   
-  /// Wait for APNS token to be available on iOS
-  Future<void> _waitForApnsToken() async {
-    try {
-      // On iOS, we need to wait for APNS token before getting FCM token
-      int attempts = 0;
-      const maxAttempts = 10;
-      const delay = Duration(milliseconds: 500);
-      
-      while (attempts < maxAttempts) {
-        final apnsToken = await _messaging.getAPNSToken();
-        if (apnsToken != null) {
-          debugPrint('🔔 APNS token received: ${apnsToken.substring(0, 20)}...');
-          return;
-        }
-        
-        if (attempts % 3 == 0) debugPrint('🔔 APNS token not available yet, waiting... (attempt ${attempts + 1}/$maxAttempts)');
-        await Future.delayed(delay);
-        attempts++;
-      }
-      
-      debugPrint('⚠️ APNS token not received after $maxAttempts attempts');
-    } catch (e) {
-      debugPrint('❌ Error waiting for APNS token: $e');
-    }
-  }
+  // (removed) _waitForApnsToken(): we don't need to block on APNs token in app code
+
   
   /// Handle foreground messages
-  void _handleForegroundMessage(RemoteMessage message) {
-    // 🛑 BREAKPOINT: Set breakpoint here to inspect message data
-    debugPrint('🔔 Foreground message received: ${message.notification?.title}');
-    debugPrint('🔔 Message data: ${message.data}');
-    debugPrint('🔔 Message body: ${message.notification?.body}');
-    
+  Future<void> _handleForegroundMessage(RemoteMessage message) async {
+    // 🛑 EARLY LOGGING - See raw push data before any processing
+    debugPrint('');
+    debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] ========== PUSH RECEIVED (FOREGROUND) ==========');
+    debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] TIMESTAMP: ${DateTime.now().toIso8601String()}');
+    debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] MESSAGE ID: ${message.messageId}');
+    debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] DATA PAYLOAD: ${message.data}');
+    debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] DATA KEYS: ${message.data.keys.toList()}');
+    debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] TYPE: ${message.data['type']}');
+    debugPrint('');
+
+    // Check if this is a video call notification
+    if (VideoCallPushHandler.isVideoCallNotification(message.data)) {
+      final notificationType = message.data['type'] as String?;
+      debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] VIDEO CALL NOTIFICATION DETECTED');
+      debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] Notification type: $notificationType');
+
+      if (notificationType == 'call.missed' || notificationType == 'call.ended') {
+        // Call was cancelled/missed - ensure CallKit is ended
+        // This is a backup in case WebSocket notification is delayed
+        debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] Call missed/ended (type=$notificationType)');
+        debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] Ending any active CallKit notifications');
+        if (Platform.isAndroid) {
+          FlutterCallkitIncoming.endAllCalls().catchError((e) {
+            debugPrint('[VC] ❌ [PushNotificationService:_handleForegroundMessage] Error ending CallKit: $e');
+          });
+        }
+      } else if (notificationType == 'call.ring') {
+        debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] call.ring - App is in foreground');
+        debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] WebSocket will handle incoming call');
+        debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] NOT showing CallKit notification (in-app UI will show instead)');
+      } else {
+        debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] Unknown type: $notificationType');
+      }
+      debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] ========== END FOREGROUND VIDEO CALL ==========');
+      return;
+    }
+
     // Show the notification even when app is in foreground
     // For Stream Chat data-only notifications, show them manually
     if (NotificationParser.isStreamChatMessage(message.data)) {
+      // Check if this is a call-related message (system message about call)
+      // Stream sends regular FCM pushes for call log messages, but we don't want to show them
+      // because VoIP push already handles the call UI
+      if (_isCallRelatedStreamMessage(message.data)) {
+        debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] Call-related Stream Chat message detected - skipping notification display');
+        debugPrint('[VC] 📞 [PushNotificationService:_handleForegroundMessage] Only VoIP push will show call UI');
+        return;
+      }
+
       final chatData = NotificationParser.parseStreamChatData(message.data);
       AndroidNotificationDisplayService.instance.showStreamChatNotification(
         title: chatData.title,
@@ -280,7 +368,9 @@ class PushNotificationService extends ChangeNotifier {
     } else {
       debugPrint('🔔 Non-Stream Chat foreground notification');
     }
-    
+
+    debugPrint('🔔 ========== END FOREGROUND MESSAGE ==========');
+
     // Update notification badge count when foreground notification received
     if (_notificationsService != null) {
       Future.microtask(() => _notificationsService!.fetchNotifications());
@@ -308,7 +398,14 @@ Screen value: ${message.data['screen']}
   /// Parse message and execute direct navigation
   void _storeNavigationFromMessage(RemoteMessage message) {
     final data = message.data;
-    
+
+    // Handle video call notifications first (highest priority)
+    if (VideoCallPushHandler.isVideoCallNotification(data)) {
+      debugPrint('📞 Video call notification detected in push');
+      VideoCallPushHandler.instance.handleVideoCallPush(data);
+      return;
+    }
+
     // First try to handle via NotificationNavigationService for structured notifications
     if (data.containsKey('eventType')) {
       final eventType = data['eventType'] as String;
@@ -420,18 +517,66 @@ Screen value: ${message.data['screen']}
 }
 
 /// Background message handler (must be top-level function)
+/// NOTE: This runs in a separate isolate where StreamVideo.instance is NOT available.
+/// For Android terminated state, we must manually show CallKit notification.
+/// When user accepts, the app launches and consumeAndAcceptActiveCall() handles joining.
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // 🛑 BREAKPOINT: Set breakpoint here to inspect background notifications
-  debugPrint('🔔 Background message received: ${message.notification?.title}');
-  debugPrint('🔔 Background message data: ${message.data}');
-  debugPrint('🔔 Background message body: ${message.notification?.body}');
-  
+  // 🛑 EARLY LOGGING - See raw push data before any processing
+  debugPrint('');
+  debugPrint('[VC] 📞 [BackgroundHandler] ========== PUSH RECEIVED (BACKGROUND) ==========');
+  debugPrint('[VC] 📞 [BackgroundHandler] TIMESTAMP: ${DateTime.now().toIso8601String()}');
+  debugPrint('[VC] 📞 [BackgroundHandler] MESSAGE ID: ${message.messageId}');
+  debugPrint('[VC] 📞 [BackgroundHandler] DATA PAYLOAD: ${message.data}');
+  debugPrint('[VC] 📞 [BackgroundHandler] DATA KEYS: ${message.data.keys.toList()}');
+  debugPrint('[VC] 📞 [BackgroundHandler] TYPE: ${message.data['type']}');
+  debugPrint('');
+
+  // Handle video call notifications
+  // On iOS: VoIP push triggers CallKit automatically via StreamVideoPKDelegateManager in AppDelegate
+  // On Android (terminated): We must manually show CallKit because StreamVideo isn't initialized here
+  // On Android (background): SDK should handle via handleRingingFlowNotifications in foreground listener
+  if (VideoCallPushHandler.isVideoCallNotification(message.data)) {
+    debugPrint('[VC] 📞 [BackgroundHandler] ========== VIDEO CALL NOTIFICATION ==========');
+    debugPrint('[VC] 📞 [BackgroundHandler] Video call notification detected');
+    debugPrint('[VC] 📞 [BackgroundHandler] Message data: ${message.data}');
+
+    final notificationType = message.data['type'] as String?;
+    debugPrint('[VC] 📞 [BackgroundHandler] Notification type: $notificationType');
+
+    // On Android, we need to handle both showing and ending CallKit notifications
+    // because Stream Video SDK is not initialized in the background isolate.
+    if (Platform.isAndroid) {
+      if (notificationType == 'call.ring') {
+        debugPrint('[VC] 📞 [BackgroundHandler] Android: call.ring - Showing incoming call notification');
+        await _showAndroidIncomingCallNotification(message.data);
+      } else if (notificationType == 'call.missed' || notificationType == 'call.ended') {
+        debugPrint('[VC] 📞 [BackgroundHandler] Android: $notificationType - Ending CallKit notification');
+        await _endAndroidCallNotification();
+      } else {
+        debugPrint('[VC] 📞 [BackgroundHandler] Android: Unhandled type: $notificationType');
+      }
+    } else {
+      debugPrint('[VC] 📞 [BackgroundHandler] iOS: VoIP push handled natively');
+    }
+    debugPrint('[VC] 📞 [BackgroundHandler] ========== END VIDEO CALL NOTIFICATION ==========');
+    return;
+  }
+
   // Handle background message
   // This runs when app is terminated or in background
-  
+
   // For Stream Chat data-only notifications, we need to show them manually
   if (NotificationParser.isStreamChatMessage(message.data)) {
+    // Check if this is a call-related message (system message about call)
+    // Stream sends regular FCM pushes for call log messages, but we don't want to show them
+    // because VoIP push already handles the call UI
+    if (_isCallRelatedStreamMessage(message.data)) {
+      debugPrint('[VC] 📞 [BackgroundHandler] Call-related Stream Chat message detected - skipping notification display');
+      debugPrint('[VC] 📞 [BackgroundHandler] Only VoIP push will show call UI');
+      return;
+    }
+
     final chatData = NotificationParser.parseStreamChatData(message.data);
     await AndroidNotificationDisplayService.instance.showStreamChatNotification(
       title: chatData.title,
@@ -446,4 +591,154 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   } else {
     debugPrint('🔔 Data-only notification received, no automatic display');
   }
+}
+
+/// End incoming call notification on Android when call is cancelled
+/// This is called when mentor cancels the call (call.miss or call.ended)
+@pragma('vm:entry-point')
+Future<void> _endAndroidCallNotification() async {
+  debugPrint('[VC] 📞 [Android Background] Ending incoming call notification (caller cancelled)');
+  try {
+    await FlutterCallkitIncoming.endAllCalls();
+    debugPrint('[VC] ✅ [Android Background] CallKit notification ended successfully');
+  } catch (e) {
+    debugPrint('[VC] ❌ [Android Background] Error ending CallKit notification: $e');
+  }
+}
+
+/// Show incoming call notification on Android when app is terminated
+/// Uses flutter_callkit_incoming to display full-screen incoming call UI
+@pragma('vm:entry-point')
+Future<void> _showAndroidIncomingCallNotification(Map<String, dynamic> data) async {
+  debugPrint('[VC] 📞 [Android Background] Showing incoming call notification');
+  debugPrint('[VC] 📞 [Android Background] Data: $data');
+
+  // End any existing active calls before showing new one
+  // This prevents the issue where a previous call blocks the new notification
+  // Always try to end calls unconditionally - activeCalls() can return stale data
+  try {
+    debugPrint('[VC] 📞 [Android Background] Ending any existing calls unconditionally');
+    await FlutterCallkitIncoming.endAllCalls();
+    // Small delay to ensure previous calls are fully ended
+    await Future.delayed(const Duration(milliseconds: 300));
+  } catch (e) {
+    debugPrint('[VC] ⚠️ [Android Background] Error ending previous calls (continuing anyway): $e');
+    // Even if endAllCalls fails, we'll try to show the new notification
+    // Add extra delay when there's an error
+    await Future.delayed(const Duration(milliseconds: 500));
+  }
+
+  // Extract call ID from push data
+  // Stream Video sends call_cid in format "type:callId" (e.g., "default:abc123")
+  debugPrint('[VC] 📞 [Android Background] Raw push data keys: ${data.keys.toList()}');
+  debugPrint('[VC] 📞 [Android Background] call_cid from push: ${data['call_cid']}');
+  debugPrint('[VC] 📞 [Android Background] call_id from push: ${data['call_id']}');
+  debugPrint('[VC] 📞 [Android Background] id from push: ${data['id']}');
+
+  String? callId;
+  final callCid = data['call_cid'] as String?;
+  if (callCid != null && callCid.contains(':')) {
+    callId = callCid.split(':').last;
+    debugPrint('[VC] 📞 [Android Background] Extracted callId from call_cid: $callId');
+  }
+  callId ??= data['call_id'] as String? ?? data['id'] as String?;
+
+  if (callId == null) {
+    debugPrint('[VC] ❌ [Android Background] No call ID found in push data');
+    return;
+  }
+
+  // Extract caller name
+  final callerName = data['caller_name'] as String? ??
+      data['created_by_display_name'] as String? ??
+      data['sender_name'] as String? ??
+      'Mentor';
+
+  debugPrint('[VC] 📞 [Android Background] FINAL Call ID to use: $callId, Caller: $callerName');
+  debugPrint('[VC] 📞 [Android Background] Storing in extra - call_cid: ${callCid ?? 'default:$callId'}, call_id: $callId');
+
+  // Use call_id as notification ID so we can track it
+  // This allows SharedPreferences listener to detect decline by call_id
+  debugPrint('[VC] 📞 [Android Background] Using call_id as notification ID: $callId');
+
+  // Configure the incoming call notification
+  final params = CallKitParams(
+    id: callId,  // Use actual call_id, not random UUID
+    nameCaller: callerName,
+    appName: 'launchgo',
+    type: 0, // 0 = video call, 1 = audio call
+    textAccept: 'Accept',
+    textDecline: 'Decline',
+    duration: 30000, // Ring for 30 seconds
+    extra: <String, dynamic>{
+      'call_cid': callCid ?? 'default:$callId',
+      'call_id': callId,
+    },
+    android: const AndroidParams(
+      isCustomNotification: true,
+      isShowLogo: false,
+      ringtonePath: 'system_ringtone_default',
+      backgroundColor: '#0955fa',
+      actionColor: '#4CAF50',
+      isShowFullLockedScreen: true,
+      isShowCallID: false,
+    ),
+  );
+
+  debugPrint('[VC] 📞 [Android Background] Calling FlutterCallkitIncoming.showCallkitIncoming');
+
+  // Try to show the incoming call notification with retry logic
+  int retryCount = 0;
+  const maxRetries = 2;
+
+  while (retryCount <= maxRetries) {
+    try {
+      await FlutterCallkitIncoming.showCallkitIncoming(params);
+      debugPrint('[VC] ✅ [Android Background] Incoming call notification shown successfully');
+
+      // Save pending call to SharedPreferences
+      // This is the KEY for detecting decline in terminated state!
+      // When app starts, it checks if pending call is NOT in activeCalls → declined
+      debugPrint('[VC] 📞 [Android Background] Saving pending call to SharedPreferences...');
+      try {
+        await VideoCallNativeBridge.savePendingCall(
+          callId: callId,
+          callCid: callCid,
+        );
+        debugPrint('[VC] 📞 [Android Background] Pending call saved successfully');
+      } catch (e) {
+        debugPrint('[VC] ⚠️ [Android Background] Error saving pending call: $e');
+      }
+
+      // Also try to schedule WorkManager (may not work in isolate)
+      try {
+        await VideoCallNativeBridge.scheduleCallMonitor(
+          callId: callId,
+          callCid: callCid,
+        );
+        debugPrint('[VC] 📞 [Android Background] WorkManager scheduled successfully');
+      } catch (e) {
+        debugPrint('[VC] ⚠️ [Android Background] Could not schedule WorkManager (expected in isolate): $e');
+      }
+
+      return;
+    } catch (e) {
+      retryCount++;
+      debugPrint('[VC] ❌ [Android Background] Error showing notification (attempt $retryCount/$maxRetries): $e');
+
+      if (retryCount <= maxRetries) {
+        // Wait and try again
+        await Future.delayed(const Duration(milliseconds: 500));
+        // Try to clear any stale state before retry
+        try {
+          await FlutterCallkitIncoming.endAllCalls();
+        } catch (_) {
+          // Ignore error on retry cleanup
+        }
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
+    }
+  }
+
+  debugPrint('[VC] ❌ [Android Background] Failed to show notification after $maxRetries retries');
 }

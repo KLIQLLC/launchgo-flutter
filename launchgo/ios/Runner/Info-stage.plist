@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>launchgo</string>
+	<string>launchgo Stage</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -42,21 +42,32 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>This app needs access to the camera to allow you to take and send photos in chat.</string>
+	<string>This app needs access to the camera for video calls and to take and send photos in chat.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>This app uses your location to suggest nearby addresses and verify event check-ins.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app uses your location to suggest nearby addresses and verify event check-ins.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>This app needs access to the microphone to record videos with audio in chat.</string>
+	<string>This app needs access to the microphone for video calls and to record videos with audio in chat.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>This app needs permission to save photos and videos to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>This app needs access to photo library to allow you to upload documents and images.</string>
+	<key>NSVoIPUsageDescription</key>
+	<string>This app uses VoIP to receive incoming video calls from your mentor, even when the app is closed.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
+		<string>fetch</string>
+		<string>processing</string>
 		<string>remote-notification</string>
+		<string>voip</string>
 	</array>
-	<key>FirebaseAppDelegateProxyEnabled</key>
-	<true/>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER).refresh</string>
+	</array>
 	<key>UIUserNotificationSettings</key>
 	<dict>
 		<key>UIUserNotificationTypeBadge</key>

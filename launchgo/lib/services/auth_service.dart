@@ -1,6 +1,8 @@
+// services/auth_service.dart
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import '../api/dio_client.dart';
@@ -14,6 +16,7 @@ import 'preferences_service.dart';
 import 'chat/stream_chat_service.dart';
 import 'push_notification_service.dart';
 import 'weekly_notification_service.dart';
+import 'video_call/voip_pushkit_service.dart';
 
 /// Service for managing user authentication with Google Sign-In and backend JWT tokens
 class AuthService extends ChangeNotifier {
@@ -22,7 +25,9 @@ class AuthService extends ChangeNotifier {
   UserModel? _userInfo;
   String? _selectedStudentId;
   bool _isInitialized = false;
+  bool _isInitializing = false;
   bool _isSigningIn = false;
+  bool _isSigningOut = false;
   Completer<void>? _signInCompleter;
   ApiServiceRetrofit? _apiService;
   StreamChatService? _streamChatService;
@@ -34,6 +39,7 @@ class AuthService extends ChangeNotifier {
   String? get selectedStudentId => _selectedStudentId;
   bool get isInitialized => _isInitialized;
   bool get isSigningIn => _isSigningIn;
+  bool get isSigningOut => _isSigningOut;
   bool get isAuthenticated => _accessToken != null && !(_accessToken != null ? JwtDecoder.isExpired(_accessToken!) : true);
   bool get hasAccessToken => _accessToken != null;
   
@@ -62,33 +68,32 @@ class AuthService extends ChangeNotifier {
 
   /// Initialize the authentication service
   Future<void> initialize() async {
-    if (_isInitialized) return;
-    
-    // Initialize preferences service for user selections
-    await PreferencesService.initialize();
-    await PreferencesService.migrateOldPreferences();
-    
-    // Initialize API client
-    if (_apiService == null) {
-      _apiService = ApiServiceRetrofit(authService: this);
-    }
-    
-    // Migrate old tokens to environment-specific storage
-    await SecureStorageService.migrateOldTokens();
-    
-    // Load stored access token for current environment
-    _accessToken = await SecureStorageService.getAccessToken();
-    
-    // Verify token validity
-    if (_accessToken != null) {
-      final isExpired = await SecureStorageService.isTokenExpired();
-      if (isExpired) {
-        _accessToken = null;
-        await SecureStorageService.clearAllAuthData();
-      }
-    }
-    
     try {
+      if (_isInitialized || _isInitializing) return;
+      _isInitializing = true;
+
+      // Initialize preferences service for user selections
+      await PreferencesService.initialize();
+      await PreferencesService.migrateOldPreferences();
+
+      // Initialize API client
+      _apiService ??= ApiServiceRetrofit(authService: this);
+
+      // Migrate old tokens to environment-specific storage
+      await SecureStorageService.migrateOldTokens();
+
+      // Load stored access token for current environment (may be temporarily unavailable on iOS while locked)
+      _accessToken = await SecureStorageService.getAccessToken();
+
+      // Verify token validity (guard against storage/protected data failures)
+      if (_accessToken != null) {
+        final isExpired = await SecureStorageService.isTokenExpired();
+        if (isExpired) {
+          _accessToken = null;
+          await SecureStorageService.clearAllAuthData();
+        }
+      }
+
       final GoogleSignIn signIn = GoogleSignIn.instance;
       
       // Initialize with serverClientId for backend authentication
@@ -118,12 +123,46 @@ class AuthService extends ChangeNotifier {
         await SecureStorageService.clearAllAuthData();
         _accessToken = null;
       }
-      
-      _isInitialized = true;
-      notifyListeners();
+
+    } on PlatformException catch (e) {
+      // Avoid bricking initialization on iOS "protected data unavailable" type errors.
+      debugPrint('❌ [AUTH] PlatformException during initialize: ${e.code} ${e.message}');
     } catch (error) {
+      debugPrint('❌ [AUTH] Error during initialize: $error');
+    } finally {
       _isInitialized = true;
+      _isInitializing = false;
       notifyListeners();
+    }
+  }
+
+  /// Re-check secure storage for an access token and (if found) load user info.
+  ///
+  /// This is important for iOS CallKit/lock-screen wakeups where protected data
+  /// might have been temporarily unavailable during cold start; once the device
+  /// is unlocked, we can recover without forcing an app restart.
+  Future<void> refreshFromStorageIfPossible() async {
+    try {
+      final stored = await SecureStorageService.getAccessToken();
+      if (stored == null) return;
+
+      if (_accessToken == stored && _userInfo != null) return;
+
+      _accessToken = stored;
+      final isExpired = await SecureStorageService.isTokenExpired();
+      if (isExpired) {
+        _accessToken = null;
+        _userInfo = null;
+        await SecureStorageService.clearAllAuthData();
+        notifyListeners();
+        return;
+      }
+
+      await loadUserInfo();
+      _setupFCMTokenCallback();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('❌ [AUTH] refreshFromStorageIfPossible failed: $e');
     }
   }
 
@@ -170,11 +209,11 @@ class AuthService extends ChangeNotifier {
         // User is already authenticated with Google, just need backend token
         await _getServerAuthCode(_currentUser!);
         _signInCompleter?.complete();
-        await _signInCompleter?.future;
+        await _signInCompleter?.future.timeout(const Duration(seconds: 20));
       } else {
         // Normal sign-in flow
         await GoogleSignIn.instance.authenticate();
-        await _signInCompleter?.future;
+        await _signInCompleter?.future.timeout(const Duration(seconds: 20));
       }
       
       final success = _currentUser != null && _accessToken != null;
@@ -182,6 +221,12 @@ class AuthService extends ChangeNotifier {
       notifyListeners();
       
       return success;
+    } on TimeoutException {
+      // Prevent infinite loader if GoogleSignIn callbacks never arrive (e.g., app launched via CallKit/lock screen edge cases).
+      _isSigningIn = false;
+      _signInCompleter = null;
+      notifyListeners();
+      return false;
     } catch (error) {
       _isSigningIn = false;
       _signInCompleter?.completeError(error);
@@ -193,32 +238,32 @@ class AuthService extends ChangeNotifier {
 
   /// Sign out
   Future<void> signOut({StreamChatService? streamChatService}) async {
+    _isSigningOut = true;
+    
     try {
+      // Disable iOS PushKit ASAP on logout to stop VoIP pushes while logged out.
+      debugPrint('📞 [AUTH] signOut: disabling PushKit (VoIP) ...');
+      await VoipPushKitService.disable();
+      debugPrint('📞 [AUTH] signOut: PushKit disabled');
+
       // Unregister device before logout
       try {
-        debugPrint('🔔 Unregistering device during logout...');
         if (_apiService != null) {
           await PushNotificationService.instance.unregisterDevice(_apiService!);
-          debugPrint('✅ Device unregistered during logout');
         }
       } catch (e) {
         debugPrint('❌ [AUTH] Error unregistering device during logout: $e');
-        // Don't fail logout if device unregistration fails
       }
       
       // Always try to disconnect from Stream Chat during logout
-      // Try with provided service first, then try to get it from static instance
       StreamChatService? chatService = streamChatService ?? StreamChatService.instance;
       
       if (chatService != null) {
         try {
           await chatService.disconnectUser();
-          debugPrint('🔴 [AUTH] Disconnected from Stream Chat during logout');
         } catch (e) {
           debugPrint('❌ [AUTH] Error disconnecting Stream Chat: $e');
         }
-      } else {
-        debugPrint('🟡 [AUTH] No StreamChatService available for disconnect');
       }
       
       await GoogleSignIn.instance.signOut();
@@ -234,15 +279,15 @@ class AuthService extends ChangeNotifier {
       // Cancel weekly notifications
       try {
         await WeeklyNotificationService.instance.cancelWeeklyRecapNotification();
-        debugPrint('✅ [AUTH] Weekly notifications cancelled during logout');
       } catch (e) {
         debugPrint('❌ [AUTH] Error cancelling weekly notifications: $e');
-        // Don't fail logout if notification cancellation fails
       }
       
       notifyListeners();
     } catch (error) {
-      // Handle sign out error
+      debugPrint('❌ [AUTH] signOut error: $error');
+    } finally {
+      _isSigningOut = false;
     }
   }
 
@@ -279,7 +324,6 @@ class AuthService extends ChangeNotifier {
     }
     
     final authClient = user.authorizationClient;
-    if (authClient == null) return;
     
     final serverAuth = await authClient.authorizeServer(_scopes);
     
@@ -443,7 +487,7 @@ class AuthService extends ChangeNotifier {
             _selectedStudentId = savedStudentId;
             
             // Connect to Stream Chat if service is available
-            if (_streamChatService != null && _userInfo!.getStreamToken != null) {
+            if (_streamChatService != null && _userInfo!.chatGetStreamToken != null) {
               _connectMentorToStreamChat(savedStudentId);
             }
           } else {
@@ -454,7 +498,7 @@ class AuthService extends ChangeNotifier {
             await PreferencesService.saveSelectedStudentId(_selectedStudentId!);
             
             // Connect to Stream Chat if service is available
-            if (_streamChatService != null && _userInfo!.getStreamToken != null) {
+            if (_streamChatService != null && _userInfo!.chatGetStreamToken != null) {
               _connectMentorToStreamChat(_selectedStudentId!);
             }
           }
@@ -579,7 +623,7 @@ class AuthService extends ChangeNotifier {
         if (!_streamChatService!.isUserConnected) {
           await _streamChatService!.connectUser(
             userId: _userInfo!.id,
-            token: _userInfo!.getStreamToken!,
+            token: _userInfo!.chatGetStreamToken!,
             userName: _userInfo!.name,
             userImage: _userInfo!.avatarUrl,
           );
@@ -621,7 +665,7 @@ class AuthService extends ChangeNotifier {
           try {
             await _streamChatService!.connectUser(
               userId: _userInfo!.id,
-              token: _userInfo!.getStreamToken!,
+              token: _userInfo!.chatGetStreamToken!,
               userName: _userInfo!.name,
               userImage: _userInfo!.avatarUrl,
             );
@@ -747,7 +791,8 @@ class AuthService extends ChangeNotifier {
     debugPrint('🔔 [AUTH] Requesting push notification permissions after login...');
     Future.microtask(() async {
       try {
-        final permissionGranted = await PushNotificationService.instance.requestPermissionsAndSetupToken();
+        final permissionGranted = await PushNotificationService.instance
+            .requestPermissionsAndSetupToken(caller: 'AuthService._requestPushNotificationPermissions');
         if (permissionGranted) {
           debugPrint('✅ [AUTH] Push notification permissions granted');
         } else {

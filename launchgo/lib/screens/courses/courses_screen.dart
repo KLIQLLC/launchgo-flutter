@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/api_service_retrofit.dart';
+import 'package:launchgo/utils/error_utils.dart';
 import 'package:provider/provider.dart';
 import '../../widgets/courses/course_card.dart';
 import '../../widgets/extended_fab.dart';
@@ -80,7 +81,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
     }
   }
 
-  Future<void> _deleteCourse(String courseId) async {
+  Future<bool> _deleteCourse(String courseId) async {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
       final apiService = ApiServiceRetrofit(authService: authService);
@@ -96,15 +97,18 @@ class _CoursesScreenState extends State<CoursesScreen> {
         );
         _loadCourses();
       }
+      return true;
     } catch (e) {
       if (mounted) {
+        final errorMessage = ErrorUtils.getErrorMessage(e);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to delete course: $e'),
+            content: Text('Failed to delete course: $errorMessage'),
             backgroundColor: AppColors.error,
           ),
         );
       }
+      return false;
     }
   }
 
@@ -237,9 +241,9 @@ class _CoursesScreenState extends State<CoursesScreen> {
               onSwipeToDelete: () async {
                 final confirmed = await _confirmDelete(context, course['name'] ?? 'this course');
                 if (confirmed && course['id'] != null) {
-                  _deleteCourse(course['id']);
+                  return await _deleteCourse(course['id']);
                 }
-                return confirmed;
+                return false;
               },
               child: CourseCard(
                 course: course,

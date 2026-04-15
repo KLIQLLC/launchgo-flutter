@@ -6,7 +6,9 @@ import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/services/push_notification_service.dart';
 import 'package:launchgo/utils/debug_utils.dart';
+import 'package:launchgo/utils/call_debug_logger.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../theme/app_colors.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -88,7 +90,109 @@ class SettingsScreen extends StatelessWidget {
             onTap: () {},
           ),
           
-          // Debug Section (only in debug mode)
+          // Call Debug Logs (always visible for release debugging)
+          Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '📋 Call Debug Logs',
+                  style: TextStyle(
+                    color: themeService.textColor,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                  Text(
+                    'Call Debug Logs',
+                    style: TextStyle(
+                      color: themeService.textSecondaryColor,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _DebugButton(
+                        label: 'View Logs',
+                        onPressed: () async {
+                          final logs = await CallDebugLogger.readLogs();
+                          if (context.mounted) {
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text('Call Debug Logs'),
+                                content: SizedBox(
+                                  width: double.maxFinite,
+                                  child: SingleChildScrollView(
+                                    child: Text(
+                                      logs,
+                                      style: const TextStyle(
+                                        fontFamily: 'monospace',
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.of(context).pop(),
+                                    child: const Text('Close'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                      _DebugButton(
+                        label: 'Share Logs',
+                        onPressed: () async {
+                          final logFile = await CallDebugLogger.getLogFile();
+                          if (logFile != null && await logFile.exists()) {
+                            await Share.shareXFiles(
+                              [XFile(logFile.path)],
+                              subject: 'Call Debug Logs',
+                            );
+                          } else {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('No log file found'),
+                                  backgroundColor: AppColors.error,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                      ),
+                      _DebugButton(
+                        label: 'Clear Logs',
+                        onPressed: () async {
+                          await CallDebugLogger.clearLogs();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Logs cleared'),
+                                backgroundColor: AppColors.success,
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          
+          Divider(color: themeService.borderColor),
+          
+          // Debug Tools Section (only in debug mode)
           if (kDebugMode) ...[
             Container(
               padding: const EdgeInsets.all(20),

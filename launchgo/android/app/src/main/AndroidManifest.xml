@@ -1,4 +1,12 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Resolve permission conflict between flutter_callkit_incoming and stream_video_push_notification -->
+    <permission
+        android:name="${applicationId}.PERMISSION_CALL"
+        android:protectionLevel="signature"
+        tools:replace="android:protectionLevel" />
+
     <application
         android:label="launchgo"
         android:name="${applicationName}"
@@ -9,12 +17,13 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTop"
-            android:taskAffinity=""
+            android:launchMode="singleInstance"
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
-            android:windowSoftInputMode="adjustResize">
+            android:windowSoftInputMode="adjustResize"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true">
             <!-- Specifies an Android theme to apply to this Activity as soon as
                  the Android process has started. This theme is visible to the user
                  while the Flutter UI initializes. After that, this theme continues
@@ -32,6 +41,14 @@
                 <action android:name="FLUTTER_NOTIFICATION_CLICK" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <!-- Intent filter for CallKit actions - handle accept/decline directly in MainActivity -->
+            <intent-filter>
+                <action android:name="com.hiennv.flutter_callkit_incoming.ACTION_CALL_ACCEPT" />
+                <action android:name="com.hiennv.flutter_callkit_incoming.ACTION_CALL_DECLINE" />
+                <action android:name="${applicationId}.com.hiennv.flutter_callkit_incoming.ACTION_CALL_ACCEPT" />
+                <action android:name="${applicationId}.com.hiennv.flutter_callkit_incoming.ACTION_CALL_DECLINE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
@@ -39,14 +56,20 @@
             android:name="flutterEmbedding"
             android:value="2" />
             
-        <!-- Firebase Cloud Messaging Service -->
+        <!-- Custom Firebase Cloud Messaging Service for call monitoring -->
         <service
-            android:name="com.google.firebase.messaging.FirebaseMessagingService"
+            android:name=".LaunchgoFirebaseMessagingService"
             android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
+        <!-- Foreground Service for monitoring call decline without opening app -->
+        <service
+            android:name=".CallMonitorService"
+            android:exported="false"
+            android:foregroundServiceType="phoneCall" />
         
         <!-- Notification icon metadata -->
         <meta-data
@@ -58,6 +81,36 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="default_notification_channel" />
+
+        <!-- BroadcastReceiver for CallKit events when app is in background -->
+        <receiver
+            android:name=".CallKitBroadcastReceiver"
+            android:exported="true">
+            <intent-filter>
+                <!-- Decline actions -->
+                <action android:name="com.hiennv.flutter_callkit_incoming.ACTION_CALL_DECLINE" />
+                <action android:name="${applicationId}.com.hiennv.flutter_callkit_incoming.ACTION_CALL_DECLINE" />
+                <action android:name="ACTION_CALL_DECLINE" />
+                <!-- Accept actions -->
+                <action android:name="com.hiennv.flutter_callkit_incoming.ACTION_CALL_ACCEPT" />
+                <action android:name="${applicationId}.com.hiennv.flutter_callkit_incoming.ACTION_CALL_ACCEPT" />
+                <action android:name="ACTION_CALL_ACCEPT" />
+                <!-- Incoming call actions -->
+                <action android:name="com.hiennv.flutter_callkit_incoming.ACTION_CALL_INCOMING" />
+                <action android:name="${applicationId}.com.hiennv.flutter_callkit_incoming.ACTION_CALL_INCOMING" />
+                <action android:name="ACTION_CALL_INCOMING" />
+                <!-- End/timeout actions -->
+                <action android:name="com.hiennv.flutter_callkit_incoming.ACTION_CALL_ENDED" />
+                <action android:name="${applicationId}.com.hiennv.flutter_callkit_incoming.ACTION_CALL_ENDED" />
+                <action android:name="com.hiennv.flutter_callkit_incoming.ACTION_CALL_TIMEOUT" />
+                <action android:name="${applicationId}.com.hiennv.flutter_callkit_incoming.ACTION_CALL_TIMEOUT" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Service for rejecting calls via Stream Video API when app is in background -->
+        <service
+            android:name=".CallRejectService"
+            android:exported="false" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
@@ -79,12 +132,40 @@
     
     <!-- Media permissions for Android 13+ (API 33+) -->
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
+
+    <!-- Explicitly remove READ_MEDIA_IMAGES and READ_MEDIA_VIDEO permissions -->
+    <!-- Google Play policy: Apps using one-time photo access must use Photo Picker instead -->
+    <!-- image_picker plugin uses Photo Picker on Android 13+ which doesn't need these permissions -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" tools:node="remove"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" tools:node="remove"/>
     
     <!-- Internet permission for file uploads -->
     <uses-permission android:name="android.permission.INTERNET"/>
-    
-    <!-- Record audio permission for videos with sound -->
-    <!-- <uses-permission android:name="android.permission.RECORD_AUDIO"/> -->
+
+    <!-- Record audio permission for videos with sound and video calls -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+
+    <!-- Modify audio settings for video calls -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+
+    <!-- Foreground service permissions for phone calls -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL"/>
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS"/>
+
+    <!-- CallKit incoming call permissions -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
+    <uses-permission android:name="android.permission.DISABLE_KEYGUARD"/>
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY"/>
+
+    <!-- Network state permissions for video calls -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>
+
+    <!-- Bluetooth permissions for video call audio routing -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
     
     <!-- Push notification permissions -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>

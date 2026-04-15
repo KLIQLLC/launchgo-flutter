@@ -2,8 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:launchgo/config/environment.dart';
 import 'package:launchgo/services/auth_service.dart';
 import 'package:launchgo/services/chat/stream_chat_service.dart';
+import 'package:launchgo/services/video_call/stream_video_service.dart';
 import 'package:launchgo/services/theme_service.dart';
 import 'package:launchgo/theme/app_colors.dart';
 import 'package:launchgo/widgets/cupertino_dropdown.dart';
@@ -184,8 +186,8 @@ class _AppDrawerState extends State<AppDrawer> {
                 ],
                 
                 const SizedBox(height: 8),
-                // Settings with indent (only in debug mode)
-                if (kDebugMode)
+                // Settings with indent (only visible in stage, hidden in prod)
+                if (!EnvironmentConfig.isProd)
                   Padding(
                     padding: const EdgeInsets.only(left: _itemIndentPadding),
                     child: _buildDrawerItem(
@@ -292,6 +294,32 @@ class _AppDrawerState extends State<AppDrawer> {
     final shouldLogout = await _showLogoutConfirmationDialog(context);
     
     if (shouldLogout == true && context.mounted) {
+      // Show blocking loader until logout completes
+      BuildContext? loaderDialogContext;
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        useRootNavigator: true,
+        builder: (ctx) {
+          loaderDialogContext = ctx;
+          return const PopScope(
+            canPop: false,
+            child: Center(
+              child: Card(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(strokeWidth: 3),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+
       // Get StreamChatService if available
       StreamChatService? streamChatService;
       try {
@@ -304,8 +332,27 @@ class _AppDrawerState extends State<AppDrawer> {
         // StreamChatService might not be available in all contexts
         debugPrint('🟡 [LOGOUT] StreamChatService not available: $e');
       }
-      
-      await authService.signOut(streamChatService: streamChatService);
+
+      // Disconnect Stream Video on logout
+      if (context.mounted) {
+        try {
+          final streamVideoService = Provider.of<StreamVideoService>(context, listen: false);
+          await streamVideoService.disconnect();
+          debugPrint('📞 [LOGOUT] StreamVideoService disconnected');
+        } catch (e) {
+          debugPrint('🟡 [LOGOUT] StreamVideoService not available: $e');
+        }
+      }
+
+      try {
+        await authService.signOut(streamChatService: streamChatService);
+      } finally {
+        // Always dismiss loader if it's still shown
+        if (loaderDialogContext != null && loaderDialogContext!.mounted) {
+          Navigator.of(loaderDialogContext!, rootNavigator: true).pop();
+        }
+      }
+
       if (context.mounted) {
         context.go('/login');
       }

@@ -1,8 +1,13 @@
+// services/chat/stream_chat_service.dart
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:launchgo/utils/call_debug_logger.dart';
 import 'package:stream_chat_flutter/stream_chat_flutter.dart';
 import 'package:app_badge_plus/app_badge_plus.dart';
 import '../push_notification_service.dart';
+import '../video_call/voip_pushkit_service.dart';
 import '../../config/environment.dart';
 
 class StreamChatService extends ChangeNotifier {
@@ -12,6 +17,13 @@ class StreamChatService extends ChangeNotifier {
   late final StreamChatClient _client;
   bool _isInitialized = false;
   bool _isUserConnected = false;
+  Future<void>? _connectInFlight;
+  bool _isRegisteringPush = false;
+  String? _lastRegisteredApnsToken;
+  String? _lastRegisteredFcmToken;
+  
+  // iOS APNs token (non-VoIP) channel
+  static const MethodChannel _apnsChannel = MethodChannel('com.launchgo.app/apns');
   
   StreamChatClient get client => _client;
   bool get isInitialized => _isInitialized;
@@ -55,12 +67,29 @@ class StreamChatService extends ChangeNotifier {
     String? userImage,
     bool setOnline = true,  // Kept for backward compatibility but not used
   }) async {
+    // Serialize connect attempts (auth listener can fire many times during login)
+    if (_connectInFlight != null) {
+      try {
+        await _connectInFlight;
+      } catch (_) {}
+      final nowConnected = _client.state.currentUser?.id == userId;
+      _isUserConnected = nowConnected;
+      notifyListeners();
+      return;
+    }
+    
+    final connectCompleter = Completer<void>();
+    _connectInFlight = connectCompleter.future;
+    
     try {
       // Check if already connected with the same user
       if (_client.state.currentUser?.id == userId) {
-        debugPrint('🟢 Stream Chat: User already connected');
+        // Keep state consistent even if another code path connected first.
+        _isUserConnected = true;
+        notifyListeners();
         // Still register FCM token in case it changed
         await _registerPushToken();
+        _setupBadgeListener();
         return;
       }
       
@@ -80,9 +109,7 @@ class StreamChatService extends ChangeNotifier {
         ),
         token,
       );
-      
-      debugPrint('🟢 Stream Chat: User connected successfully - $userId (automatically online)');
-      
+
       // Register FCM token for push notifications
       await _registerPushToken();
       
@@ -94,71 +121,159 @@ class StreamChatService extends ChangeNotifier {
     } catch (e) {
       debugPrint('❌ Stream Chat: Error connecting user - $e');
       rethrow;
+    } finally {
+      if (!connectCompleter.isCompleted) {
+        connectCompleter.complete();
+      }
+      _connectInFlight = null;
     }
   }
   
   /// Register FCM token with Stream Chat for push notifications
   Future<void> _registerPushToken() async {
+    if (_isRegisteringPush) {
+      return;
+    }
+    _isRegisteringPush = true;
     try {
       final pushNotificationService = PushNotificationService.instance;
       
       // If notification service isn't initialized yet, wait for it
       if (!pushNotificationService.isInitialized) {
-        debugPrint('🔔 Stream Chat: Waiting for notification service to initialize...');
         await pushNotificationService.initialize();
       }
-      
-      if (pushNotificationService.fcmToken != null) {
-        debugPrint('🔔 Stream Chat: Registering FCM token: ${pushNotificationService.fcmToken!.substring(0, 20)}...');
-        await _client.addDevice(pushNotificationService.fcmToken!, PushProvider.firebase, 
-          pushProviderName: EnvironmentConfig.environmentName.toLowerCase());
-        debugPrint('✅ Stream Chat: FCM token registered successfully for push notifications');
-        
-        // Verify registration by listing devices
-        final devicesResponse = await _client.getDevices();
-        debugPrint('📱 Stream Chat: Registered devices count: ${devicesResponse.devices.length}');
-        for (final device in devicesResponse.devices) {
-          debugPrint('📱 Device: ${device.id} - ${device.pushProvider}');
+
+      if (Platform.isIOS) {
+        // iOS: register APNs (non-VoIP) token for chat pushes.
+        // Also remove the Firebase device so Video can't send call.ring via FCM (shared registry in Push v2).
+        final apnsToken = await _apnsChannel.invokeMethod<String>('getApnsToken');
+        if (apnsToken != null && apnsToken.isNotEmpty) {
+          // Idempotency: avoid re-registering the same token repeatedly (can timeout and spam logs).
+          if (_lastRegisteredApnsToken == apnsToken) {
+            return;
+          }
+          await _client.addDevice(
+            apnsToken,
+            PushProvider.apn,
+            pushProviderName: 'chat_apns',
+          );
+          _lastRegisteredApnsToken = apnsToken;
+        } else {
+          // Retry after a short delay (APNs token may arrive later)
+          Future.delayed(const Duration(seconds: 2), () {
+            _registerPushToken();
+          });
         }
       } else {
-        debugPrint('⚠️ Stream Chat: No FCM token available for registration');
-        debugPrint('⚠️ NotificationService initialized: ${pushNotificationService.isInitialized}');
-        
-        // Retry after a short delay
-        Future.delayed(const Duration(seconds: 2), () async {
-          if (pushNotificationService.fcmToken != null) {
-            await _client.addDevice(pushNotificationService.fcmToken!, PushProvider.firebase, 
-          pushProviderName: EnvironmentConfig.environmentName.toLowerCase());
-            debugPrint('✅ Stream Chat: FCM token registered successfully on retry');
-          } else {
-            debugPrint('❌ Stream Chat: FCM token still not available after retry');
+        // Android: register FCM under chat_firebase
+        final fcmToken = pushNotificationService.fcmToken;
+        if (fcmToken != null && fcmToken.isNotEmpty) {
+          // Idempotency: avoid re-registering the same token repeatedly.
+          if (_lastRegisteredFcmToken == fcmToken) {
+            return;
           }
-        });
+          // Push Notifications v2 is shared between Chat + Video. Use a dedicated provider name for chat.
+          await _client.addDevice(
+            fcmToken,
+            PushProvider.firebase,
+            pushProviderName: 'chat_firebase',
+          );
+          _lastRegisteredFcmToken = fcmToken;
+        } else {
+          // Retry after a short delay (token may arrive after login)
+          Future.delayed(const Duration(seconds: 2), () {
+            _registerPushToken();
+          });
+        }
       }
     } catch (e) {
-      debugPrint('❌ Stream Chat: Error registering FCM token - $e');
+      debugPrint('❌ Stream Chat: Error registering FCM token: $e');
+      // Keep only error in persisted logs (less spam)
+      await CallDebugLogger.log('[CHAT_PUSH] ERROR registerPushToken: $e');
+    } finally {
+      _isRegisteringPush = false;
     }
   }
 
-  Future<void> disconnectUser() async {
+  Future<void> disconnectUser({bool unregisterPush = true}) async {
     try {
+      // If a connect is in-flight, wait for it to finish to avoid racing connect/disconnect.
+      if (_connectInFlight != null) {
+        try {
+          await _connectInFlight;
+        } catch (_) {}
+      }
+      
       // Check if client is connected before attempting to disconnect
       if (_client.state.currentUser != null) {
+        // CRITICAL: Unregister device from push notifications BEFORE disconnecting
+        if (unregisterPush) {
+          await _unregisterPushToken();
+        }
+        
         await _client.disconnectUser();
-        debugPrint('🟡 Stream Chat: User disconnected');
-      } else {
-        debugPrint('🟡 Stream Chat: No user to disconnect');
       }
       _isUserConnected = false;
       notifyListeners();
+
+      // Clear app icon badge on logout/disconnect.
+      await _updateAppBadge(0);
     } catch (e) {
       // Handle WebSocket close code errors gracefully
       if (e.toString().contains('close code must be 1000 or in the range 3000-4999')) {
-        debugPrint('🟡 Stream Chat: WebSocket close code error (handled gracefully)');
       } else {
         debugPrint('❌ Stream Chat: Error disconnecting user - $e');
       }
+      _isUserConnected = false;
       notifyListeners();
+
+      // Best effort: clear badge even if disconnect had issues.
+      await _updateAppBadge(0);
+    }
+  }
+  
+  /// Unregister FCM token from Stream Chat to stop push notifications
+  Future<void> _unregisterPushToken() async {
+    try {
+      final pushNotificationService = PushNotificationService.instance;
+      
+      if (Platform.isIOS) {
+        // Remove APNs (non-VoIP) token
+        final apnsToken = await _apnsChannel.invokeMethod<String>('getApnsToken');
+        if (apnsToken != null && apnsToken.isNotEmpty) {
+          await _client.removeDevice(apnsToken);
+          _lastRegisteredApnsToken = null;
+        }
+        
+        // Remove VoIP APNs token (registered by Stream Video SDK but shows up in Chat devices)
+        final voipToken = await VoipPushKitService.getVoipToken();
+        if (voipToken != null && voipToken.isNotEmpty) {
+          try {
+            await _client.removeDevice(voipToken);
+            debugPrint('✅ Stream Chat: Removed VoIP token from Chat devices');
+          } catch (e) {
+            debugPrint('⚠️ Stream Chat: Error removing VoIP token: $e');
+          }
+        }
+        
+        // Also remove the Firebase device if present (best effort)
+        final fcmToken = pushNotificationService.fcmToken;
+        if (fcmToken != null && fcmToken.isNotEmpty) {
+          try {
+            await _client.removeDevice(fcmToken);
+          } catch (_) {}
+        }
+      } else {
+        final fcmToken = pushNotificationService.fcmToken;
+        if (fcmToken != null && fcmToken.isNotEmpty) {
+          // Remove the device
+          await _client.removeDevice(fcmToken);
+          _lastRegisteredFcmToken = null;
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Stream Chat: Error unregistering push token: $e');
+      await CallDebugLogger.log('[CHAT_PUSH] ERROR unregisterPushToken: $e');
     }
   }
   
@@ -406,7 +521,6 @@ class StreamChatService extends ChangeNotifier {
           userName: userName,
           userImage: userImage,
         );
-        debugPrint('🟢 Stream Chat: Auto-connected user for unread badge (online presence enabled)');
         
         // Query and watch user's channels so they appear online to others
         try {
@@ -448,7 +562,7 @@ class StreamChatService extends ChangeNotifier {
   }
 
   /// Update app icon badge with unread count
-  void _updateAppBadge(int count) async {
+  Future<void> _updateAppBadge(int count) async {
     try {
       if (await AppBadgePlus.isSupported()) {
         if (count > 0) {

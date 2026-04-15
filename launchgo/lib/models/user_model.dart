@@ -26,7 +26,8 @@ class Student extends Equatable {
   final String? role;
   final String? mentorId;
   final String? avatarUrl;
-  final String? getStreamToken;
+  final String? chatGetStreamToken;
+  final String? callGetStreamToken;
 
   const Student({
     required this.id,
@@ -39,7 +40,8 @@ class Student extends Equatable {
     this.role,
     this.mentorId,
     this.avatarUrl,
-    this.getStreamToken,
+    this.chatGetStreamToken,
+    this.callGetStreamToken,
   });
 
   factory Student.fromJson(Map<String, dynamic> json) {
@@ -50,20 +52,21 @@ class Student extends Equatable {
       status: json['status'],
       gpa: json['gpa'] != null ? double.tryParse(json['gpa'].toString()) : null,
       academicYear: json['academicYear'],
-      createdAt: json['createdAt'] != null 
+      createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'])
           : null,
       role: json['role'],
       mentorId: json['mentorId'],
       avatarUrl: json['avatarUrl'] ?? json['avatar'],
-      getStreamToken: json['getStreamToken'],
+      chatGetStreamToken: json['chatGetStreamToken'],
+      callGetStreamToken: json['callGetStreamToken'],
     );
   }
 
   @override
   List<Object?> get props => [
-    id, name, email, status, gpa, academicYear, 
-    createdAt, role, mentorId, avatarUrl, getStreamToken
+    id, name, email, status, gpa, academicYear,
+    createdAt, role, mentorId, avatarUrl, chatGetStreamToken, callGetStreamToken
   ];
 }
 
@@ -77,7 +80,8 @@ class UserModel extends Equatable {
   final List<Student> students; // For mentors
   final List<Semester> semesters; // Available semesters
   final String? avatarUrl;
-  final String? getStreamToken;
+  final String? chatGetStreamToken;
+  final String? callGetStreamToken;
   final String? mentorId;
   final String? mentorName;
   final String? mentorAvatar;
@@ -97,7 +101,8 @@ class UserModel extends Equatable {
     this.students = const [],
     this.semesters = const [],
     this.avatarUrl,
-    this.getStreamToken,
+    this.chatGetStreamToken,
+    this.callGetStreamToken,
     this.mentorId,
     this.mentorName,
     this.mentorAvatar,
@@ -165,13 +170,14 @@ class UserModel extends Equatable {
       email: userData['email'] ?? '',
       role: userRole,
       status: userStatus,
-      createdAt: userData['createdAt'] != null 
+      createdAt: userData['createdAt'] != null
           ? DateTime.parse(userData['createdAt'])
           : null,
       students: studentsList,
       semesters: const [], // Semesters loaded separately now
       avatarUrl: userData['avatarUrl'] ?? userData['avatar'],
-      getStreamToken: userData['getStreamToken'],
+      chatGetStreamToken: userData['chatGetStreamToken'],
+      callGetStreamToken: userData['callGetStreamToken'],
       mentorId: userData['mentorId'],
       mentorName: userData['mentorName'],
       mentorAvatar: userData['mentorAvatar'],
@@ -191,7 +197,8 @@ class UserModel extends Equatable {
     List<Student>? students,
     List<Semester>? semesters,
     String? avatarUrl,
-    String? getStreamToken,
+    String? chatGetStreamToken,
+    String? callGetStreamToken,
     String? mentorId,
     String? mentorName,
     String? mentorAvatar,
@@ -210,7 +217,8 @@ class UserModel extends Equatable {
       students: students ?? this.students,
       semesters: semesters ?? this.semesters,
       avatarUrl: avatarUrl ?? this.avatarUrl,
-      getStreamToken: getStreamToken ?? this.getStreamToken,
+      chatGetStreamToken: chatGetStreamToken ?? this.chatGetStreamToken,
+      callGetStreamToken: callGetStreamToken ?? this.callGetStreamToken,
       mentorId: mentorId ?? this.mentorId,
       mentorName: mentorName ?? this.mentorName,
       mentorAvatar: mentorAvatar ?? this.mentorAvatar,
@@ -227,5 +235,5 @@ class UserModel extends Equatable {
   bool get isCaseManager => role == UserRole.caseManager;
 
   @override
-  List<Object?> get props => [id, name, email, role, students, avatarUrl, getStreamToken, mentorId, mentorName, mentorAvatar, mentorEmail, selectedStudentId, gpa, academicYear];
+  List<Object?> get props => [id, name, email, role, students, avatarUrl, chatGetStreamToken, callGetStreamToken, mentorId, mentorName, mentorAvatar, mentorEmail, selectedStudentId, gpa, academicYear];
 }

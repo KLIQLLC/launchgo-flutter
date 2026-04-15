@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../services/chat/stream_chat_service.dart';
 import '../../services/chat/chat_channel_manager.dart';
 import '../../services/auth_service.dart';
-import '../../widgets/custom_chat_widget.dart';
+import '../video_call/custom_chat_widget.dart';
 
 class RefactoredChatScreen extends StatefulWidget {
   const RefactoredChatScreen({super.key});
@@ -37,9 +37,7 @@ class _RefactoredChatScreenState extends State<RefactoredChatScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
-      debugPrint('🟡 [CHAT] App going to background');
     } else if (state == AppLifecycleState.resumed) {
-      debugPrint('🟢 [CHAT] App resumed');
     }
   }
 
@@ -47,12 +45,10 @@ class _RefactoredChatScreenState extends State<RefactoredChatScreen>
     try {
       final streamChatService = context.read<StreamChatService>();
       _channelManager = ChatChannelManager(streamChatService);
-      debugPrint('✅ [CHAT] Channel manager initialized');
     } catch (e) {
       setState(() {
         _errorMessage = 'Failed to initialize chat: $e';
       });
-      debugPrint('❌ [CHAT] Failed to initialize channel manager: $e');
     }
   }
 
@@ -72,7 +68,7 @@ class _RefactoredChatScreenState extends State<RefactoredChatScreen>
       throw Exception('User info not loaded');
     }
 
-    if (user.getStreamToken?.isEmpty ?? true) {
+    if (user.chatGetStreamToken?.isEmpty ?? true) {
       throw Exception('Stream Chat token not available');
     }
 
@@ -88,7 +84,7 @@ class _RefactoredChatScreenState extends State<RefactoredChatScreen>
 
     return await _channelManager!.initializeChannel(
       user: user,
-      token: user.getStreamToken!,
+      token: user.chatGetStreamToken!,
       selectedStudentId: selectedStudentId,
     );
   }
