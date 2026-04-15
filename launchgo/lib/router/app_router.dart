@@ -5,7 +5,6 @@ import '../theme/app_colors.dart';
 import 'package:launchgo/widgets/chat_badge_widget.dart';
 import 'package:launchgo/features/documents/domain/entities/document_entity.dart';
 import 'package:launchgo/features/documents/presentation/pages/documents_page.dart';
-import 'package:launchgo/screens/goals/goals_screen.dart';
 import 'package:launchgo/screens/chat/refactored_chat_screen.dart';
 import 'package:launchgo/screens/courses/courses_screen.dart';
 import 'package:launchgo/screens/courses/course_form_screen.dart';
@@ -61,6 +60,10 @@ class AppRouter {
 
         if (isAuthenticated && isLoginRoute) {
           return '/schedule';
+        }
+
+        if (state.uri.path == '/goals') {
+          return isAuthenticated ? '/schedule' : '/login';
         }
 
         // Prevent unauthorized access based on role permissions
@@ -308,13 +311,6 @@ class AppRouter {
                 child: RecapsScreen(),
               ),
             ),
-            GoRoute(
-              path: '/goals',
-              name: 'goals',
-              pageBuilder: (context, state) => const NoTransitionPage(
-                child: GoalsScreen(),
-              ),
-            ),
           ],
         ),
       ],
@@ -348,8 +344,6 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
           return 'Documents';
         case '/recaps':
           return 'Session Recaps';
-        case '/goals':
-          return 'Goals';
         default:
           return 'launchgo';
       }
@@ -417,23 +411,6 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
           ),
         );
       }
-
-      // Add Goals tab for all roles
-      items.add(
-        BottomNavigationBarItem(
-          icon: CustomIcon(
-            icon: CustomIconPath.goal,
-            size: const Size(24, 24),
-            color: AppColors.bottomNavUnselected,
-          ),
-          activeIcon: CustomIcon(
-            icon: CustomIconPath.goal,
-            size: const Size(24, 24),
-            color: _selectedTabColor,
-          ),
-          label: 'Goals',
-        ),
-      );
 
       return items;
     }

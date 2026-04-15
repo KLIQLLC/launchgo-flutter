@@ -61,10 +61,10 @@ class PermissionsService {
   
   /// Get list of available navigation routes for this role
   List<String> get availableRoutes {
-    List<String> routes = ['/schedule', '/courses', '/documents', '/goals'];
-    
+    List<String> routes = ['/schedule', '/courses', '/documents'];
+
     if (canShowRecapsTab) {
-      routes.insert(3, '/recaps'); // Insert before goals
+      routes.add('/recaps');
     }
     
     return routes;
