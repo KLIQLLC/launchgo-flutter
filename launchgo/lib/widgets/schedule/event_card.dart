@@ -135,6 +135,9 @@ class _EventCardContent extends StatelessWidget {
 
   const _EventCardContent({required this.event, this.onEventUpdated});
 
+  bool get _isMissedCheckIn =>
+      event.checkInLocationStatus?.trim().toLowerCase() == 'check-in-missed';
+
   Future<void> _handleCheckIn(BuildContext context) async {
     // 1. Check if location services are enabled
     final servicesEnabled = await Geolocator.isLocationServiceEnabled();
@@ -271,6 +274,11 @@ class _EventCardContent extends StatelessWidget {
   }
 
   BoxDecoration _buildCardDecoration() {
+    final borderColor = _isMissedCheckIn
+        ? Event.checkInMissedBorderColor
+        : event.color.withValues(alpha: 0.4);
+    final borderWidth = _isMissedCheckIn ? 2.0 : 1.0;
+
     return BoxDecoration(
       color: Color.alphaBlend(
         event.color.withValues(alpha: 0.15),
@@ -278,8 +286,8 @@ class _EventCardContent extends StatelessWidget {
       ),
       borderRadius: BorderRadius.circular(12),
       border: Border.all(
-        color: event.color.withValues(alpha: 0.4),
-        width: 1.0,
+        color: borderColor,
+        width: borderWidth,
       ),
     );
   }

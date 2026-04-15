@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import '../utils/recurrence_utils.dart';
 
 class Event extends Equatable {
+  /// Strong red for missed check-in emphasis (e.g. card border only; not used by [color]).
+  static const Color checkInMissedBorderColor = Color(0xFFFF3B30);
+
   final String id;
   final String name;
   final DateTime startEventAt;
