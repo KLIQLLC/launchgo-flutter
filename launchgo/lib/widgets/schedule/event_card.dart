@@ -274,11 +274,6 @@ class _EventCardContent extends StatelessWidget {
   }
 
   BoxDecoration _buildCardDecoration() {
-    final borderColor = _isMissedCheckIn
-        ? Event.checkInMissedBorderColor
-        : event.color.withValues(alpha: 0.4);
-    final borderWidth = _isMissedCheckIn ? 2.0 : 1.0;
-
     return BoxDecoration(
       color: Color.alphaBlend(
         event.color.withValues(alpha: 0.15),
@@ -286,8 +281,8 @@ class _EventCardContent extends StatelessWidget {
       ),
       borderRadius: BorderRadius.circular(12),
       border: Border.all(
-        color: borderColor,
-        width: borderWidth,
+        color: event.color.withValues(alpha: 0.4),
+        width: _isMissedCheckIn ? 2.0 : 1.0,
       ),
     );
   }

@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import '../utils/recurrence_utils.dart';
 
 class Event extends Equatable {
-  /// Strong red for missed check-in emphasis (e.g. card border only; not used by [color]).
-  static const Color checkInMissedBorderColor = Color(0xFFFF3B30);
+  /// Accent when check-in was missed; [color] returns this regardless of [type].
+  static const Color checkInMissedColor = Color(0xFFFF3B30);
 
   final String id;
   final String name;
@@ -134,8 +134,11 @@ class Event extends Equatable {
     return '$startTime - $endTime';
   }
 
-  // Get color based on event type
+  // Get color: missed check-in overrides type (full card uses this like other events).
   Color get color {
+    if (checkInLocationStatus?.trim().toLowerCase() == 'check-in-missed') {
+      return checkInMissedColor;
+    }
     switch (type.toLowerCase()) {
       case 'lg_session':
         return const Color(0xFFE97DE8); // Purple
