@@ -98,7 +98,7 @@ class _RefactoredChatScreenState extends State<RefactoredChatScreen>
       if (user == null) return 'Chat';
 
       if (user.isStudent) {
-        return user.mentorName ?? 'Mentor';
+        return user.studentChatDisplayTitle;
       } else if (user.isMentor) {
         final selectedStudent = authService.getSelectedStudent();
         return selectedStudent?.name ?? 'Client';

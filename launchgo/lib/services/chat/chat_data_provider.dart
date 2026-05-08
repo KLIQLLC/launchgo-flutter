@@ -18,16 +18,24 @@ class ChatDataProvider {
 
   /// Get chat data for student users
   static Map<String, dynamic> _getStudentChatData(UserModel user) {
+    final primaryMentorId =
+        user.mentors.isNotEmpty ? user.mentors.first.id : user.mentorId;
+    final primaryName = user.mentors.isNotEmpty
+        ? user.mentors.first.name
+        : (user.mentorName ?? 'Mentor');
+    final primaryImage = user.mentors.isNotEmpty
+        ? user.mentors.first.avatarUrl
+        : user.mentorAvatar;
     return {
       'userId': user.id,
       'userToken': user.chatGetStreamToken ?? '',
       'userName': user.name,
       'userImage': user.avatarUrl ?? '',
-      'secondUserId': user.mentorId ?? '',
-      'secondUserName': user.mentorName ?? 'Mentor',
-      'secondUserImage': user.mentorAvatar ?? '',
+      'secondUserId': primaryMentorId ?? '',
+      'secondUserName': primaryName,
+      'secondUserImage': primaryImage ?? '',
       'channelId': user.id, // Student's ID as channel ID
-      'chatTitle': user.mentorName ?? 'Mentor',
+      'chatTitle': user.studentChatDisplayTitle,
     };
   }
 

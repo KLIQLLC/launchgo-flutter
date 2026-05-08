@@ -1,6 +1,7 @@
 // services/auth_service.dart
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -56,6 +57,20 @@ class AuthService extends ChangeNotifier {
   // Permissions service
   PermissionsService get permissions => PermissionsService(_userInfo);
 
+  /// Debug: print LaunchGo API JWT. Enabled in [kDebugMode], or in release with
+  /// `--dart-define=LOG_ACCESS_TOKEN=true` (do not ship to stores).
+  static const bool _logAccessTokenRelease =
+      bool.fromEnvironment('LOG_ACCESS_TOKEN', defaultValue: false);
+
+  void _debugLogAccessToken(String context) {
+    final t = _accessToken;
+    if (t == null || t.isEmpty) return;
+    if (!kDebugMode && !_logAccessTokenRelease) return;
+    debugPrint(
+      '🔐 [AUTH] $context — accessToken for curl (Authorization: Bearer …):\n$t',
+    );
+  }
+
   // Google Sign-In configuration
   static const List<String> _scopes = [
     'email',
@@ -107,6 +122,7 @@ class AuthService extends ChangeNotifier {
         
         // Try to load user info - if it fails, the token is invalid
         debugPrint('🔐 Found stored token, attempting to load user data...');
+        _debugLogAccessToken('initialize (stored session)');
         try {
           await loadUserInfo();
           debugPrint('✅ Token valid, user data loaded successfully');
@@ -158,6 +174,7 @@ class AuthService extends ChangeNotifier {
         return;
       }
 
+      _debugLogAccessToken('refreshFromStorageIfPossible');
       await loadUserInfo();
       _setupFCMTokenCallback();
       notifyListeners();
@@ -275,6 +292,8 @@ class AuthService extends ChangeNotifier {
       // Clear secure storage and user preferences
       await SecureStorageService.clearAllAuthData();
       await PreferencesService.clearAllPreferences();
+      // Stream Video token copied to SharedPreferences for Android native; clear on every logout path.
+      await PreferencesService.clearStreamVideoCredentials();
       
       // Cancel weekly notifications
       try {
@@ -362,7 +381,8 @@ class AuthService extends ChangeNotifier {
       if (accessToken != null) {
         debugPrint('🔐 Access token received successfully');
         _accessToken = accessToken;
-        
+        _debugLogAccessToken('after login (GET /users/auth/google/mobile)');
+
         // Store token securely
         await SecureStorageService.saveAccessToken(_accessToken!);
         debugPrint('🔐 Token saved to secure storage');
@@ -462,6 +482,28 @@ class AuthService extends ChangeNotifier {
     }
   }
   
+  /// Debug: log Stream tokens as parsed from [GET /users/me] (source of truth for the app).
+  void _logStreamTokensFromApi(String context) {
+    final call = _userInfo?.callGetStreamToken;
+    final chat = _userInfo?.chatGetStreamToken;
+    debugPrint('🔐 [AUTH] $context — tokens after UserModel.fromJson(/users/me):');
+    if (call == null || call.isEmpty) {
+      debugPrint('🔐 [AUTH]   callGetStreamToken: null_or_empty');
+    } else {
+      final n = call.split('.').length;
+      debugPrint(
+        '🔐 [AUTH]   callGetStreamToken: len=${call.length} jwtParts=$n (expect 3) raw=$call',
+      );
+    }
+    if (chat == null || chat.isEmpty) {
+      debugPrint('🔐 [AUTH]   chatGetStreamToken: null_or_empty');
+    } else {
+      debugPrint(
+        '🔐 [AUTH]   chatGetStreamToken: len=${chat.length} jwtParts=${chat.split('.').length}',
+      );
+    }
+  }
+
   /// Load user information including role and students
   Future<void> loadUserInfo() async {
     if (_apiService == null) {
@@ -476,6 +518,7 @@ class AuthService extends ChangeNotifier {
         debugPrint('✅ User info data received: ${userInfoData['id']} - ${userInfoData['name']}');
         _userInfo = UserModel.fromJson(userInfoData);
         debugPrint('✅ User info parsed: ${_userInfo?.id} - ${_userInfo?.name} (${_userInfo?.role})');
+        _logStreamTokensFromApi('loadUserInfo');
         
         
         // Restore saved student selection for mentors
@@ -544,6 +587,7 @@ class AuthService extends ChangeNotifier {
           );
         }
         
+        _logStreamTokensFromApi('refreshUserInfo');
         debugPrint('✅ User info refreshed with latest data');
       }
     } catch (e) {

@@ -184,11 +184,8 @@ class _CustomChatWidgetState extends State<CustomChatWidget> {
                     );
                   },
                   messageBuilder: (context, details, messages, defaultWidget) {
-                    return defaultWidget.copyWith(
-                      showUsername: true,
-                      showTimestamp: true,
-                      showSendingIndicator: true,
-                    );
+                    // Keep Stream defaults (username only on first message in a streak for others).
+                    return defaultWidget;
                   },
                 ),
               ),
@@ -270,92 +267,8 @@ class _CustomChatAppBar extends StatefulWidget {
 }
 
 class _CustomChatAppBarState extends State<_CustomChatAppBar> {
-  StreamSubscription? _channelSubscription;
-  Timer? _statusRefreshTimer;
-  bool isOnline = false;
-  
   /// Prevents duplicate calls when mentor taps call button multiple times
   bool _startingVideoCall = false;
-
-  String displayName = '';
-  String displayAvatar = '';
-  String? otherUserId;
-
-  @override
-  void initState() {
-    super.initState();
-    _initUserData();
-    _subscribeToChannelEvents();
-    _updateOnlineStatus();
-    
-    // Set up periodic refresh for status (every 5 seconds)
-    _statusRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      _updateOnlineStatus();
-    });
-  }
-
-  void _initUserData() {
-    final authService = Provider.of<AuthService>(context, listen: false);
-    final user = authService.userInfo;
-    if (user == null) {
-      displayName = 'Unknown';
-    } else if (user.isStudent) {
-      // if student
-      displayName = user.mentorName ?? 'Mentor';
-      displayAvatar = user.mentorAvatar ?? '';
-      otherUserId = user.mentorId;
-    } else if (user.isMentor) {
-      // if mentor
-      final selectedStudent = authService.getSelectedStudent();
-      displayName = selectedStudent?.name ?? 'Client';
-      displayAvatar = selectedStudent?.avatarUrl ?? '';
-      otherUserId = selectedStudent?.id;
-    }
-  }
-
-  void _subscribeToChannelEvents() {
-    _channelSubscription = widget.channel.on().listen((event) {
-      // Listen for various presence and user events
-      if (event.type == 'user.presence.changed' ||
-          event.type == 'user.watching.start' ||
-          event.type == 'user.watching.stop' ||
-          event.type == 'user.updated' ||
-          event.type == 'member.updated' ||
-          event.type == 'health.check') {
-        _updateOnlineStatus();
-      }
-    });
-    
-    // Also listen to channel state changes
-    widget.channel.state?.membersStream.listen((_) {
-      _updateOnlineStatus();
-    });
-  }
-
-  void _updateOnlineStatus() {
-    if (!mounted) return;
-    
-    final members = widget.channel.state?.members ?? [];
-    
-    final otherMember = members.firstWhere(
-      (m) => m.userId == otherUserId,
-      orElse: () => members.isNotEmpty ? members.first : Member(userId: '', user: null),
-    );
-    
-    final newOnlineStatus = otherMember.user?.online ?? false;
-    if (newOnlineStatus != isOnline) {
-      setState(() {
-        isOnline = newOnlineStatus;
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _channelSubscription?.cancel();
-    _statusRefreshTimer?.cancel();
-    super.dispose();
-  }
 
   void _showPermissionSettingsDialog(BuildContext context) {
     showDialog(
@@ -643,42 +556,67 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
 
   @override
   Widget build(BuildContext context) {
+    final myId = StreamChat.of(context).currentUser?.id ?? '';
+
     return SafeArea(
       child: Container(
         height: 64,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        color: const Color(0xFF0F1828), // Slightly lighter than background for app bar
+        padding: const EdgeInsets.only(left: 8, right: 4),
+        color: const Color(0xFF0F1828),
         child: Row(
           children: [
-            CircleAvatar(
-              radius: 20,
-              backgroundImage: displayAvatar.isNotEmpty ? NetworkImage(displayAvatar) : null,
-              backgroundColor: Colors.grey[800],
+            Expanded(
+              child: StreamBuilder<ChannelState>(
+                stream: widget.channel.state?.channelStateStream,
+                initialData: widget.channel.state?.channelState,
+                builder: (context, snapshot) {
+                  final members = widget.channel.state?.members ?? [];
+                  final participants = members
+                      .where((m) {
+                        final uid = m.userId;
+                        return uid != null &&
+                            uid.isNotEmpty &&
+                            uid != myId &&
+                            uid != 'readonly';
+                      })
+                      .toList()
+                    ..sort((a, b) {
+                      final an = a.user?.name ?? a.userId ?? '';
+                      final bn = b.user?.name ?? b.userId ?? '';
+                      return an.compareTo(bn);
+                    });
+
+                  if (participants.isEmpty) {
+                    return const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Chat',
+                        style: TextStyle(color: Colors.white70, fontSize: 16),
+                      ),
+                    );
+                  }
+
+                  return ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+                    itemCount: participants.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 10),
+                    itemBuilder: (context, index) {
+                      final member = participants[index];
+                      final u = member.user;
+                      final name = u?.name ?? member.userId ?? '';
+                      final online = u?.online ?? false;
+                      final image = u?.image;
+                      return _ChatHeaderParticipantTile(
+                        name: name,
+                        imageUrl: image,
+                        isOnline: online,
+                      );
+                    },
+                  );
+                },
+              ),
             ),
-            const SizedBox(width: 12),
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  displayName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  isOnline ? 'Online' : 'Offline',
-                  style: TextStyle(
-                    color: isOnline ? Colors.green : Colors.grey,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-            const Spacer(),
             // Video call button (mentor only)
             Consumer<AuthService>(
               builder: (context, authService, _) {
@@ -694,16 +632,131 @@ class _CustomChatAppBarState extends State<_CustomChatAppBar> {
             IconButton(
               icon: const Icon(Icons.close, color: Colors.white),
               onPressed: () {
-                // Try to pop first, if not possible, navigate to schedule
                 if (Navigator.of(context).canPop()) {
                   Navigator.of(context).pop();
                 } else {
-                  // If no navigation stack (opened via push notification), go to schedule
                   context.go('/schedule');
                 }
               },
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ChatHeaderParticipantTile extends StatelessWidget {
+  final String name;
+  final String? imageUrl;
+  final bool isOnline;
+
+  const _ChatHeaderParticipantTile({
+    required this.name,
+    required this.imageUrl,
+    required this.isOnline,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            _ChatHeaderAvatar(url: imageUrl, name: name),
+            Positioned(
+              right: -1,
+              bottom: -1,
+              child: Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: isOnline ? Colors.green : Colors.grey,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: const Color(0xFF0F1828),
+                    width: 2,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(width: 8),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 120),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                isOnline ? 'Online' : 'Offline',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                  color: isOnline ? Colors.green.shade400 : Colors.grey,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ChatHeaderAvatar extends StatelessWidget {
+  final String? url;
+  final String name;
+
+  const _ChatHeaderAvatar({required this.url, required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+    final u = url;
+    if (u != null && u.isNotEmpty) {
+      return ClipOval(
+        child: Image.network(
+          u,
+          width: 32,
+          height: 32,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _initialCircle(initial),
+        ),
+      );
+    }
+    return _initialCircle(initial);
+  }
+
+  Widget _initialCircle(String initial) {
+    return Container(
+      width: 32,
+      height: 32,
+      alignment: Alignment.center,
+      decoration: const BoxDecoration(
+        color: Color(0xFF2563EB),
+        shape: BoxShape.circle,
+      ),
+      child: Text(
+        initial,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 14,
         ),
       ),
     );

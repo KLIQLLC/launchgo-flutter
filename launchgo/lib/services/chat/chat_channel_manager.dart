@@ -3,6 +3,16 @@ import 'package:stream_chat_flutter/stream_chat_flutter.dart';
 import '../../models/user_model.dart' as app_models;
 import 'stream_chat_service.dart';
 
+String _studentChannelDisplayName(app_models.UserModel user) {
+  if (user.mentors.isEmpty) {
+    return 'Chat with ${user.mentorName ?? 'Mentor'}';
+  }
+  if (user.mentors.length == 1) {
+    return 'Chat with ${user.mentors.first.name}';
+  }
+  return 'Chat with mentors';
+}
+
 /// Manages chat channel lifecycle and operations
 class ChatChannelManager {
   final StreamChatService _streamChatService;
@@ -110,21 +120,31 @@ class ChatChannelManager {
   /// Private: Get channel configuration based on user role
   _ChannelConfig _getChannelConfig(app_models.UserModel user, String? selectedStudentId) {
     if (user.isStudent) {
-      // For students, use their ID as channel ID, chat with mentor
+      final mentorIds = user.mentorIdsForChatChannel;
+      final memberIds = <String>{user.id, ...mentorIds}
+          .where((id) => id.isNotEmpty)
+          .toList();
+      final channelTitle = _studentChannelDisplayName(user);
       return _ChannelConfig(
         channelId: user.id,
         channelType: 'messaging',
-        members: [user.id, user.mentorId ?? ''],
+        members: memberIds.isNotEmpty
+            ? memberIds
+            : [user.id],
         extraData: {
-          'name': 'Chat with ${user.mentorName ?? 'Mentor'}',
+          'name': channelTitle,
           'studentId': user.id,
           'studentName': user.name,
           'mentorId': user.mentorId,
           'mentorName': user.mentorName,
         },
-        otherUserId: user.mentorId,
-        otherUserName: user.mentorName ?? 'Mentor',
-        otherUserImage: user.mentorAvatar,
+        otherUserId: mentorIds.isNotEmpty ? mentorIds.first : user.mentorId,
+        otherUserName: user.mentors.isNotEmpty
+            ? user.mentors.first.name
+            : (user.mentorName ?? 'Mentor'),
+        otherUserImage: user.mentors.isNotEmpty
+            ? user.mentors.first.avatarUrl
+            : user.mentorAvatar,
       );
     } else if (user.isMentor) {
       // For mentors, use selected student's ID as channel ID
