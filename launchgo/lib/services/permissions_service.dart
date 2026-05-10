@@ -1,4 +1,5 @@
 import '../models/user_model.dart';
+import '../models/user_permission_type.dart';
 
 /// Centralized service for managing role-based permissions and UI visibility
 /// This service defines all role-based logic in one place for consistency
@@ -26,6 +27,10 @@ class PermissionsService {
   /// Same logic as tab visibility
   bool get canAccessRecaps => !isStudent;
 
+  /// Mentor-only shell tab (student event permission toggles for selected student).
+  bool get canShowMentorSettingsTab =>
+      isMentor && (_userInfo?.students.isNotEmpty ?? false);
+
   // Document Operation Permissions
   
   /// Can create documents - disabled for students
@@ -47,15 +52,24 @@ class PermissionsService {
   bool get canAccessAdmin => isCaseManager;
 
   // Event Management Permissions
-  
-  /// Can create events - disabled for students
-  bool get canCreateEvents => !isStudent;
-  
-  /// Can edit events - disabled for students
-  bool get canEditEvents => !isStudent;
-  
-  /// Can delete events - disabled for students
-  bool get canDeleteEvents => !isStudent;
+
+  /// Can create events — mentors/CMS always; students only if mentor enabled [UserPermissionType.eventCreate].
+  bool get canCreateEvents {
+    if (!isStudent) return true;
+    return _userInfo?.hasPermission(UserPermissionType.eventCreate) ?? false;
+  }
+
+  /// Can edit calendar events — mentors/CMS always; students per [UserPermissionType.eventUpdate].
+  bool get canEditEvents {
+    if (!isStudent) return true;
+    return _userInfo?.hasPermission(UserPermissionType.eventUpdate) ?? false;
+  }
+
+  /// Can delete calendar events — mentors/CMS always; students per [UserPermissionType.eventDelete].
+  bool get canDeleteEvents {
+    if (!isStudent) return true;
+    return _userInfo?.hasPermission(UserPermissionType.eventDelete) ?? false;
+  }
 
   // Navigation Permissions
   
@@ -65,6 +79,10 @@ class PermissionsService {
 
     if (canShowRecapsTab) {
       routes.add('/recaps');
+    }
+
+    if (canShowMentorSettingsTab) {
+      routes.add('/settings');
     }
     
     return routes;
@@ -87,6 +105,9 @@ class PermissionsService {
   
   /// Should redirect from a route based on permissions
   String? getRedirectRoute(String currentRoute) {
+    if (currentRoute == '/settings' && !canShowMentorSettingsTab) {
+      return '/schedule';
+    }
     if (currentRoute == '/recaps' && !canAccessRecaps) {
       return '/schedule'; // Redirect students away from recaps
     }

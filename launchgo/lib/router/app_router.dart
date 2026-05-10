@@ -17,6 +17,7 @@ import 'package:launchgo/features/recaps/presentation/pages/recaps_page.dart';
 import 'package:launchgo/features/recaps/presentation/pages/recap_form_page.dart';
 import 'package:launchgo/models/recap_model.dart';
 import 'package:launchgo/screens/schedule/schedule_screen.dart';
+import 'package:launchgo/screens/mentor_student_permissions_screen.dart';
 import 'package:launchgo/screens/settings_screen.dart';
 import 'package:launchgo/screens/notifications_screen.dart';
 import 'package:launchgo/screens/schedule/event_form_screen.dart';
@@ -69,6 +70,12 @@ class AppRouter {
 
         // Prevent unauthorized access based on role permissions
         if (isAuthenticated) {
+          if ((state.matchedLocation == '/new-event' ||
+                  state.matchedLocation == '/new-recurring-event') &&
+              authService.permissions.isStudent &&
+              !authService.permissions.canCreateEvents) {
+            return '/schedule';
+          }
           // Check for document and course creation/edit routes
           if ((state.matchedLocation == '/new-document' && !authService.permissions.canCreateDocuments) ||
               (state.matchedLocation == '/new-course' && !authService.permissions.canCreateDocuments) ||
@@ -92,8 +99,8 @@ class AppRouter {
           builder: (context, state) => const LoginScreen(),
         ),
         GoRoute(
-          path: '/settings',
-          name: 'settings',
+          path: '/account-settings',
+          name: 'accountSettings',
           builder: (context, state) => const SettingsScreen(),
         ),
         GoRoute(
@@ -312,6 +319,13 @@ class AppRouter {
                 child: RecapsScreen(),
               ),
             ),
+            GoRoute(
+              path: '/settings',
+              name: 'studentPermissionsSettings',
+              pageBuilder: (context, state) => const NoTransitionPage(
+                child: MentorStudentPermissionsScreen(),
+              ),
+            ),
           ],
         ),
       ],
@@ -345,6 +359,10 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
           return 'Documents';
         case '/recaps':
           return 'Session Recaps';
+        case '/settings':
+          return 'Settings';
+        case '/account-settings':
+          return 'Account';
         default:
           return 'launchgo';
       }
@@ -409,6 +427,24 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
               color: _selectedTabColor,
             ),
             label: 'Recaps',
+          ),
+        );
+      }
+
+      if (authService.permissions.canShowMentorSettingsTab) {
+        items.add(
+          BottomNavigationBarItem(
+            icon: Icon(
+              Icons.tune_rounded,
+              size: 24,
+              color: AppColors.bottomNavUnselected,
+            ),
+            activeIcon: Icon(
+              Icons.tune_rounded,
+              size: 24,
+              color: _selectedTabColor,
+            ),
+            label: 'Settings',
           ),
         );
       }

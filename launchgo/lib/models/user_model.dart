@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'semester_model.dart';
+import 'user_permission_type.dart';
 
 enum UserRole {
   student,
@@ -158,6 +159,8 @@ class UserModel extends Equatable {
   final String? selectedSemesterId; // Currently selected semester
   final double? gpa; // Student's GPA (for student users)
   final String? academicYear; // Student's academic year (for student users)
+  /// Server-driven feature flags (students; keys match [UserPermissionType.apiKey]).
+  final Map<String, bool> permissions;
 
   const UserModel({
     required this.id,
@@ -180,6 +183,7 @@ class UserModel extends Equatable {
     this.selectedSemesterId,
     this.gpa,
     this.academicYear,
+    this.permissions = const {},
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -270,6 +274,7 @@ class UserModel extends Equatable {
       selectedSemesterId: null, // Will be set when semesters are loaded
       gpa: userData['gpa'] != null ? double.tryParse(userData['gpa'].toString()) : null,
       academicYear: userData['academicYear'],
+      permissions: parseUserPermissions(userData['permissions']),
     );
   }
 
@@ -311,6 +316,7 @@ class UserModel extends Equatable {
     String? selectedSemesterId,
     double? gpa,
     String? academicYear,
+    Map<String, bool>? permissions,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -332,13 +338,17 @@ class UserModel extends Equatable {
       selectedSemesterId: selectedSemesterId ?? this.selectedSemesterId,
       gpa: gpa ?? this.gpa,
       academicYear: academicYear ?? this.academicYear,
+      permissions: permissions ?? this.permissions,
     );
   }
+
+  bool hasPermission(UserPermissionType type) =>
+      permissionMapValue(permissions, type);
 
   bool get isMentor => role == UserRole.mentor;
   bool get isStudent => role == UserRole.student;
   bool get isCaseManager => role == UserRole.caseManager;
 
   @override
-  List<Object?> get props => [id, name, email, role, students, avatarUrl, chatGetStreamToken, callGetStreamToken, mentorId, mentorName, mentorAvatar, mentorEmail, mentors, selectedStudentId, gpa, academicYear];
+  List<Object?> get props => [id, name, email, role, students, avatarUrl, chatGetStreamToken, callGetStreamToken, mentorId, mentorName, mentorAvatar, mentorEmail, mentors, selectedStudentId, gpa, academicYear, permissions];
 }
