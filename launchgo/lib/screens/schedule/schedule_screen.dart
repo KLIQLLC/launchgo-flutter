@@ -1,3 +1,4 @@
+// screens/schedule/schedule_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:launchgo/models/deadline_model.dart';
@@ -926,7 +927,7 @@ class _UpcomingDeadlinesView extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(left: 4, bottom: 8),
                   child: Text(
-                    assignment.course?.code ?? 'Unknown Course',
+                    assignment.course?.code ?? 'Unknown Task',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 16,
@@ -965,9 +966,14 @@ class _StudentHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final userInfo = authService.userInfo;
     final displayedStudent = authService.getSelectedStudent();
-    final displayName = userInfo?.isMentor == true && displayedStudent != null
-        ? displayedStudent.name
-        : userInfo?.name ?? 'Client';
+    final isMentor = userInfo?.isMentor == true;
+    final mentorHasNoStudents = isMentor && (userInfo?.students.isEmpty ?? true);
+
+    final displayName = mentorHasNoStudents
+        ? 'No clients yet'
+        : (isMentor && displayedStudent != null
+            ? displayedStudent.name
+            : userInfo?.name ?? 'Client');
 
     return Container(
       width: double.infinity,
@@ -996,9 +1002,10 @@ class _StudentHeader extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            _StudentInfo(
-              student: displayedStudent ?? userInfo,
-            ),
+            if (!mentorHasNoStudents)
+              _StudentInfo(
+                student: displayedStudent ?? userInfo,
+              ),
           ],
         ),
       ),

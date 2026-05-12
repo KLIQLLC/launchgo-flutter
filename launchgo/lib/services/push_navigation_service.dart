@@ -154,7 +154,7 @@ class PushNavigationService {
         break;
       
       case 'settings':
-        _router!.go('/settings');
+        _router!.go('/account-settings');
         break;
       
       default:

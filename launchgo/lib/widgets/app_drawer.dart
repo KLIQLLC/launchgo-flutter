@@ -193,11 +193,11 @@ class _AppDrawerState extends State<AppDrawer> {
                     child: _buildDrawerItem(
                       context: context,
                       title: 'Settings',
-                      isSelected: currentRoute == '/settings',
+                      isSelected: currentRoute == '/account-settings',
                       svgPath: 'assets/icons/ic_settings.svg',
                       onTap: () {
                         Navigator.pop(context); // Close drawer
-                        context.push('/settings');
+                        context.push('/account-settings');
                       },
                     ),
                   ),

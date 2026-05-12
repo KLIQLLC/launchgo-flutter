@@ -1,3 +1,4 @@
+// features/documents/presentation/pages/documents_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../theme/app_colors.dart';
@@ -335,7 +336,7 @@ class _DocumentsViewState extends State<DocumentsView> {
                             return CupertinoDropdown(
                               value: getCurrentCourse(),
                               items: const ['All', 'CODE11', 'CODE12', 'CODE13'],
-                              hintText: 'Select course',
+                              hintText: 'Select task',
                               onChanged: (course) {
                                   if (course != null) {
                                     // Filter by course
@@ -414,7 +415,7 @@ class _DocumentsViewState extends State<DocumentsView> {
                                     ? 'No documents yet'
                                     : isAllCoursesSelected
                                       ? 'No documents yet'  // This should only show if filtered docs are empty when "All" is selected
-                                      : 'No documents in this course',
+                                      : 'No documents in this task',
                                 style: TextStyle(
                                   color: themeService.textColor,
                                   fontSize: 18,

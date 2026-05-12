@@ -223,4 +223,15 @@ abstract class ApiService {
     @Path("recapId") String recapId,
     @Body() Map<String, dynamic> recapData,
   );
+
+  @GET("/users/{userId}/permissions")
+  Future<HttpResponse<dynamic>> getUserPermissions(
+    @Path("userId") String userId,
+  );
+
+  @PUT("/users/{userId}/permissions")
+  Future<HttpResponse<dynamic>> updateUserPermission(
+    @Path("userId") String userId,
+    @Body() Map<String, dynamic> body,
+  );
 }

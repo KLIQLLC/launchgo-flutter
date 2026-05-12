@@ -1,3 +1,4 @@
+// features/documents/domain/entities/document_entity.dart
 import 'package:equatable/equatable.dart';
 
 enum DocumentType {
@@ -12,7 +13,7 @@ class DocumentEntity extends Equatable {
   final String category;
   final String ownerId;
   final String fileId;
-  final String? courseId;
+  final String? courseId; 
   final String? semesterId;
   final String link;
   final DateTime createdAt;

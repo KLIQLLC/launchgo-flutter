@@ -92,6 +92,55 @@ class ApiServiceRetrofit {
       rethrow;
     }
   }
+
+  /// GET `/users/{userId}/permissions` — returns `{ "permissions": { ... } }`.
+  Future<Map<String, bool>> getUserPermissionsMap(String userId) async {
+    try {
+      final response = await _retrofit.getUserPermissions(userId);
+      final parsed = _parseJsonResponse(response.data);
+      if (parsed is! Map<String, dynamic>) return {};
+      final permsRaw = parsed['permissions'];
+      if (permsRaw is! Map) return {};
+      final out = <String, bool>{};
+      permsRaw.forEach((k, v) {
+        final key = k?.toString() ?? '';
+        if (key.isEmpty) return;
+        out[key] = v == true || v.toString().toLowerCase() == 'true';
+      });
+      return out;
+    } catch (e) {
+      debugPrint('❌ Failed to get permissions: $e');
+      rethrow;
+    }
+  }
+
+  /// PUT `/users/{userId}/permissions` with `{ permission, isEnabled }`.
+  Future<Map<String, bool>> updateUserPermission(
+    String userId,
+    String permissionApiKey,
+    bool isEnabled,
+  ) async {
+    try {
+      final response = await _retrofit.updateUserPermission(userId, {
+        'permission': permissionApiKey,
+        'isEnabled': isEnabled,
+      });
+      final parsed = _parseJsonResponse(response.data);
+      if (parsed is! Map<String, dynamic>) return {};
+      final permsRaw = parsed['permissions'];
+      if (permsRaw is! Map) return {};
+      final out = <String, bool>{};
+      permsRaw.forEach((k, v) {
+        final key = k?.toString() ?? '';
+        if (key.isEmpty) return;
+        out[key] = v == true || v.toString().toLowerCase() == 'true';
+      });
+      return out;
+    } catch (e) {
+      debugPrint('❌ Failed to update permission: $e');
+      rethrow;
+    }
+  }
   
   // Semester endpoints
   
@@ -242,7 +291,7 @@ class ApiServiceRetrofit {
     try {
       final userId = _getEffectiveUserId();
       if (userId == null) {
-        debugPrint('User ID is null, cannot get course');
+        debugPrint('User ID is null, cannot get task');
         return null;
       }
       

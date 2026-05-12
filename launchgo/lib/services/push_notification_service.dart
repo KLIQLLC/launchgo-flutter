@@ -496,7 +496,7 @@ Screen value: ${message.data['screen']}
       case 'notifications':
         return '/notifications';
       case 'settings':
-        return '/settings';
+        return '/account-settings';
       case 'assignments':
         return '/courses'; // Default to courses, will be overridden if course_id is present
       default:

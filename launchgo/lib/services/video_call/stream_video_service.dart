@@ -109,11 +109,21 @@ class StreamVideoService extends ChangeNotifier {
         throw Exception('No Stream Video token available');
       }
 
-      // Verify token not expired
+      debugPrint(
+        '[VC] 📞 [StreamVideoService:initialize] callGetStreamToken source: '
+        'AuthService.userInfo (field from last GET /users/me via loadUserInfo/refreshUserInfo); '
+        'NOT read from SharedPreferences in Dart. len=${token.length}',
+      );
+
+      // Verify token shape and expiry (backend must return a full JWT: header.payload.signature)
       debugPrint('[VC] 📞 [StreamVideoService:initialize] Verifying token validity...');
-      if (!_verifyToken(token)) {
-        debugPrint('[VC] ❌ [StreamVideoService:initialize] << EXIT: Token expired');
-        throw Exception('Stream Video token is expired or invalid');
+      final (tokenOk, tokenReason) = _analyzeToken(token);
+      if (!tokenOk) {
+        debugPrint(
+          '[VC] ❌ [StreamVideoService:initialize] << EXIT: $tokenReason — '
+          'fix callGetStreamToken on API or call refreshUserInfo() after backend deploy',
+        );
+        throw Exception('Stream Video token is invalid: $tokenReason');
       }
       debugPrint('[VC] 📞 [StreamVideoService:initialize] Token is valid');
 
@@ -215,24 +225,24 @@ class StreamVideoService extends ChangeNotifier {
     }
   }
 
-  /// Verify token is not expired
-  bool _verifyToken(String token) {
-    return isTokenValid(token);
-  }
-
-  /// Check if a video token is valid (not expired).
-  /// This is a static method so it can be called before initialization.
-  static bool isTokenValid(String? token) {
+  /// Returns (true, null) if token looks usable, else (false, short reason for logs).
+  static (bool, String?) _analyzeToken(String? token) {
     if (token == null || token.isEmpty) {
       debugPrint('[VC] 📞 [StreamVideoService:isTokenValid] Token is null or empty');
-      return false;
+      return (false, 'token_null_or_empty');
     }
 
     try {
       final parts = token.split('.');
       if (parts.length != 3) {
-        debugPrint('[VC] 📞 [StreamVideoService:isTokenValid] Token is not a valid JWT (wrong number of parts)');
-        return false;
+        debugPrint(
+          '[VC] 📞 [StreamVideoService:isTokenValid] Token is not a valid JWT '
+          '(parts=${parts.length}, length=${token.length})',
+        );
+        debugPrint(
+          '[VC] 📞 [StreamVideoService:isTokenValid] Raw callGetStreamToken: $token',
+        );
+        return (false, 'not_a_full_jwt(parts=${parts.length}, expected 3)');
       }
 
       final payload = parts[1];
@@ -246,17 +256,30 @@ class StreamVideoService extends ChangeNotifier {
 
         if (isExpired) {
           debugPrint('[VC] 📞 [StreamVideoService:isTokenValid] Token expired at: $expTime');
-          return false;
+          debugPrint(
+            '[VC] 📞 [StreamVideoService:isTokenValid] Raw callGetStreamToken: $token',
+          );
+          return (false, 'expired(at $expTime)');
         }
 
         debugPrint('[VC] 📞 [StreamVideoService:isTokenValid] Token valid until: $expTime');
       }
 
-      return true;
+      return (true, null);
     } catch (e) {
       debugPrint('[VC] ❌ [StreamVideoService:isTokenValid] Error verifying token: $e');
-      return false;
+      debugPrint(
+        '[VC] ❌ [StreamVideoService:isTokenValid] Raw callGetStreamToken: $token',
+      );
+      return (false, 'jwt_decode_failed($e)');
     }
+  }
+
+  /// Check if a video token is valid (not expired).
+  /// This is a static method so it can be called before initialization.
+  static bool isTokenValid(String? token) {
+    final (ok, _) = _analyzeToken(token);
+    return ok;
   }
 
   /// Listen for incoming calls (foreground - students only)
@@ -712,6 +735,14 @@ class StreamVideoService extends ChangeNotifier {
 
     await _client?.disconnect();
     _client = null;
+
+    // Android (and consistency): remove token/apiKey/userId saved for native reject flow.
+    try {
+      await PreferencesService.clearStreamVideoCredentials();
+      debugPrint('[VC] 📞 [StreamVideoService:disconnect] Cleared saved Stream Video credentials from preferences');
+    } catch (e) {
+      debugPrint('[VC] ⚠️ [StreamVideoService:disconnect] Error clearing Stream Video preferences: $e');
+    }
 
     // iOS: Clear native auth so a logged-out device cannot reject/act on calls.
     if (Platform.isIOS) {

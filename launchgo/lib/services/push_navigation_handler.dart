@@ -113,7 +113,7 @@ class PushNavigationHandler {
         targetRoute = '/notifications';
         break;
       case 'settings':
-        targetRoute = '/settings';
+        targetRoute = '/account-settings';
         break;
       case 'assignments':
         if (data.containsKey('course_id')) {

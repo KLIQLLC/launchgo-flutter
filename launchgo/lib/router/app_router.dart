@@ -1,3 +1,4 @@
+// router/app_router.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -5,7 +6,6 @@ import '../theme/app_colors.dart';
 import 'package:launchgo/widgets/chat_badge_widget.dart';
 import 'package:launchgo/features/documents/domain/entities/document_entity.dart';
 import 'package:launchgo/features/documents/presentation/pages/documents_page.dart';
-import 'package:launchgo/screens/goals/goals_screen.dart';
 import 'package:launchgo/screens/chat/refactored_chat_screen.dart';
 import 'package:launchgo/screens/courses/courses_screen.dart';
 import 'package:launchgo/screens/courses/course_form_screen.dart';
@@ -17,6 +17,7 @@ import 'package:launchgo/features/recaps/presentation/pages/recaps_page.dart';
 import 'package:launchgo/features/recaps/presentation/pages/recap_form_page.dart';
 import 'package:launchgo/models/recap_model.dart';
 import 'package:launchgo/screens/schedule/schedule_screen.dart';
+import 'package:launchgo/screens/mentor_student_permissions_screen.dart';
 import 'package:launchgo/screens/settings_screen.dart';
 import 'package:launchgo/screens/notifications_screen.dart';
 import 'package:launchgo/screens/schedule/event_form_screen.dart';
@@ -63,8 +64,18 @@ class AppRouter {
           return '/schedule';
         }
 
+        if (state.uri.path == '/goals') {
+          return isAuthenticated ? '/schedule' : '/login';
+        }
+
         // Prevent unauthorized access based on role permissions
         if (isAuthenticated) {
+          if ((state.matchedLocation == '/new-event' ||
+                  state.matchedLocation == '/new-recurring-event') &&
+              authService.permissions.isStudent &&
+              !authService.permissions.canCreateEvents) {
+            return '/schedule';
+          }
           // Check for document and course creation/edit routes
           if ((state.matchedLocation == '/new-document' && !authService.permissions.canCreateDocuments) ||
               (state.matchedLocation == '/new-course' && !authService.permissions.canCreateDocuments) ||
@@ -88,8 +99,8 @@ class AppRouter {
           builder: (context, state) => const LoginScreen(),
         ),
         GoRoute(
-          path: '/settings',
-          name: 'settings',
+          path: '/account-settings',
+          name: 'accountSettings',
           builder: (context, state) => const SettingsScreen(),
         ),
         GoRoute(
@@ -309,10 +320,10 @@ class AppRouter {
               ),
             ),
             GoRoute(
-              path: '/goals',
-              name: 'goals',
+              path: '/settings',
+              name: 'studentPermissionsSettings',
               pageBuilder: (context, state) => const NoTransitionPage(
-                child: GoalsScreen(),
+                child: MentorStudentPermissionsScreen(),
               ),
             ),
           ],
@@ -343,13 +354,15 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
         case '/schedule':
           return 'Schedule';
         case '/courses':
-          return 'Courses';
+          return 'Tasks';
         case '/documents':
           return 'Documents';
         case '/recaps':
           return 'Session Recaps';
-        case '/goals':
-          return 'Goals';
+        case '/settings':
+          return 'Settings';
+        case '/account-settings':
+          return 'Account';
         default:
           return 'launchgo';
       }
@@ -382,7 +395,7 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
             size: const Size(24, 24),
             color: _selectedTabColor,
           ),
-          label: 'Courses',
+          label: 'Tasks',
         ),
         BottomNavigationBarItem(
           icon: CustomIcon(
@@ -418,22 +431,23 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
         );
       }
 
-      // Add Goals tab for all roles
-      items.add(
-        BottomNavigationBarItem(
-          icon: CustomIcon(
-            icon: CustomIconPath.goal,
-            size: const Size(24, 24),
-            color: AppColors.bottomNavUnselected,
+      if (authService.permissions.canShowMentorSettingsTab) {
+        items.add(
+          BottomNavigationBarItem(
+            icon: Icon(
+              Icons.tune_rounded,
+              size: 24,
+              color: AppColors.bottomNavUnselected,
+            ),
+            activeIcon: Icon(
+              Icons.tune_rounded,
+              size: 24,
+              color: _selectedTabColor,
+            ),
+            label: 'Settings',
           ),
-          activeIcon: CustomIcon(
-            icon: CustomIconPath.goal,
-            size: const Size(24, 24),
-            color: _selectedTabColor,
-          ),
-          label: 'Goals',
-        ),
-      );
+        );
+      }
 
       return items;
     }
