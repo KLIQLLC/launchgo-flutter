@@ -59,9 +59,19 @@ class _LocationEditScreenState extends State<LocationEditScreen> {
     });
   }
 
+  /// Places API returns [`description`] in this language (ISO 639-1).
+  /// Must match user/device locale — do not hardcode (was `ru`, which forced Cyrillic everywhere).
+  String _placesLanguageCode() {
+    final fromApp = Localizations.maybeLocaleOf(context)?.languageCode;
+    if (fromApp != null && fromApp.isNotEmpty) return fromApp;
+    return WidgetsBinding.instance.platformDispatcher.locale.languageCode;
+  }
+
   Future<void> _getSuggestions(String input) async {
+    if (!mounted) return;
+    final lang = _placesLanguageCode();
     setState(() => _isLoading = true);
-    final url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${Uri.encodeComponent(input)}&key=$kGoogleApiKey&language=ru&types=address';
+    final url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${Uri.encodeComponent(input)}&key=$kGoogleApiKey&language=$lang&types=address';
     // print('[PlacesAPI] GET: $url');
     final resp = await http.get(Uri.parse(url));
     // print('[PlacesAPI] Status: ${resp.statusCode}');
@@ -88,7 +98,9 @@ class _LocationEditScreenState extends State<LocationEditScreen> {
   }
 
   Future<void> _getPlaceDetails(String placeId) async {
-    final detailsUrl = 'https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&key=$kGoogleApiKey&language=ru';
+    if (!mounted) return;
+    final lang = _placesLanguageCode();
+    final detailsUrl = 'https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&key=$kGoogleApiKey&language=$lang';
     // print('[PlaceDetails] GET: $detailsUrl');
     final resp = await http.get(Uri.parse(detailsUrl));
     // print('[PlaceDetails] Status: ${resp.statusCode}');
